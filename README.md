@@ -12,7 +12,7 @@
 
 构建产物已放在 `docs/index.html`，开启 GitHub Pages 后可直接在浏览器里拖拽：
 
-> `https://<你的用户名>.github.io/<仓库名>/`
+> `https://marvelous-dot.github.io/city-diorama/`
 
 ## 预设
 
