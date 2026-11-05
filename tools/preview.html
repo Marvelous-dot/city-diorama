@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>USD → 三渲二 预览</title>
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#eceae2;font:13px/1.6 system-ui,sans-serif}
+  canvas{display:block}
+  #hud{position:fixed;left:14px;top:12px;color:#3c4a52;background:rgba(255,255,255,.72);
+       padding:8px 12px;border-radius:8px;pointer-events:none}
+  #hud b{font-size:14px}
+</style>
+</head>
+<body>
+<div id="hud"></div>
+<script>
+// three.js 走绝对路径引用 skill 模板里的副本（本机固定位置）
+var THREE_SRC = 'C:/Users/Lenovo/.workbuddy/skills/city-diorama/template/three.min.js';
+var q = new URLSearchParams(location.search);
+var MESH_SRC = q.get('src') || 'demo.js';
+
+function load(src, next) {
+  var s = document.createElement('script');
+  s.src = src; s.onload = next;
+  s.onerror = function () { document.getElementById('hud').textContent = '加载失败：' + src; };
+  document.body.appendChild(s);
+}
+
+load(THREE_SRC, function () {
+  load(MESH_SRC, init);
+});
+
+function init() {
+  var W = innerWidth, H = innerHeight;
+  var scene = new THREE.Scene();
+  scene.background = new THREE.Color(0xeceae2);
+
+  var c = window.MESH.stats.bboxMin, d = window.MESH.stats.bboxMax;
+  var cy = (c[1] + d[1]) / 2, cz = (c[2] + d[2]) / 2, cx = (c[0] + d[0]) / 2;
+  var size = Math.max(d[0] - c[0], d[1] - c[1], d[2] - c[2]) || 1;
+
+  var camera = new THREE.PerspectiveCamera(32, W / H, 0.01, 200);
+  camera.position.set(cx + size * 1.55, cy + size * 1.05, cz + size * 1.75);
+  camera.lookAt(cx, cy, cz);
+
+  var renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(W, H);
+  renderer.setPixelRatio(1);
+  document.body.appendChild(renderer.domElement);
+
+  // 四段色阶。必须 RGBA：RedFormat 会让绿蓝通道归零，整片发黑
+  var lv = [0.40, 0.66, 0.85, 1.0];
+  var data = new Uint8Array(lv.length * 4);
+  lv.forEach(function (x, i) {
+    var v = Math.round(x * 255);
+    data[i * 4] = v; data[i * 4 + 1] = v; data[i * 4 + 2] = v; data[i * 4 + 3] = 255;
+  });
+  var grad = new THREE.DataTexture(data, lv.length, 1, THREE.RGBAFormat);
+  grad.minFilter = grad.magFilter = THREE.NearestFilter;
+  grad.generateMipmaps = false; grad.needsUpdate = true;
+
+  var v = window.MESH.v, pos = [], nrm = [], col = [];
+  for (var i = 0; i < v.length; i++) {
+    pos.push(v[i][0], v[i][1], v[i][2]);
+    nrm.push(v[i][3], v[i][4], v[i][5]);
+    col.push(v[i][6], v[i][7], v[i][8]);
+  }
+  var geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  geo.computeBoundingSphere();
+
+  scene.add(new THREE.Mesh(geo, new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: grad })));
+
+  // 反向外壳描边：粗细按屏幕像素算，别做成固定世界单位
+  scene.add(new THREE.Mesh(geo, new THREE.ShaderMaterial({
+    side: THREE.BackSide,
+    uniforms: { uT: { value: 0.0018 * size } },
+    vertexShader: [
+      'uniform float uT;',
+      'void main(){',
+      '  vec4 mv = modelViewMatrix * vec4(position,1.0);',
+      '  mv.xyz += normalize(normalMatrix * normal) * uT;',
+      '  gl_Position = projectionMatrix * mv;',
+      '}'
+    ].join('\n'),
+    fragmentShader: 'void main(){ gl_FragColor = vec4(0.10,0.11,0.12,1.0); }'
+  })));
+
+  var floor = new THREE.Mesh(new THREE.PlaneGeometry(size * 8, size * 8),
+    new THREE.MeshToonMaterial({ color: 0xd8d4c6, gradientMap: grad }));
+  floor.rotation.x = -Math.PI / 2;
+  floor.position.set(cx, c[1] - 0.001, cz);
+  scene.add(floor);
+
+  scene.add(new THREE.HemisphereLight(0xdfeaf2, 0xbfb49a, 1.05));
+  var sun = new THREE.DirectionalLight(0xfff2d6, 1.9);
+  sun.position.set(cx + size * 2, cy + size * 3, cz + size * 1.5);
+  scene.add(sun);
+
+  renderer.render(scene, camera);
+
+  var st = window.MESH.stats;
+  document.getElementById('hud').innerHTML =
+    '<b>' + MESH_SRC + '</b><br>' +
+    st.meshes + ' 网格 · ' + st.tris + ' 三角<br>' +
+    '尺寸 ' + st.size.map(function (x) { return x.toFixed(3); }).join(' × ') + ' m<br>' +
+    '原 up=' + st.upAxis + ' · mpu=' + st.metersPerUnit + ' · scale=' + st.scale;
+  window.__done = 1;
+}
+</script>
+</body>
+</html>

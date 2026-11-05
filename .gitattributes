@@ -1,0 +1,7 @@
+# 统一换行符，避免 Windows / macOS 协作时整个文件都被标成修改
+* text=auto eol=lf
+
+# 二进制
+*.png binary
+*.jpg binary
+*.usda binary
