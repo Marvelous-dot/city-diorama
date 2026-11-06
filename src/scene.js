@@ -21,7 +21,7 @@
   if (PS.fog) {
     scene.fog = new T.Fog(new T.Color(PS.fog.color), PS.fog.near, PS.fog.far);
   }
-  const camera = new T.PerspectiveCamera(33, window.innerWidth / window.innerHeight, 0.3, 300);
+  const camera = new T.PerspectiveCamera(33, window.innerWidth / window.innerHeight, 0.3, cfg(PS.camFar, 300));
 
   /* ================= 光 ================= */
   const LT = PS.light || {};
@@ -7405,6 +7405,742 @@
     return g;
   }
 
+  /* ==================================================================
+     外环扩展（city 专用）
+     老城 64×60 的展台坐标一个不动，向外铺 134×124 的新底座。
+     挖 L 形运河（西河 + 南湖），四片新区填内容，六座不同结构的桥
+     把两岸接起来。水面比老城低 1.05 米，所有陆地垫到 y=0，
+     于是老城/新区是浮在水上的台地，岸墙就是台地的侧面。
+     ================================================================== */
+  const CT_EX = {
+    x0: -64, x1: 70, z0: -58, z1: 66,
+    wy: -1.05, bed: -1.80,
+    W: { x0: -46, x1: -34, z0: -54, z1: 50 },   // 西河（南北向，宽 12）
+    S: { x0: -34, x1: 70,  z0: 32,  z1: 50 }    // 南湖（东西向，宽 18）
+  };
+
+  let _ctWTex = null, _ctRTex = null;
+  function ctWaterTexOnce() {
+    if (_ctWTex) return _ctWTex;
+    _ctWTex = canvasTex(256, 256, function (c, w, h) {
+      c.fillStyle = '#101f3c'; c.fillRect(0, 0, w, h);
+      let s = 12345;
+      function r() { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff; }
+      for (let i = 0; i < 220; i++) {
+        c.fillStyle = 'rgba(110,175,235,' + (0.05 + r() * 0.13).toFixed(3) + ')';
+        c.fillRect(r() * w, r() * h, 8 + r() * 62, 0.6 + r() * 1.4);
+      }
+      for (let i = 0; i < 30; i++) {
+        c.fillStyle = 'rgba(160,210,255,' + (0.02 + r() * 0.05).toFixed(3) + ')';
+        c.fillRect(r() * w, r() * h, 1 + r() * 3, 1);
+      }
+    });
+    _ctWTex.wrapS = _ctWTex.wrapT = T.RepeatWrapping;
+    return _ctWTex;
+  }
+  function ctReflTexOnce() {
+    if (_ctRTex) return _ctRTex;
+    _ctRTex = canvasTex(256, 256, function (c, w, h) {
+      c.clearRect(0, 0, w, h);
+      const cols = ['255,45,122', '34,230,255', '255,210,63', '154,107,255', '255,110,60'];
+      let s = 9876;
+      function r() { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff; }
+      for (let i = 0; i < 34; i++) {
+        const x = r() * w, ww = 2 + r() * 11, col = cols[i % cols.length];
+        const g = c.createLinearGradient(0, 0, 0, h);
+        g.addColorStop(0, 'rgba(' + col + ',0)');
+        g.addColorStop(0.18, 'rgba(' + col + ',' + (0.13 + r() * 0.20).toFixed(2) + ')');
+        g.addColorStop(0.55, 'rgba(' + col + ',0.05)');
+        g.addColorStop(1, 'rgba(' + col + ',0)');
+        c.fillStyle = g; c.fillRect(x, 0, ww, h);
+      }
+    });
+    _ctRTex.wrapS = _ctRTex.wrapT = T.RepeatWrapping;
+    return _ctRTex;
+  }
+  function ctWSlab(x0, x1, z0, z1, g) {
+    const t = ctWaterTexOnce().clone(); t.needsUpdate = true;
+    t.repeat.set((x1 - x0) / 14, (z1 - z0) / 14);
+    const m = new T.Mesh(new T.PlaneGeometry(x1 - x0, z1 - z0),
+      new T.MeshBasicMaterial({ map: t, color: 0xc8d8f0 }));
+    m.rotation.x = -Math.PI / 2;
+    m.position.set((x0 + x1) / 2, CT_EX.wy, (z0 + z1) / 2);
+    g.add(m);
+    /* 霓虹倒影：一整张加色贴图盖在水面上，比几十个亮片省 draw call */
+    const rt = ctReflTexOnce().clone(); rt.needsUpdate = true;
+    rt.repeat.set((x1 - x0) / 18, (z1 - z0) / 18);
+    const r = new T.Mesh(new T.PlaneGeometry(x1 - x0, z1 - z0),
+      new T.MeshBasicMaterial({
+        map: rt, transparent: true, opacity: 0.88,
+        blending: T.AdditiveBlending, depthWrite: false, fog: false
+      }));
+    r.rotation.x = -Math.PI / 2;
+    r.position.set((x0 + x1) / 2, CT_EX.wy + 0.016, (z0 + z1) / 2);
+    r.renderOrder = 2;
+    g.add(r);
+  }
+  function ctWGlow(x, z, sx, sz, color, op, rot) {
+    const m = new T.Mesh(new T.PlaneGeometry(sx, sz), new T.MeshBasicMaterial({
+      map: CY_GLOW, color: new T.Color(color), transparent: true, opacity: op,
+      blending: T.AdditiveBlending, depthWrite: false, fog: false
+    }));
+    m.rotation.set(-Math.PI / 2, 0, rot || 0);
+    m.position.set(x, CT_EX.wy + 0.034, z);
+    m.renderOrder = 3;
+    scene.add(m);
+    return m;
+  }
+
+  /* 驳岸贴面：地台侧面本身是沥青色，贴一层石砌 + 压顶灯带才像河岸 */
+  function ctQuayRun(b, x0, z0, x1, z1, seed) {
+    const dx = x1 - x0, dz = z1 - z0, L = Math.hypot(dx, dz);
+    const ry = Math.atan2(dx, dz);
+    const n = Math.max(1, Math.round(L / 7));
+    for (let i = 0; i < n; i++) {
+      const t0 = i / n, t1 = (i + 1) / n;
+      const ax = x0 + dx * t0, az = z0 + dz * t0;
+      const bx = x0 + dx * t1, bz = z0 + dz * t1;
+      const cx = (ax + bx) / 2, cz = (az + bz) / 2, seg = L / n;
+      ctBox(b, 'ctQuay', 0.62, 2.08, seg + 0.02, 0, -0.76, 0, cx, 0, cz, ry);
+      ctBox(b, 'ctQuayD', 0.88, 0.16, seg + 0.02, 0, 0.30, 0, cx, 0, cz, ry);
+      ctBox(b, 'ctQuayL', 0.10, 0.06, seg - 0.12, 0, 0.22, 0, cx, 0, cz, ry);
+      if (i % 2 === 0) {
+        ctBox(b, 'ctBol', 0.22, 0.36, 0.22, 0, 0.48, 0, cx, 0, cz, ry);
+        ctBox(b, 'ctSteelD', 0.30, 0.05, 0.30, 0, 0.66, 0, cx, 0, cz, ry);
+      }
+      if (i % 3 === 1) {
+        for (let k = 0; k < 5; k++) {
+          ctBox(b, 'ctQuayD', 0.34, 0.10, 0.90,
+            0.62 + k * 0.30, 0.22 - k * 0.34, 0, cx, 0, cz, ry);
+        }
+      }
+    }
+  }
+
+  function ctLand(b, x0, x1, z0, z1, key) {
+    const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, w = x1 - x0, d = z1 - z0;
+    b.box('ctConcrete2', w, 1.80, d, cx, -0.90, cz);
+    b.box(key || 'ctRoad3', w - 0.10, 0.04, d - 0.10, cx, 0.012, cz);
+    b.box('ctCurb', w - 0.10, 0.06, 0.10, cx, 0.05, z0 + 0.06);
+    b.box('ctCurb', w - 0.10, 0.06, 0.10, cx, 0.05, z1 - 0.06);
+    b.box('ctNeonCd', w - 0.30, 0.04, 0.05, cx, 0.09, z0 + 0.14);
+  }
+
+  function buildCtExterior() {
+    const g = new T.Group();
+    const b = new Builder();
+    const E = CT_EX, cX = (E.x0 + E.x1) / 2, cZ = (E.z0 + E.z1) / 2;
+    /* 大底座：顶面 -1.80，正好托住老展台的底（-1.88） */
+    b.box('ctRock', E.x1 - E.x0, 0.72, E.z1 - E.z0, cX, -2.16, cZ);
+    b.box('ctRock2', E.x1 - E.x0 - 1.4, 0.22, E.z1 - E.z0 - 1.4, cX, -1.69, cZ);
+    /* 展台外沿一圈收边灯，微缩模型的「托盘」感全靠这条线 */
+    b.box('ctNeonCd', E.x1 - E.x0 - 1.0, 0.05, 0.06, cX, -1.55, E.z0 + 0.5);
+    b.box('ctNeonCd', E.x1 - E.x0 - 1.0, 0.05, 0.06, cX, -1.55, E.z1 - 0.5);
+
+    ctWSlab(E.W.x0, E.W.x1, E.W.z0, E.W.z1, g);
+    ctWSlab(E.S.x0, E.S.x1, E.S.z0, E.S.z1, g);
+
+    /* 陆地：严格避开两块水面，边界相切不重叠 */
+    ctLand(b, -64, -46, -54, 50, 'ctRoad3');   // 西新区 · 集装箱港
+    ctLand(b, -64, -34, 50, 66, 'ctWalk');     // 西南岸
+    ctLand(b, -34, 70, 50, 66, 'ctWalk');      // 南岸灯市
+    ctLand(b, -30, 34, -58, -32, 'ctRoad3');   // 北新区
+    ctLand(b, 34, 70, -58, -32, 'ctRoad3');    // 东北
+    ctLand(b, 38, 70, -32, 28, 'ctRoad3');     // 东新区
+    ctLand(b, -34, -30, -54, 28, 'ctWalk');    // 西岸步道 + 西北连接
+    ctLand(b, -34, 70, 28, 32, 'ctWalk');      // 南岸步道
+    ctLand(b, 34, 38, -32, 28, 'ctWalk');      // 东岸连接
+
+    /* 驳岸 */
+    ctQuayRun(b, -46, -54, -46, 50, 11);
+    ctQuayRun(b, -34, -54, -34, 32, 13);
+    ctQuayRun(b, -34, 32, 70, 32, 17);
+    ctQuayRun(b, -64, 50, -46, 50, 19);
+    ctQuayRun(b, -34, 50, 70, 50, 23);
+    ctQuayRun(b, -46, -54, -34, -54, 29);
+    ctQuayRun(b, 70, 32, 70, 50, 31);
+
+    /* 水波纹：几百条细亮线合批成一个 mesh，不逐个建对象 */
+    const rnd = ctRnd(20261106);
+    function ripples(x0, x1, z0, z1, n) {
+      for (let i = 0; i < n; i++) {
+        const x = x0 + 0.8 + rnd() * (x1 - x0 - 1.6);
+        const z = z0 + 0.8 + rnd() * (z1 - z0 - 1.6);
+        b.box('ctWaterRip', 0.8 + rnd() * 3.4, 0.012, 0.05 + rnd() * 0.07,
+          x, CT_EX.wy + 0.024, z, 0, (rnd() - 0.5) * 0.9, 0);
+      }
+    }
+    ripples(E.W.x0, E.W.x1, E.W.z0, E.W.z1, 130);
+    ripples(E.S.x0, E.S.x1, E.S.z0, E.S.z1, 170);
+
+    /* 浮标灯：沿岸每隔十米一对，只给一半配光晕 */
+    let bi = 0;
+    function buoy(x, z) {
+      b.cyl('ctSteelD', 0.11, 0.15, 0.55, 6, x, CT_EX.wy + 0.16, z);
+      b.sph('ctLantern', 0.15, x, CT_EX.wy + 0.50, z);
+      if (bi++ % 2 === 0) ctGlow(x, CT_EX.wy + 0.55, z, 0xffb45a, 2.4, 0.16);
+    }
+    for (let z = -48; z <= 28; z += 10) { buoy(-44.4, z); buoy(-35.4, z); }
+    for (let x = -28; x <= 66; x += 10) { buoy(x, 33.6); buoy(x, 48.4); }
+
+    /* 岸边霓虹在水里的局部倒影：贴图给大面，亮片给节奏 */
+    const cols = [0xff2d7a, 0x22e6ff, 0xffd23f, 0x9a6bff];
+    let k = 0;
+    for (let z = -46; z < 28; z += 9) ctWGlow(-36.6, z, 2.8, 6.2, cols[k++ % 4], 0.30, Math.PI / 2);
+    for (let x = -28; x < 68; x += 9) ctWGlow(x, 35.4, 2.6, 5.8, cols[k++ % 4], 0.28, 0);
+
+    /* 西河北端水闸：两扇闸板 + 发光格栅，给水系一个「源头」 */
+    b.box('ctQuayD', 12.4, 0.50, 0.9, -40, 0.25, -53.6);
+    for (let i = 0; i < 9; i++) b.box('ctSteel', 0.16, 2.5, 0.22, -45.2 + i * 1.3, -0.25, -53.6);
+    b.box('ctWaterRip', 11.6, 0.07, 0.10, -40, -0.86, -53.1);
+    ctGlow(-40, 0.9, -53.0, 0x22e6ff, 7.0, 0.18);
+
+    b.build(g);
+    return g;
+  }
+
+  /* ================= 六座跨水结构 =================
+     一条水系如果只配一座桥，读起来还是「一条沟」。六座桥六种结构，
+     而且必须分高低：拱桥 0.85 / 太鼓 0.7 / 轻轨 5.4 / 斜拉 1.1 /
+     玻璃廊桥 3.2 / 浮桥 -0.6，俯视才看得出层次。 */
+  function ctArchBridge(b, x0, x1, z, y, w) {
+    const len = x1 - x0, n = 14, cx = (x0 + x1) / 2, rise = 1.55;
+    for (let i = 0; i < n; i++) {
+      const t0 = i / n, t1 = (i + 1) / n;
+      const xa = x0 + len * t0, xb = x0 + len * t1;
+      const ya = y + rise * Math.sin(Math.PI * t0), yb = y + rise * Math.sin(Math.PI * t1);
+      const sl = Math.hypot(xb - xa, yb - ya), ang = Math.atan2(yb - ya, xb - xa);
+      const mx = (xa + xb) / 2, my = (ya + yb) / 2;
+      b.box('ctDeck2', sl + 0.04, 0.30, w, mx, my, z, 0, 0, ang);
+      b.box('ctSteelD', sl + 0.04, 0.10, w + 0.26, mx, my - 0.20, z, 0, 0, ang);
+      b.box('ctPaint', sl * 0.46, 0.02, 0.12, mx, my + 0.17, z, 0, 0, ang);
+    }
+    [-w / 2 - 0.18, w / 2 + 0.18].forEach(function (off) {
+      for (let i = 0; i < n; i++) {
+        const t0 = i / n, t1 = (i + 1) / n;
+        const xa = x0 + len * t0, xb = x0 + len * t1;
+        const ya = y + 1.0 + rise * 1.55 * Math.sin(Math.PI * t0);
+        const yb = y + 1.0 + rise * 1.55 * Math.sin(Math.PI * t1);
+        b.to('ctArch', 0.13, xa, ya, z + off, xb, yb, z + off, 6);
+        if (i % 2 === 0) {
+          b.to('ctCable2', 0.035, xa, ya, z + off,
+            xa, y + rise * Math.sin(Math.PI * t0) + 0.22, z + off, 4);
+        }
+      }
+    });
+    [x0, x1].forEach(function (x) {
+      b.cyl('ctSteel', 0.09, 0.12, 3.2, 6, x, y + 1.6, z - w / 2 - 0.34);
+      b.sph('ctLantern', 0.22, x, y + 3.2, z - w / 2 - 0.34);
+      ctGlow(x, y + 3.2, z - w / 2 - 0.34, 0xffcf8a, 3.0, 0.20);
+    });
+    ctNeonBar(cx, y - 0.44, z, len - 0.6, 0.16, 0.16, 0x2fe8ff, 0.55, 0);
+  }
+
+  function ctTaiko(b, x0, x1, z, w) {
+    const len = x1 - x0, n = 12, rise = 2.15, y = 0.70;
+    for (let i = 0; i < n; i++) {
+      const t0 = i / n, t1 = (i + 1) / n;
+      const xa = x0 + len * t0, xb = x0 + len * t1;
+      const ya = y + rise * Math.sin(Math.PI * t0), yb = y + rise * Math.sin(Math.PI * t1);
+      const sl = Math.hypot(xb - xa, yb - ya), ang = Math.atan2(yb - ya, xb - xa);
+      b.box('ctTorii', sl + 0.05, 0.22, w, (xa + xb) / 2, (ya + yb) / 2, z, 0, 0, ang);
+      b.box('ctRedD', sl + 0.05, 0.08, w + 0.12, (xa + xb) / 2, (ya + yb) / 2 - 0.15, z, 0, 0, ang);
+    }
+    [-w / 2, w / 2].forEach(function (off) {
+      for (let i = 0; i <= n; i++) {
+        const t = i / n, xx = x0 + len * t, yy = y + rise * Math.sin(Math.PI * t);
+        b.box('ctTorii', 0.10, 0.82, 0.10, xx, yy + 0.44, z + off);
+      }
+      for (let i = 0; i < n; i++) {
+        const t0 = i / n, t1 = (i + 1) / n;
+        b.to('ctTorii', 0.055,
+          x0 + len * t0, y + rise * Math.sin(Math.PI * t0) + 0.84, z + off,
+          x0 + len * t1, y + rise * Math.sin(Math.PI * t1) + 0.84, z + off, 4);
+      }
+    });
+    for (let i = 1; i < n; i += 3) {
+      const t = i / n, xx = x0 + len * t, yy = y + rise * Math.sin(Math.PI * t);
+      b.sph('ctLantern', 0.20, xx, yy + 1.25, z - w / 2 - 0.1);
+      ctGlow(xx, yy + 1.25, z - w / 2 - 0.1, 0xff7a4a, 2.2, 0.18);
+    }
+    ctNeonBar((x0 + x1) / 2, 0.26, z, len - 1.0, 0.10, 0.10, 0xff4d6a, 0.42, 0);
+  }
+
+  function ctCableStay(b, x, z0, z1, y, w) {
+    const len = z1 - z0, n = 16, cz = (z0 + z1) / 2;
+    for (let i = 0; i < n; i++) {
+      b.box('ctDeck2', w, 0.28, len / n + 0.03, x, y, z0 + len * (i + 0.5) / n);
+    }
+    b.box('ctSteelD', w + 0.34, 0.12, len, x, y - 0.22, cz);
+    b.box('ctPaint', 0.12, 0.02, len - 0.6, x, y + 0.16, cz);
+    [0.28, 0.72].forEach(function (cf) {
+      const tz = z0 + len * cf;
+      [-w / 2 - 0.55, w / 2 + 0.55].forEach(function (px) {
+        b.box('ctSteel', 0.80, 11.5, 0.80, px, y + 5.75, tz);
+      });
+      b.box('ctSteelD', w + 2.3, 0.50, 0.92, x, y + 11.0, tz);
+      b.box('ctTail', 0.18, 0.18, 0.18, x, y + 11.6, tz);
+      /* 每侧只拉 3 根，塔也压矮。10 根自发光索在俯视下会叠成
+         两坨实心三角形，看着像两棵圣诞树，完全不像斜拉桥。 */
+      for (let i = 1; i <= 3; i++) {
+        const f = i / 4;
+        [cf - f * 0.26, cf + f * 0.26].forEach(function (ff) {
+          if (ff < 0.02 || ff > 0.98) return;
+          b.to('ctCable2', 0.026, x, y + 11.0, tz, x, y + 0.30, z0 + len * ff, 4);
+        });
+      }
+    });
+    ctNeonBar(x, y - 0.42, cz, 0.16, 0.16, len - 0.6, 0xff2d7a, 0.50, 0);
+    ctGlow(x, y + 11.6, z0 + len * 0.28, 0xff2d7a, 4.2, 0.16);
+    ctGlow(x, y + 11.6, z0 + len * 0.72, 0xff2d7a, 4.2, 0.16);
+  }
+
+  function ctPontoon(b, x, z0, z1, w) {
+    const len = z1 - z0, n = Math.round(len / 1.6);
+    for (let i = 0; i < n; i++) {
+      const z = z0 + len * (i + 0.5) / n;
+      b.box('ctFloat', w, 0.20, len / n - 0.07, x, -0.58, z);
+      b.cyl('ctPier', 0.26, 0.26, 0.52, 8, x - w / 2 + 0.18, -0.88, z);
+      b.cyl('ctPier', 0.26, 0.26, 0.52, 8, x + w / 2 - 0.18, -0.88, z);
+      if (i % 3 === 0) {
+        b.box('ctSteelD', 0.07, 0.80, 0.07, x - w / 2, -0.10, z);
+        b.box('ctSteelD', 0.07, 0.80, 0.07, x + w / 2, -0.10, z);
+      }
+    }
+    [z0, z1].forEach(function (z, qi) {
+      for (let k = 0; k < 4; k++) {
+        b.box('ctQuayD', w, 0.14, 0.36, x, -0.44 + k * 0.16, z + (qi ? -0.18 - k * 0.36 : 0.18 + k * 0.36));
+      }
+    });
+    ctNeonBar(x - w / 2, -0.42, (z0 + z1) / 2, 0.08, 0.08, len, 0x22e6ff, 0.40, 0);
+    ctNeonBar(x + w / 2, -0.42, (z0 + z1) / 2, 0.08, 0.08, len, 0x22e6ff, 0.40, 0);
+  }
+
+  function ctMonoBridge(b, x0, x1, z, y) {
+    const len = x1 - x0, cx = (x0 + x1) / 2;
+    b.box('ctMono', len, 0.55, 1.60, cx, y, z);
+    b.box('ctRail', len, 0.10, 0.20, cx, y + 0.34, z - 0.44);
+    b.box('ctRail', len, 0.10, 0.20, cx, y + 0.34, z + 0.44);
+    for (let i = 0; i <= 8; i++) {
+      const x = x0 + len * i / 8;
+      b.box('ctSteelD', 0.14, 2.6, 0.14, x, y + 1.3, z - 0.86);
+      b.box('ctSteelD', 0.14, 2.6, 0.14, x, y + 1.3, z + 0.86);
+      b.box('ctMonoD', 1.9, 0.12, 0.12, x, y + 2.6, z);
+      if (i % 2 === 0) {
+        b.to('ctSteelD', 0.045, x, y + 0.28, z - 0.86, x, y + 2.6, z + 0.86, 4);
+      }
+    }
+    /* 河心两根桥墩，一直扎到河床 */
+    [-42, -38].forEach(function (x) {
+      b.cyl('ctPier', 0.42, 0.55, y - CT_EX.bed - 0.2, 8, x, (y + CT_EX.bed) / 2 - 0.1, z);
+      b.box('ctQuayD', 1.5, 0.28, 2.2, x, CT_EX.bed + 0.14, z);
+    });
+    ctNeonBar(cx, y - 0.40, z, len - 0.4, 0.14, 0.14, 0xffd23f, 0.48, 0);
+  }
+
+  function buildCtSpanBridges() {
+    const g = new T.Group();
+    const b = new Builder();
+    /* 西河：车行拱桥 / 太鼓人行桥 / 轻轨桁架桥 */
+    ctArchBridge(b, -48, -30, -18, 0.85, 4.6);
+    ctTaiko(b, -48, -30, 7, 3.0);
+    ctMonoBridge(b, -48, -30, 24, 5.4);
+    /* 南湖：斜拉桥 / 开敞桁架桥 / 浮桥
+       中间那座原来用 glass 天桥，不透明顶板从俯视把 18 米宽的水面
+       切成一条实心紫带 —— 跨水的桥必须能透下去，一律改开敞桁架。 */
+    ctCableStay(b, -24, 28, 52, 1.10, 3.8);
+    ctBridge(b, 30, 28, 30, 52, 2.60, 3.0, 2.2, 'truss');
+    [[30, 28], [30, 52]].forEach(function (q) {
+      b.cyl('ctSteel', 0.20, 0.26, 2.6, 8, q[0], 1.30, q[1]);
+      b.box('ctQuayD', 1.2, 0.24, 1.2, q[0], 0.12, q[1]);
+    });
+    ctPontoon(b, 52, 30, 52, 2.8);
+    /* 斜拉桥两端引桥的护栏 */
+    [-24].forEach(function (x) {
+      [28.4, 51.6].forEach(function (z) {
+        b.box('ctSteelD', 0.12, 0.90, 0.12, x - 2.6, 1.55, z);
+        b.box('ctSteelD', 0.12, 0.90, 0.12, x + 2.6, 1.55, z);
+      });
+    });
+    b.build(g);
+    return g;
+  }
+
+  /* ================= 新区内容 ================= */
+  function ctFarmTower(b, x, z, h) {
+    b.cyl('ctSteelD', 0.62, 0.80, h, 10, x, h / 2, z);
+    for (let i = 0; i < 6; i++) {
+      const y = 3.0 + i * (h - 4.0) / 5, R = 3.4 - i * 0.22;
+      b.cyl('ctFarm', R, R, 0.24, 14, x, y, z);
+      b.torus('ctFarmG', R - 0.12, 0.10, x, y + 0.16, z, Math.PI / 2, 0, 0);
+      for (let j = 0; j < 8; j++) {
+        const a = j / 8 * Math.PI * 2;
+        b.box('ctFarmG', 0.30, 0.55, 0.30,
+          x + Math.cos(a) * (R - 0.55), y + 0.42, z + Math.sin(a) * (R - 0.55));
+      }
+    }
+    b.cyl('ctCrown', 0.10, 1.0, 1.6, 8, x, h + 0.8, z);
+    ctGlow(x, h * 0.62, z, 0x64ff9c, 9.0, 0.16);
+  }
+
+  function ctTorii(b, x, z, s) {
+    const H = 6.2 * s, W = 7.4 * s;
+    [-W / 2, W / 2].forEach(function (dx) {
+      b.cyl('ctTorii', 0.30 * s, 0.40 * s, H, 10, x + dx, CT_EX.wy + H / 2, z);
+      b.cyl('ctSteelD', 0.48 * s, 0.52 * s, 0.30, 10, x + dx, CT_EX.wy + 0.15, z);
+    });
+    b.box('ctTorii', W + 2.5 * s, 0.52 * s, 0.72 * s, x, CT_EX.wy + H - 0.10, z);
+    b.box('ctRedD', W + 3.1 * s, 0.20 * s, 0.90 * s, x, CT_EX.wy + H + 0.28 * s, z);
+    b.box('ctTorii', W + 0.5 * s, 0.34 * s, 0.50 * s, x, CT_EX.wy + H - 1.5 * s, z);
+    for (let i = -2; i <= 2; i++) {
+      b.box('ctLantern', 0.34 * s, 0.60 * s, 0.34 * s,
+        x + i * 1.35 * s, CT_EX.wy + H - 0.9 * s, z);
+    }
+    ctGlow(x, CT_EX.wy + H - 0.6 * s, z, 0xff3b3b, 10.0 * s, 0.20);
+    for (let i = -1; i <= 1; i++) {
+      ctWGlow(x + i * 2.0 * s, z + 2.2, 1.8 * s, 7.0, 0xff3b3b, 0.30, 0);
+    }
+  }
+
+  function ctCrane(b, x, z, seed) {
+    const H = 12.0;
+    [-3.2, 3.2].forEach(function (dx) {
+      [-2.2, 2.2].forEach(function (dz) {
+        b.box('ctCrane', 0.42, H, 0.42, x + dx, H / 2, z + dz);
+      });
+    });
+    b.box('ctCrane', 7.4, 0.55, 0.55, x, H, z - 2.2);
+    b.box('ctCrane', 7.4, 0.55, 0.55, x, H, z + 2.2);
+    b.box('ctSteelD', 7.8, 0.30, 5.0, x, H + 0.42, z);
+    /* 吊臂伸出水面 + 两根拉索 + 吊具 */
+    b.box('ctCrane', 7.0, 0.40, 0.40, x + 3.6, H - 1.2, z);
+    b.to('ctCable2', 0.045, x, H + 2.0, z, x + 7.0, H - 1.0, z, 4);
+    b.to('ctCable2', 0.045, x, H - 1.0, z, x + 6.4, H - 1.0, z, 4);
+    b.to('ctCable2', 0.035, x + 6.4, H - 1.0, z, x + 6.4, 4.2, z, 4);
+    b.box('ctCont4', 2.4, 0.55, 1.2, x + 6.4, 3.9, z);
+    b.box('ctTail', 0.14, 0.14, 0.14, x, H + 0.8, z);
+    ctGlow(x, H + 0.8, z, 0xffd23f, 4.0, 0.18);
+  }
+
+  function ctContainer(b, x, z, key, ry, y) {
+    b.box(key, 2.5, 1.15, 1.15, x, (y || 0) + 0.58, z, 0, ry || 0, 0);
+    for (let i = -1; i <= 1; i++) {
+      b.box('ctSteelD', 0.06, 1.05, 1.18, x + i * 0.8, (y || 0) + 0.58, z, 0, ry || 0, 0);
+    }
+  }
+
+  function ctFerrisWheel(b, g, x, z, R, cy) {
+    /* 立在水上的摩天轮：支座扎到水面，轮子单独成组才能转 */
+    [-3.6, 3.6].forEach(function (dx) {
+      [-2.8, 2.8].forEach(function (dz) {
+        b.to('ctSteel', 0.38, x + dx, CT_EX.wy + 0.1, z + dz, x, cy, z, 8);
+        b.box('ctQuayD', 1.6, 0.40, 1.6, x + dx, CT_EX.wy + 0.20, z + dz);
+      });
+    });
+    b.box('ctSteelD', 0.70, 0.70, 6.2, x, cy, z);
+    const wb = new Builder();
+    /* 轮面在 YZ 平面：torus 默认 XY，绕 y 转 90°。
+       外圈再套一道霓虹，不然深紫夜空里轮圈就是一圈黑线。 */
+    wb.torus('ctFerris', R, 0.30, 0, 0, 0, 0, Math.PI / 2, 0);
+    wb.torus('ctFerris', R * 0.70, 0.14, 0, 0, 0, 0, Math.PI / 2, 0);
+    wb.torus('ctNeonC', R + 0.16, 0.11, 0, 0, 0, 0, Math.PI / 2, 0);
+    wb.torus('ctNeonM', R - 0.20, 0.06, 0, 0, 0, 0, Math.PI / 2, 0);
+    for (let i = 0; i < 16; i++) {
+      const a = i / 16 * Math.PI * 2;
+      const yy = Math.sin(a) * R, zz = Math.cos(a) * R;
+      wb.to('ctSteelD', 0.055, 0, 0, 0, 0, yy, zz, 5);
+      wb.box('ctSteelD', 0.10, 0.52, 0.10, 0, yy + 0.62, zz);
+      wb.box('ctFerrisC', 1.15, 0.82, 1.22, 0, yy + 0.05, zz);
+      wb.box('ctNeonM', 1.18, 0.07, 0.07, 0, yy + 0.50, zz + 0.62);
+    }
+    const wheel = new T.Group();
+    wb.build(wheel, { noOutline: ['ctFerrisC', 'ctNeonM', 'ctNeonC'] });
+    wheel.position.set(x, cy, z);
+    g.add(wheel);
+    CT_ANIM.push(function (t) { wheel.rotation.x = t * 0.052; });
+    ctGlow(x, cy + R + 1.0, z, 0x22e6ff, 13.0, 0.18);
+    ctGlow(x, cy - R * 0.5, z, 0xff2d7a, 10.0, 0.14);
+    for (let i = -1; i <= 1; i++) {
+      ctWGlow(x + i * 2.2, z, 2.0, R * 1.8, i ? 0xff2d7a : 0x22e6ff, 0.26, 0);
+    }
+  }
+
+  function ctMonoLine(b, ax, az, bx, bz, y) {
+    const dx = bx - ax, dz = bz - az, L = Math.hypot(dx, dz);
+    const alongX = Math.abs(dx) > Math.abs(dz);
+    const cx = (ax + bx) / 2, cz = (az + bz) / 2;
+    if (alongX) {
+      b.box('ctMono', L, 0.55, 1.60, cx, y, cz);
+      b.box('ctRail', L, 0.10, 0.20, cx, y + 0.34, cz - 0.44);
+      b.box('ctRail', L, 0.10, 0.20, cx, y + 0.34, cz + 0.44);
+    } else {
+      b.box('ctMono', 1.60, 0.55, L, cx, y, cz);
+      b.box('ctRail', 0.20, 0.10, L, cx - 0.44, y + 0.34, cz);
+      b.box('ctRail', 0.20, 0.10, L, cx + 0.44, y + 0.34, cz);
+    }
+    const n = Math.max(2, Math.round(L / 6));
+    for (let i = 0; i <= n; i++) {
+      const f = i / n, px = ax + dx * f, pz = az + dz * f;
+      if (alongX) {
+        b.cyl('ctPier', 0.32, 0.42, y - 0.4, 8, px, (y - 0.4) / 2, pz);
+        b.box('ctQuayD', 1.2, 0.22, 1.2, px, 0.11, pz);
+      } else {
+        b.cyl('ctPier', 0.32, 0.42, y - 0.4, 8, px, (y - 0.4) / 2, pz);
+        b.box('ctQuayD', 1.2, 0.22, 1.2, px, 0.11, pz);
+      }
+    }
+    b.box('ctNeonCd', alongX ? L : 0.06, 0.05, alongX ? 0.06 : L,
+      cx, y - 0.32, cz);
+  }
+
+  function ctStallRow(b, x0, x1, z, seed) {
+    const n = Math.round((x1 - x0) / 6.2);
+    const rnd = ctRnd(seed || 5);
+    for (let i = 0; i < n; i++) {
+      const x = x0 + (i + 0.5) * (x1 - x0) / n;
+      const k = CT_AWNK[i % CT_AWNK.length];
+      const yy = 1.85 + rnd() * 0.25;
+      b.box('ctWoodD', 3.4, 0.12, 2.0, x, 0.86, z);
+      [[-1.6, -0.9], [1.6, -0.9], [-1.6, 0.9], [1.6, 0.9]].forEach(function (q) {
+        b.box('ctWoodD', 0.10, 0.86, 0.10, x + q[0], 0.43, z + q[1]);
+      });
+      b.box(k, 3.8, 0.10, 2.4, x, yy, z);
+      b.box('ctSteelD', 0.06, 0.42, 2.42, x - 1.9, yy - 0.22, z);
+      b.box('ctSteelD', 0.06, 0.42, 2.42, x + 1.9, yy - 0.22, z);
+      b.box('ctFoam', 0.9, 0.42, 0.7, x - 0.8, 1.13, z);
+      b.box('ctCrate3', 0.8, 0.44, 0.7, x + 0.7, 1.14, z);
+      b.sph('ctLantern', 0.18, x, yy - 0.42, z + 1.0);
+      if (i % 2 === 0) ctGlow(x, yy - 0.4, z + 1.0, 0xffb45a, 2.6, 0.18);
+    }
+  }
+
+  function buildCtNewTown() {
+    const g = new T.Group();
+    const b = new Builder();
+
+    /* ---- 北新区：高架单轨 + 垂直农场 + 造型塔群 ---- */
+    ctMonoLine(b, -28, -34.5, 52, -34.5, 11.6);
+    ctMonoLine(b, 52, -34.5, 52, 26, 11.6);
+    /* 两座车站：站台 + 顶棚 + 发光站牌 */
+    [[2, -34.5, '北', 0x22e6ff], [52, -6, '東', 0xff2d7a]].forEach(function (q) {
+      b.box('ctWalk', 9.0, 0.30, 3.6, q[0], 11.9, q[1]);
+      b.box('ctSteelD', 9.6, 0.20, 4.2, q[0], 13.9, q[1]);
+      [[-4.4, -1.8], [4.4, -1.8], [-4.4, 1.8], [4.4, 1.8]].forEach(function (p) {
+        b.box('ctSteel', 0.16, 2.0, 0.16, q[0] + p[0], 12.9, q[1] + p[1]);
+      });
+      b.box('ctSignBox', 3.2, 0.70, 0.16, q[0], 12.9, q[1] + 1.9);
+      ctSign(q[2] + '駅', q[3], q[0], 12.9, q[1] + 2.0, 2.9, 0.60, 0, false, 1);
+      ctGlow(q[0], 12.9, q[1] + 2.1, q[3], 5.0, 0.18);
+    });
+    ctFarmTower(b, -18, -48, 22);
+    ctArtCyl(b,   { x: -24, z: -43, w: 7.4, d: 7.4, h: 25, seed: 211 });
+    ctArtTwin(b,  { x: 4,   z: -44, w: 11.0, d: 8.0, h: 29, seed: 223 });
+    ctArtWedge(b, { x: 24,  z: -43, w: 7.0, d: 8.2, h: 21, seed: 227 });
+    ctArtFrame(b, { x: 32,  z: -50, w: 7.6, d: 7.0, h: 26, seed: 229 });
+    /* 东北：冷却塔 + 两根远景塔，避免角落空着 */
+    ctArtFar(b, 44, -46, 8.0, 7.0, 24, 233, 'cyl');
+    ctArtFar(b, 60, -46, 7.6, 7.0, 29, 239, 'hex');
+    b.cyl('ctConcrete2', 3.4, 4.6, 6.4, 14, 62, 3.2, -34);
+    b.torus('ctNeonC', 3.5, 0.12, 62, 6.4, -34, Math.PI / 2, 0, 0);
+    ctGlow(62, 6.8, -34, 0x22e6ff, 7.0, 0.16);
+
+    /* ---- 东新区：造型塔群 + 滨水店街 ---- */
+    /* 摩天轮改立在南湖东段水面上：放楼群里会被前后两栋塔夹成一条缝，
+       从全景完全看不见。水上才有完整的圆和倒影。 */
+    b.cyl('ctWalk', 5.4, 5.4, 0.16, 20, 60, 0.08, -10);
+    b.torus('ctNeonM', 5.2, 0.10, 60, 0.18, -10, Math.PI / 2, 0, 0);
+    b.cyl('ctCore', 0.55, 0.85, 5.0, 10, 60, 2.6, -10);
+    ctGlow(60, 5.2, -10, 0x22e6ff, 8.0, 0.18);
+    ctArtHelix(b,   { x: 44, z: -22, w: 8.0, d: 8.0, h: 30, seed: 241 });
+    ctArtNeedle(b,  { x: 64, z: -24, w: 8.4, d: 8.4, h: 40, seed: 251 });
+    ctArtVoid(b,    { x: 43, z: 10,  w: 8.0, d: 8.6, h: 21, seed: 257 });
+    ctArtStagger(b, { x: 63, z: 12,  w: 7.6, d: 8.0, h: 23, seed: 263 });
+    /* 滨水一层小店：贴南湖北岸，别高过老城前景 */
+    for (let i = 0; i < 5; i++) {
+      const x = 40 + i * 6.0;
+      b.box(i % 2 ? 'ctT3' : 'ctT5', 5.0, 3.6 + (i % 3) * 0.9, 4.4, x, 2.0 + (i % 3) * 0.45, 25.0);
+      b.box('ctShopW', 3.8, 1.5, 0.10, x, 1.8, 22.76);
+      ctRim(b, x, 25.0, 5.0, 4.4, 3.9 + (i % 3) * 0.9, i % 2 ? 'ctNeonM' : 'ctNeonC', 0.12);
+      b.sph('ctLantern', 0.20, x - 1.8, 3.4, 22.6);
+      b.sph('ctLantern', 0.20, x + 1.8, 3.4, 22.6);
+    }
+
+    /* ---- 西新区：集装箱港 ---- */
+    ctCrane(b, -56, -30, 271);
+    ctCrane(b, -56, 12, 277);
+    const ck = ['ctCont1', 'ctCont2', 'ctCont3', 'ctCont4', 'ctCont5'];
+    for (let row = 0; row < 14; row++) {
+      const z = -50 + row * 6.8;
+      for (let j = 0; j < 4; j++) {
+        const x = -61.2 + j * 2.9;
+        ctContainer(b, x, z, ck[(row + j) % 5], 0, 0);
+        if ((row + j) % 3 === 0) ctContainer(b, x, z, ck[(row + j + 2) % 5], 0, 1.18);
+      }
+    }
+    /* 堆场标线 + 灯柱 + 三辆集卡：18×86 的空地不填就成了停机坪 */
+    for (let z = -50; z <= 40; z += 6.8) {
+      b.box('ctPaint', 12.6, 0.014, 0.06, -56.0, 0.026, z + 2.9);
+    }
+    for (let z = -48; z <= 38; z += 14) {
+      b.cyl('ctSteel', 0.10, 0.14, 7.0, 6, -47.2, 3.5, z);
+      b.box('ctLampGlow', 1.1, 0.24, 0.5, -47.2, 7.0, z);
+      ctGlow(-47.2, 7.0, z, 0xffd9a0, 5.0, 0.16);
+    }
+    [[-58, -20], [-55, -4], [-59, 26]].forEach(function (q, i) {
+      b.box('ctSteelD', 2.0, 0.55, 3.6, q[0], 0.42, q[1]);
+      b.box(['ctCont2', 'ctCont4', 'ctCont1'][i], 1.9, 1.2, 2.2, q[0], 1.28, q[1] - 0.4);
+      b.box('ctTail', 0.16, 0.14, 0.10, q[0], 0.55, q[1] + 1.85);
+    });
+    /* 两栋仓库 + 港招牌 */
+    [-42, 20].forEach(function (z, i) {
+      b.box('ctT3', 12.0, 5.2, 8.0, -57, 2.6, z);
+      b.box('ctTile', 12.6, 0.30, 8.6, -57, 5.3, z);
+      b.box('ctShopW', 5.0, 2.0, 0.10, -57, 2.4, z - 4.06);
+      ctRim(b, -57, z, 12.0, 8.0, 5.4, i ? 'ctNeonC' : 'ctNeonM', 0.12);
+    });
+    ctSign('港', 0xffd23f, -46.1, 6.0, -6.0, 1.4, 3.0, Math.PI / 2, true, 1);
+    ctGlow(-46.0, 6.0, -6.0, 0xffd23f, 7.0, 0.20);
+
+    /* ---- 南岸：灯市 + 大鸟居 + 水上舞台 + 水上摩天轮 ---- */
+    ctStallRow(b, -60, 68, 58, 281);
+    ctFerrisWheel(b, g, 62, 41, 8.8, 9.2);
+    ctTorii(b, 8, 41, 2.2);
+    /* 圆形浮台：一圈浮筒 + 环形灯 + 中央全息柱 */
+    for (let i = 0; i < 16; i++) {
+      const a = i / 16 * Math.PI * 2;
+      b.cyl('ctPier', 0.42, 0.42, 0.8, 8,
+        36 + Math.cos(a) * 4.2, CT_EX.wy + 0.1, 41 + Math.sin(a) * 4.2);
+    }
+    b.cyl('ctFloat', 4.4, 4.4, 0.28, 18, 36, CT_EX.wy + 0.34, 41);
+    b.torus('ctNeonC', 4.2, 0.10, 36, CT_EX.wy + 0.50, 41, Math.PI / 2, 0, 0);
+    b.cyl('ctCore', 0.50, 0.80, 6.0, 10, 36, CT_EX.wy + 3.4, 41);
+    ctGlow(36, CT_EX.wy + 6.6, 41, 0x22e6ff, 9.0, 0.20);
+    /* 南岸背后几栋矮楼：一栋一尺寸一塔冠，等距同形会读成一排积木 */
+    const SB = [
+      [-58, 62.2, 9.0, 6.0, 4.2, 'ctT2', 'step'],
+      [-47, 61.2, 6.8, 7.2, 6.2, 'ctT4', 'blade'],
+      [-36, 62.6, 11.0, 5.4, 3.6, 'ctT3', 'blade'],
+      [-22, 61.0, 8.0, 8.0, 7.4, 'ctT5', 'disc'],
+      [-9, 62.4, 6.5, 6.0, 4.8, 'ctT1', 'spire'],
+      [4, 61.2, 11.0, 6.6, 5.6, 'ctT2', 'frame'],
+      [18, 62.6, 7.5, 7.0, 3.8, 'ctT4', 'step'],
+      [32, 61.0, 9.5, 6.0, 6.8, 'ctT3', 'step'],
+      [46, 62.4, 8.0, 8.0, 4.4, 'ctT5', 'pyramid'],
+      [60, 61.2, 10.0, 6.4, 5.2, 'ctT1', 'frame']
+    ];
+    SB.forEach(function (q, i) {
+      const x = q[0], z = q[1], w = q[2], d = q[3], h = q[4];
+      b.box(q[5], w, h, d, x, h / 2, z);
+      ctFacadeOn(x, z, w, d, 0, h - 0.2, 300 + i * 7, i % 3, 0.45, 0.62);
+      ctRim(b, x, z, w, d, h + 0.05, i % 2 ? 'ctNeonMd' : 'ctNeonCd', 0.10);
+      ctCrown(b, x, z, w, d, h, q[6], 311 + i);
+      b.box('ctWoodD', w * 0.72, 0.14, 1.5, x, 2.45, z - d / 2 - 0.7);
+      b.box('ctShopW', w * 0.42, 0.62, 0.10, x, 2.05, z - d / 2 - 0.06);
+    });
+    /* 南岸前缘：栏杆 + 灯柱 + 铺装分隔线，把 16 米深的空地填出尺度 */
+    for (let x = -62; x <= 68; x += 3.2) b.box('ctSteelD', 0.07, 1.0, 0.07, x, 0.50, 51.0);
+    b.box('ctSteelD', 130.0, 0.06, 0.06, 3.0, 0.98, 51.0);
+    for (let x = -58; x <= 66; x += 8) {
+      b.cyl('ctSteel', 0.08, 0.11, 3.4, 6, x, 1.70, 54.6);
+      b.sph('ctLantern', 0.22, x, 3.45, 54.6);
+      if ((x + 58) % 16 === 0) ctGlow(x, 3.45, 54.6, 0xffb45a, 3.2, 0.16);
+    }
+    for (let x = -60; x <= 66; x += 2.6) b.box('ctWalk2', 0.04, 0.012, 12.0, x, 0.035, 58.0);
+    /* 南岸灯笼串 */
+    for (let x = -60; x <= 68; x += 2.4) {
+      b.box('ctCable', 2.4, 0.03, 0.03, x + 1.2, 3.1, 52.6);
+      b.sph('ctLantern', 0.16, x, 2.92, 52.6);
+    }
+
+    b.build(g);
+    return g;
+  }
+
+  /* ================= 扩展区的动态生命 =================
+     列车 / 驳船 / 新桥车流 / 行人 / 摩天轮（轮子在上面的组里转）。
+     移动单元一律独立成 T.Group，绝不进 Builder 的合并池。 */
+  function ctTrainUnit() {
+    const g = new T.Group();
+    const b = new Builder();
+    /* 三节车厢沿局部 +z 排开 */
+    for (let i = 0; i < 3; i++) {
+      const z = (i - 1) * 2.45;
+      b.box('ctTrain', 1.7, 1.5, 2.25, 0, 1.18, z);
+      b.box('ctTrainW', 1.42, 0.52, 2.05, 0, 1.35, z);
+      b.box('ctSteelD', 1.76, 0.18, 2.30, 0, 0.50, z);
+      b.box('ctNeonM', 0.10, 0.12, 2.30, 0.88, 0.62, z);
+      b.box('ctHead', 0.24, 0.18, 0.10, 0, 0.78, z + (i === 2 ? 1.18 : 0));
+    }
+    b.build(g, { noOutline: ['ctTrainW', 'ctNeonM', 'ctHead'] });
+    return g;
+  }
+  function ctBargeUnit() {
+    const g = new T.Group();
+    const b = new Builder();
+    b.box('ctBoat', 3.4, 0.85, 9.0, 0, 0.42, 0);
+    b.box('ctSteelD', 3.6, 0.14, 9.2, 0, 0.06, 0);
+    b.box('ctBoatC', 2.4, 1.15, 2.6, 0, 1.42, -2.4);
+    for (let i = 0; i < 3; i++) {
+      const k = ['ctCont1', 'ctCont3', 'ctCont5'][i];
+      b.box(k, 2.6, 1.0, 2.2, 0, 1.35, 0.4 + i * 2.35);
+    }
+    b.box('ctNeonC', 3.4, 0.08, 0.08, 0, 0.88, 4.5);
+    b.box('ctTail', 0.20, 0.20, 0.20, 0, 2.05, -2.4);
+    b.build(g, { noOutline: ['ctBoatC', 'ctNeonC', 'ctTail'] });
+    return g;
+  }
+  function buildCtExtLife() {
+    const g = new T.Group();
+    /* 两列单轨：北线沿 x，东线沿 z */
+    const TR = [
+      [-28, -34.5, 50, -34.5, 12.45, 5.6, 0.00],
+      [-28, -34.5, 50, -34.5, 12.45, 5.6, 0.52],
+      [52, -32, 52, 24, 12.45, 5.0, 0.16],
+      [52, -32, 52, 24, 12.45, 5.0, 0.70]
+    ];
+    TR.forEach(function (q) {
+      const u = ctTrainUnit(); g.add(u);
+      ctTrack(u, { x0: q[0], z0: q[1], x1: q[2], z1: q[3],
+        y: q[4], speed: q[5], phase: q[6], cull: 0.02 });
+    });
+    /* 两艘驳船：一艘走西河，一艘走南湖 */
+    [[-40, -46, -40, 44], [-28, 41, 64, 41]].forEach(function (q, i) {
+      const u = ctBargeUnit(); g.add(u);
+      ctTrack(u, { x0: q[0], z0: q[1], x1: q[2], z1: q[3],
+        y: CT_EX.wy + 0.10, speed: i ? 3.4 : 2.8, phase: i ? 0.3 : 0.0, cull: 0.015 });
+    });
+    /* 斜拉桥上的车流（平桥，不会穿模） */
+    [[-25.0, 28.5, -25.0, 51.5], [-23.0, 51.5, -23.0, 28.5]].forEach(function (q, i) {
+      const u = ctCarUnit(i ? 'ctBodyL' : 'ctBodyL2', 0.92); g.add(u);
+      ctTrack(u, { x0: q[0], z0: q[1], x1: q[2], z1: q[3],
+        y: 1.26, speed: 7.0, phase: i ? 0.52 : 0.0, cull: 0.03 });
+    });
+    /* 开敞桁架桥上的两辆车 */
+    [[30, 28.5, 30, 51.5], [30, 51.5, 30, 28.5]].forEach(function (q, i) {
+      const u = ctCarUnit(i ? 'ctBody4' : 'ctBody', 0.86); g.add(u);
+      ctTrack(u, { x0: q[0], z0: q[1], x1: q[2], z1: q[3],
+        y: 2.76, speed: 6.4, phase: i ? 0.48 : 0.0, cull: 0.03 });
+    });
+    /* 桥上 / 岸上行人 */
+    const PW = [
+      [-48, -17.7, -30, -17.7, 1.10, 0.00], [-30, -18.3, -48, -18.3, 1.10, 0.55],
+      [-48, 6.7, -30, 6.7, 1.20, 0.20], [-30, 7.3, -48, 7.3, 1.20, 0.72],
+      [52, 31, 52, 51, -0.42, 0.10], [52, 51, 52, 31, -0.42, 0.60],
+      [-24, 30.0, 12, 30.0, 0.05, 0.15], [12, 30.6, -24, 30.6, 0.05, 0.65],
+      [-62, 55.0, -20, 55.0, 0.05, 0.30], [20, 56.0, 66, 56.0, 0.05, 0.80],
+      [40, -12, 40, 18, 0.05, 0.40], [64, 18, 64, -12, 0.05, 0.05]
+    ];
+    PW.forEach(function (q, i) {
+      const u = ctPedUnit(['ctPedA', 'ctPedB', 'ctPedC', 'ctPedD'][i % 4], 1.06);
+      g.add(u);
+      ctTrack(u, { x0: q[0], z0: q[1], x1: q[2], z1: q[3], y: q[4],
+        speed: 1.15 + (i % 3) * 0.12, phase: q[5], walk: true, bob: 0.035, cull: 0.01 });
+    });
+    scene.add(g);
+    return g;
+  }
+
+
   /* ================= 远景天际线 =================
      后排一圈又高又暗的塔，只给稀疏的窗点。
      没有这一层，六块街区看起来像摆在桌上的六个盒子。 */
@@ -9098,6 +9834,7 @@
   const WRH = !!PS.wh;
   if (CTY) {
     scene.add(buildCtBase());
+    scene.add(buildCtExterior());
     scene.add(buildCtSkyline());
     scene.add(buildCtA());
     scene.add(buildCtB());
@@ -9115,7 +9852,10 @@
     scene.add(buildCtStreet());
     scene.add(buildCtWet());
     scene.add(buildCtHolo());
+    scene.add(buildCtSpanBridges());
+    scene.add(buildCtNewTown());
     buildCtTraffic();
+    buildCtExtLife();
   } else if (CYB) {
     scene.add(buildCyBase());
     scene.add(buildCyA());
@@ -9185,7 +9925,14 @@
       [-20.60, 1.80, 23.00, 0xffb060, 8.0, 7.0],   // 稻荷社
       [4.05, 5.20, -18.00, 0xffe0a8, 14.0, 12.0],  // 高架步道
       [-4.00, 20.00, -19.00, 0x6a8fff, 22.0, 24.0],// 巨构冷光
-      [17.40, 21.00, -18.60, 0x22e6ff, 22.0, 20.0] // 楼顶 LED 屏
+      [17.40, 21.00, -18.60, 0x22e6ff, 22.0, 20.0], // 楼顶 LED 屏
+      /* 外环：只在「有东西亮」的位置补光，别把夜景洗成白天 */
+      [-40.0, 3.20, -18.0, 0x2fe8ff, 22.0, 20.0],  // 西河拱桥
+      [8.0, 7.00, 41.0, 0xff3b3b, 28.0, 24.0],     // 水中大鸟居
+      [36.0, 4.00, 41.0, 0x22e6ff, 22.0, 20.0],    // 水上舞台
+      [60.0, 16.0, -10.0, 0x22e6ff, 26.0, 24.0],   // 摩天轮
+      [-18.0, 14.0, -48.0, 0x64ff9c, 20.0, 18.0],  // 垂直农场
+      [-56.0, 8.00, -6.0, 0xffd23f, 20.0, 18.0]    // 集装箱港
     ];
     for (let i = 0; i < ctL.length; i++) {
       const q = ctL[i];

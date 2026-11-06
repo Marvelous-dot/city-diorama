@@ -541,10 +541,11 @@
       city: true,
       sky: ['#2a2350', '#1b1736', '#0c0a1c', '#04030a'],
       vig: 'rgba(2,1,8,0.70)',
-      distMax: 200,
-      targetR: 36,
-      shadowSpan: 40,
-      shadowFar: 170,
+      distMax: 340,
+      targetR: 80,
+      camFar: 1000,
+      shadowSpan: 78,
+      shadowFar: 320,
       palette: {
         /* 展台 / 路面。沥青不能压太暗 —— 俯视角下街面几乎是唯一
            能读出「这里有一座城」的负空间，太黑就和展台融成一片。 */
@@ -601,7 +602,18 @@
         ctLampGlow: 0x1a1508, ctBulb: 0x1a1408,
         ctTail: 0x3a0c0a, ctHead: 0x2a2a1a,
         ctNeonM: 0x1a0c14, ctNeonC: 0x0a1a20, ctVendIn: 0x102030,
-        ctNeonMd: 0x1a1c24, ctNeonCd: 0x161c24
+        ctNeonMd: 0x1a1c24, ctNeonCd: 0x161c24,
+
+        /* ---- 外环水系：驳岸 / 桥 / 单轨 ---- */
+        ctQuay: 0x3c4254, ctQuayD: 0x565d70, ctBol: 0x2e3340,
+        ctDeck2: 0x4b5060, ctArch: 0x7c8296, ctCable2: 0x9aa6bc,
+        ctFloat: 0x6b5540, ctPier: 0x3e4452,
+        ctMono: 0x5a6074, ctMonoD: 0x41465a, ctRail: 0x8a90a0,
+        ctCrane: 0x8a7048, ctFarm: 0x3e5a48,
+        ctFerris: 0x9aa6c0, ctTrain: 0x4a5c78, ctBoat: 0x3a4658,
+        /* 集装箱：五种高饱和，港区能不能读成「港」全看这排色块 */
+        ctCont1: 0xb84f4f, ctCont2: 0x3a7ea8, ctCont3: 0x4e9a6e,
+        ctCont4: 0xc8a24a, ctCont5: 0x8a5aa8
       },
       emit: {
         ctWinW:    { c: 0x3a2a18, e: 0xffb867 },
@@ -633,9 +645,18 @@
            环形窗带分冷/暖两路，圆柱塔才不会读成一根均匀灯管。 */
         ctCore:   { c: 0x142a3e, e: 0x2e6c92 },
         ctBandW:  { c: 0x182634, e: 0x4f9ac4 },
-        ctBandA:  { c: 0x2a2014, e: 0xc08a4a }
+        ctBandA:  { c: 0x2a2014, e: 0xc08a4a },
+        /* ---- 外环自发光 ---- */
+        ctQuayL:    { c: 0x102028, e: 0x2a8ea8 },
+        ctWaterRip: { c: 0x0a1a2c, e: 0x4a9ad0 },
+        ctLantern:  { c: 0x3a1e10, e: 0xffa050 },
+        ctTorii:    { c: 0x6a1e1e, e: 0xd83a32 },
+        ctFarmG:    { c: 0x143a24, e: 0x4ce884 },
+        ctFerrisC:  { c: 0x2a1a30, e: 0xff5aa8 },
+        ctTrainW:   { c: 0x16283a, e: 0x9fe0ff },
+        ctBoatC:    { c: 0x1a2a38, e: 0x6fc4e0 }
       },
-      fog: { color: 0x1c1734, near: 92.0, far: 400.0 },
+      fog: { color: 0x1c1734, near: 130.0, far: 520.0 },
       light: {
         sun:  { color: 0x93a0ff, i: 1.15, pos: [26.0, 46.0, 24.0] },
         fill: { color: 0xff5a8a, i: 0.95, pos: [-30.0, 12.0, -26.0] },
@@ -643,7 +664,7 @@
         amb:  { color: 0x3a3c78, i: 0.80 }
       },
       veg: { willows: [], bamboo: [], pots: [] },
-      cam: { theta: 0.90, phi: 1.14, dist: 163.0, target: [2.0, 24.0, -1.0] }
+      cam: { theta: 0.90, phi: 1.06, dist: 232.0, target: [3.0, 13.0, 3.0] }
     }
 
   };
