@@ -6591,7 +6591,389 @@
     if (o.dress !== false && o.reg !== false && y < 26 && w * d > 9) {
       ctRoofDress(b, o.x, o.z, w * 0.78, d * 0.78, y, (o.seed || 3) + 3, y);
     }
+    /* 塔冠：方盒本体不用动，只把收头换掉，天际线的识别度就变了 */
+    if (o.crown) ctCrown(b, o.x, o.z, w, d, y, o.crown, o.seed || 3);
     return { top: y, w: w, d: d };
+  }
+
+  /* ================================================================
+     造型塔原型
+     ctTower 只会画「方盒 + 等比例退台」，全城都用同一套就变成一排
+     方形立柱。下面每个函数是一种独立的建筑原型：各自负责体块、窗、
+     檐口和塔冠，最后统一交给 Builder 按材质合批。
+     共同约定：o = { x, z, w, d, h, y0, seed, ... }，返回 {top,w,d}。
+     ================================================================ */
+
+  /* 环形窗带：圆柱 / 棱柱没有平立面可以贴 ctFacadeOn，
+     改成每隔 step 米一圈薄发光环。每 4 圈压一道粗腰带，
+     塔身才有「楼层」的节奏，而不是一整根灯管。 */
+  function ctRingBands(b, x, z, r, y0, h, seg, rot, seed, step) {
+    step = step || 2.7;
+    const n = Math.max(1, Math.floor(h / step));
+    for (let i = 1; i <= n; i++) {
+      const yy = y0 + (h * i) / (n + 1);
+      const fat = (i % 4 === 0);
+      const k = fat ? 'ctSteelD'
+        : (((i + (seed || 0)) % 5 < 2) ? 'ctBandA' : 'ctBandW');
+      b.cyl(k, r + 0.035, r + 0.035, fat ? 0.20 : 0.11, seg,
+        x, yy, z, 0, rot || 0, 0);
+    }
+  }
+
+  /* 棱柱竖棱：八棱 / 六棱塔不加这几条线，俯视下就只是一个圆 */
+  function ctRibs(b, x, z, r, y0, h, seg, rot, key) {
+    for (let i = 0; i < seg; i++) {
+      const a = (i / seg) * Math.PI * 2 + (rot || 0);
+      b.box(key || 'ctSteel', 0.13, h, 0.13,
+        x + Math.cos(a) * r, y0 + h / 2, z + Math.sin(a) * r, 0, -a, 0);
+    }
+  }
+
+  /* 四角巨柱，骨架塔 / 架空层用 */
+  function ctCornerCols(b, x, z, w, d, y0, h, key, t) {
+    t = t || 0.52;
+    [-1, 1].forEach(function (sx) {
+      [-1, 1].forEach(function (sz) {
+        b.box(key || 'ctSteel', t, h, t,
+          x + sx * (w / 2 - t / 2), y0 + h / 2, z + sz * (d / 2 - t / 2));
+      });
+    });
+  }
+
+  /* 塔冠分发：给保留下来的方盒塔换顶。
+     金字塔 / 圆冠 / 飞碟 / 刀片 / 立环 / 针尖 / 开敞框架 / 错层收头。 */
+  function ctCrown(b, x, z, w, d, y, kind, seed) {
+    const s = Math.min(w, d);
+    const rnd = ctRnd((seed || 5) * 977 + 31);
+    if (kind === 'pyramid') {
+      const ph = s * 0.46;
+      b.cyl('ctCrown', 0.02, s * 0.60, ph, 4, x, y + ph / 2, z, 0, Math.PI / 4, 0);
+      ctRim(b, x, z, w, d, y + 0.06, 'ctNeonM', 0.12);
+      b.cyl('ctSteelD', 0.05, 0.09, 1.5, 5, x, y + ph + 0.75, z);
+      b.box('ctTail', 0.14, 0.14, 0.14, x, y + ph + 1.55, z);
+    } else if (kind === 'dome') {
+      b.cyl('ctSteelD', s * 0.44, s * 0.44, 0.30, 14, x, y + 0.15, z);
+      b.sph('ctCrown', s * 0.42, x, y + 0.30, z, 1, 0.62, 1);
+      b.torus('ctNeonC', s * 0.42, 0.07, x, y + 0.32, z, Math.PI / 2, 0, 0);
+      b.cyl('ctSteelD', 0.04, 0.06, 1.2, 5, x, y + s * 0.62 + 0.6, z);
+    } else if (kind === 'disc') {
+      b.cyl('ctCrown', s * 0.72, s * 0.72, 0.36, 16, x, y + 0.60, z);
+      b.cyl('ctGlassB', s * 0.62, s * 0.62, 1.25, 16, x, y + 1.40, z);
+      b.cyl('ctCrown', s * 0.68, s * 0.68, 0.30, 16, x, y + 2.18, z);
+      b.torus('ctNeonM', s * 0.72, 0.07, x, y + 0.60, z, Math.PI / 2, 0, 0);
+      b.torus('ctNeonC', s * 0.68, 0.06, x, y + 2.34, z, Math.PI / 2, 0, 0);
+    } else if (kind === 'blade') {
+      [-1, 1].forEach(function (sgn) {
+        b.box('ctFin', 0.20, s * 0.86, s * 0.44,
+          x + sgn * s * 0.20, y + s * 0.43, z, 0, 0, sgn * 0.26);
+        b.box('ctNeonC', 0.06, s * 0.86, 0.07,
+          x + sgn * (s * 0.20 + s * 0.20), y + s * 0.43, z + s * 0.22,
+          0, 0, sgn * 0.26);
+      });
+    } else if (kind === 'ring') {
+      b.torus('ctSteel', s * 0.46, 0.14, x, y + s * 0.46, z, 0, Math.PI / 2, 0);
+      b.torus('ctNeonM', s * 0.38, 0.05, x, y + s * 0.46, z, 0, Math.PI / 2, 0);
+      b.box('ctSteelD', 0.16, s * 0.46, 0.16, x, y + s * 0.23, z);
+    } else if (kind === 'spire') {
+      b.cyl('ctSteelD', 0.10, 0.28, s * 0.80, 6, x, y + s * 0.40, z);
+      b.torus('ctNeonC', s * 0.34, 0.06, x, y + 0.10, z, Math.PI / 2, 0, 0);
+      b.box('ctTail', 0.16, 0.16, 0.16, x, y + s * 0.82, z);
+    } else if (kind === 'frame') {
+      const fh = 2.2;
+      ctCornerCols(b, x, z, w * 0.86, d * 0.86, y, fh, 'ctSteel', 0.20);
+      ctRim(b, x, z, w * 0.86, d * 0.86, y + fh, 'ctNeonC', 0.14);
+    } else if (kind === 'step') {
+      [0, 1, 2].forEach(function (i) {
+        const k = 1 - i * 0.26;
+        b.box('ctCrown', w * k, 0.9, d * k,
+          x + (rnd() - 0.5) * 0.5, y + 0.45 + i * 0.9, z + (rnd() - 0.5) * 0.5);
+      });
+      ctRim(b, x, z, w * 0.48, d * 0.48, y + 2.75, 'ctNeonM', 0.10);
+    }
+  }
+
+  /* ① 收分八棱塔 —— 全场制高点。八棱柱 + 逐段收分 +
+     飞碟观景盘 + 针尖，不再是「四段方盒叠起来」。 */
+  function ctArtNeedle(b, o) {
+    const y0 = o.y0 || 0, seed = o.seed || 3;
+    const R = Math.min(o.w, o.d) * 0.54;
+    const seg = 8, rot = Math.PI / 8;
+    const parts = [
+      { h: o.h * 0.46, r: 1.00 },
+      { h: o.h * 0.24, r: 0.84 },
+      { h: o.h * 0.20, r: 0.62 },
+      { h: o.h * 0.10, r: 0.38 }
+    ];
+    let y = y0;
+    parts.forEach(function (p, i) {
+      const r = R * p.r, h = p.h;
+      b.cyl(i % 2 ? 'ctT2' : 'ctT1', r, r, h, seg, o.x, y + h / 2, o.z, 0, rot, 0);
+      ctRingBands(b, o.x, o.z, r, y, h, seg, rot, seed + i * 3, 2.9);
+      ctRibs(b, o.x, o.z, r + 0.02, y, h, seg, rot + Math.PI / seg, 'ctSteel');
+      b.cyl('ctSteelD', r + 0.26, r + 0.26, 0.24, seg, o.x, y + h, o.z, 0, rot, 0);
+      /* 亮环只在两段接缝上给，四个接缝全挂彩环就成了一根螺纹管 */
+      if (i === 0 || i === 2) {
+        b.torus('ctNeonM', r + 0.26, 0.07, o.x, y + h + 0.14, o.z, Math.PI / 2, 0, 0);
+      }
+      y += h;
+    });
+    const dy = y0 + parts[0].h + parts[1].h * 0.55;
+    b.cyl('ctCrown', R * 1.46, R * 1.46, 0.44, 16, o.x, dy, o.z);
+    b.cyl('ctGlassB', R * 1.30, R * 1.30, 1.05, 16, o.x, dy + 0.72, o.z);
+    b.cyl('ctCrown', R * 1.40, R * 1.40, 0.30, 16, o.x, dy + 1.38, o.z);
+    b.torus('ctNeonC', R * 1.46, 0.08, o.x, dy - 0.20, o.z, Math.PI / 2, 0, 0);
+    ctGlow(o.x, dy + 0.6, o.z, 0x22e6ff, 9.0, 0.14);
+    b.cyl('ctSteelD', 0.08, 0.34, 6.2, 6, o.x, y + 3.1, o.z);
+    b.box('ctTail', 0.18, 0.18, 0.18, o.x, y + 6.3, o.z);
+    ctGlow(o.x, y + 1.0, o.z, 0xff2d7a, 6.0, 0.18);
+    return { top: y, w: R * 2, d: R * 2 };
+  }
+
+  /* ② 外露钢骨架塔 —— 四角巨柱 + 每层横梁 + X 斜撑 +
+     中央发光玻璃核心筒。整栋是透空的「笼子」，
+     和实心方盒的剪影完全相反。 */
+  function ctArtFrame(b, o) {
+    const y0 = o.y0 || 0, h = o.h, w = o.w, d = o.d;
+    const cw = w * 0.52, cd = d * 0.52;
+    b.box('ctCore', cw, h, cd, o.x, y0 + h / 2, o.z);
+    ctFacadeOn(o.x, o.z, cw, cd, y0, h - 0.2, o.seed || 3, 2, 0.34, 0.75);
+    ctCornerCols(b, o.x, o.z, w, d, y0, h, 'ctSteel', 0.55);
+    const n = Math.max(2, Math.round(h / 3.1)), fh = h / n;
+    for (let i = 0; i <= n; i++) {
+      ctRim(b, o.x, o.z, w, d, y0 + i * fh, 'ctSteelD', 0.22);
+    }
+    for (let i = 0; i < n; i++) {
+      const ya = y0 + i * fh + 0.12, yb = y0 + (i + 1) * fh - 0.12;
+      [-1, 1].forEach(function (sx) {
+        const xx = o.x + sx * (w / 2 - 0.10);
+        b.to('ctSteelD', 0.065, xx, ya, o.z - d / 2 + 0.10, xx, yb, o.z + d / 2 - 0.10, 4);
+        b.to('ctSteelD', 0.065, xx, ya, o.z + d / 2 - 0.10, xx, yb, o.z - d / 2 + 0.10, 4);
+      });
+      [-1, 1].forEach(function (sz) {
+        const zz = o.z + sz * (d / 2 - 0.10);
+        b.to('ctSteelD', 0.065, o.x - w / 2 + 0.10, ya, zz, o.x + w / 2 - 0.10, yb, zz, 4);
+        b.to('ctSteelD', 0.065, o.x + w / 2 - 0.10, ya, zz, o.x - w / 2 + 0.10, yb, zz, 4);
+      });
+    }
+    const fy = y0 + h;
+    ctCornerCols(b, o.x, o.z, w * 0.84, d * 0.84, fy, 3.0, 'ctSteel', 0.24);
+    ctRim(b, o.x, o.z, w * 0.84, d * 0.84, fy + 3.0, 'ctNeonC', 0.16);
+    ctRim(b, o.x, o.z, w * 0.84, d * 0.84, fy + 1.5, 'ctSteelD', 0.12);
+    ctGlow(o.x, fy + 1.6, o.z, 0x22e6ff, 5.0, 0.12);
+    return { top: fy + 3.0, w: w, d: d };
+  }
+
+  /* ③ 圆柱塔 —— 一圈圈发光窗环 + 飞碟观景层 + 半球冠 */
+  function ctArtCyl(b, o) {
+    const y0 = o.y0 || 0, h = o.h;
+    const R = Math.min(o.w, o.d) * 0.46;
+    const seg = 14;
+    b.cyl('ctT4', R, R, h * 0.86, seg, o.x, y0 + h * 0.43, o.z);
+    ctRingBands(b, o.x, o.z, R, y0, h * 0.86, seg, 0, o.seed || 5, 1.85);
+    for (let i = 0; i < 7; i++) {
+      const a = (i / 7) * Math.PI * 2;
+      b.box('ctGlassB', 0.16, h * 0.86, 0.16,
+        o.x + Math.cos(a) * R * 1.02, y0 + h * 0.43, o.z + Math.sin(a) * R * 1.02, 0, -a, 0);
+    }
+    const dy = y0 + h * 0.68;
+    b.cyl('ctCrown', R * 1.52, R * 1.52, 0.34, 18, o.x, dy, o.z);
+    b.cyl('ctGlassB', R * 1.38, R * 1.38, 1.30, 18, o.x, dy + 0.82, o.z);
+    b.cyl('ctCrown', R * 1.48, R * 1.48, 0.28, 18, o.x, dy + 1.60, o.z);
+    b.torus('ctNeonM', R * 1.52, 0.075, o.x, dy - 0.16, o.z, Math.PI / 2, 0, 0);
+    b.torus('ctNeonC', R * 1.48, 0.065, o.x, dy + 1.75, o.z, Math.PI / 2, 0, 0);
+    const ty = y0 + h * 0.86;
+    b.cyl('ctSteelD', R * 0.96, R * 0.96, 0.26, seg, o.x, ty + 0.13, o.z);
+    b.sph('ctCrown', R * 0.94, o.x, ty + 0.26, o.z, 1, 0.58, 1);
+    b.cyl('ctSteelD', 0.05, 0.10, 2.4, 6, o.x, ty + 1.8, o.z);
+    b.box('ctTail', 0.14, 0.14, 0.14, o.x, ty + 3.05, o.z);
+    ctGlow(o.x, dy + 0.8, o.z, 0x22e6ff, 8.0, 0.15);
+    return { top: ty + 3.0, w: R * 3.0, d: R * 3.0 };
+  }
+
+  /* ④ 双塔连体 —— 左塔八棱柱、右塔方盒，形状本身先对撞一次，
+     再靠三道空中连廊和顶部横跨门框把两者绑成一栋。
+     两根都是方柱的话，从俯视角看只会连成一整块方盒。 */
+  function ctArtTwin(b, o) {
+    const y0 = o.y0 || 0, seed = o.seed || 7;
+    const gap = o.w * 0.72, tw = o.w * 0.27, td = o.d * 0.70;
+    const hA = o.h, hB = o.h * 0.78;
+    const ax = o.x - gap / 2, bx = o.x + gap / 2;
+
+    /* 左塔：八棱柱 + 环形窗带 + 三道亮腰环 */
+    const R = tw * 0.58, seg = 8, rot = Math.PI / 8;
+    b.cyl('ctT2', R, R, hA, seg, ax, y0 + hA / 2, o.z, 0, rot, 0);
+    ctRingBands(b, ax, o.z, R, y0, hA, seg, rot, seed, 2.5);
+    ctRibs(b, ax, o.z, R + 0.02, y0, hA, seg, rot + Math.PI / seg, 'ctSteel');
+    for (let k = 1; k <= 3; k++) {
+      const ky = y0 + (hA * k) / 4;
+      b.cyl('ctSteelD', R + 0.18, R + 0.18, 0.22, seg, ax, ky, o.z, 0, rot, 0);
+      b.torus('ctNeonC', R + 0.18, 0.06, ax, ky + 0.13, o.z, Math.PI / 2, 0, 0);
+    }
+    b.cyl('ctWalk', R - 0.1, R - 0.1, 0.05, seg, ax, y0 + hA + 0.02, o.z, 0, rot, 0);
+
+    /* 右塔：方盒，保留原来的窗格质感作为对照 */
+    b.box('ctT5', tw, hB, td, bx, y0 + hB / 2, o.z);
+    b.box('ctWalk', tw - 0.1, 0.05, td - 0.1, bx, y0 + hB + 0.02, o.z);
+    ctFacadeOn(bx, o.z, tw, td, y0, hB - 0.2, seed + 13, 0, 0.5, 1);
+    const n = Math.max(2, Math.round(hB / 3.4));
+    for (let k = 1; k < n; k++) {
+      ctRim(b, bx, o.z, tw + 0.10, td + 0.10, y0 + (hB * k) / n,
+        (k % 3 === 0) ? 'ctNeonC' : 'ctSteelD', 0.10);
+    }
+    ctRim(b, bx, o.z, tw, td, y0 + hB + 0.06, 'ctNeonM', 0.13);
+
+    /* 三道连廊：加宽 + 上下各一条亮边，俯视下才不会消失在两塔之间 */
+    const span = gap - R - tw / 2 + 0.4;
+    const cx = (ax + R + bx - tw / 2) / 2;
+    [0.32, 0.56, 0.80].forEach(function (f) {
+      const yy = y0 + Math.min(hA, hB) * f;
+      b.box('ctGlassB', span, 1.7, 2.6, cx, yy, o.z);
+      b.box('ctSteelD', span + 0.2, 0.18, 2.8, cx, yy - 0.95, o.z);
+      b.box('ctBandW', span, 0.14, 2.7, cx, yy - 1.06, o.z);
+      b.box('ctNeonC', span, 0.10, 0.10, cx, yy + 0.75, o.z + 1.32);
+      b.box('ctNeonC', span, 0.10, 0.10, cx, yy + 0.75, o.z - 1.32);
+      ctGlow(cx, yy, o.z, 0x22e6ff, 5.0, 0.10);
+    });
+
+    /* 顶部横跨门框 */
+    const yy = y0 + hA - 1.2;
+    b.box('ctSteel', gap + tw * 0.9, 0.50, 1.0, ax + gap * 0.28, yy, o.z);
+    b.box('ctNeonM', gap + tw * 0.9, 0.09, 0.10, ax + gap * 0.28, yy - 0.30, o.z + 0.51);
+    ctCrown(b, ax, o.z, tw, tw, y0 + hA, 'blade', seed);
+    ctCrown(b, bx, o.z, tw, td, y0 + hB, 'disc', seed + 2);
+    return { top: y0 + hA, w: o.w, d: td };
+  }
+
+  /* ⑤ 错层悬挑 —— 四层板楼逐层平移 + 交替转向，
+     每层底面挑出一块暗板，俯视下像一摞错开的书 */
+  function ctArtStagger(b, o) {
+    const y0 = o.y0 || 0, n = 4, fh = o.h / n;
+    let last = { x: o.x, z: o.z, w: o.w, d: o.d };
+    for (let i = 0; i < n; i++) {
+      const swap = (i % 2 === 1);
+      const w = swap ? o.d * 0.72 : o.w;
+      const d = swap ? o.w * 0.72 : o.d;
+      const xx = o.x + (i - 1.5) * 0.95;
+      const zz = o.z + (i % 2 ? -0.55 : 0.55);
+      b.box('ctSteelD', w + 0.9, 0.26, d + 0.9, xx, y0 + i * fh + 0.13, zz);
+      b.box(i % 2 ? 'ctT3' : 'ctT1', w, fh - 0.3, d, xx, y0 + i * fh + fh / 2, zz);
+      ctFacadeOn(xx, zz, w, d, y0 + i * fh + 0.3, fh - 0.5, (o.seed || 3) + i * 17, 1, 0.5, 1);
+      ctRim(b, xx, zz, w + 0.9, d + 0.9, y0 + i * fh + 0.28,
+        (i % 2) ? 'ctNeonC' : 'ctNeonM', 0.12);
+      for (let k = 0; k < 3; k++) {
+        b.box('ctFin', 0.10, fh - 0.6, 0.16,
+          xx - w / 2 - 0.06, y0 + i * fh + fh / 2, zz - d / 2 + (d * (k + 1)) / 4);
+      }
+      last = { x: xx, z: zz, w: w, d: d };
+    }
+    const ty = y0 + o.h;
+    b.box('ctCrown', last.w + 1.8, 0.28, last.d + 1.8, last.x, ty + 0.14, last.z);
+    ctRim(b, last.x, last.z, last.w + 1.8, last.d + 1.8, ty + 0.30, 'ctNeonM', 0.14);
+    ctCrown(b, last.x, last.z, last.w * 0.6, last.d * 0.6, ty + 0.32, 'step', o.seed || 3);
+    return { top: ty, w: o.w, d: o.d };
+  }
+
+  /* ⑥ 镂空门洞塔 —— 底部四柱架空，中部整层挖空做空中花园，
+     上部才是实体。俯视下是一个「有洞的楼」。 */
+  function ctArtVoid(b, o) {
+    const y0 = o.y0 || 0, h = o.h, w = o.w, d = o.d;
+    const legH = h * 0.28, voidH = h * 0.26, solidH = h - legH - voidH;
+    b.box('ctSteelD', w + 0.4, 0.30, d + 0.4, o.x, y0 + 0.15, o.z);
+    ctCornerCols(b, o.x, o.z, w, d, y0, legH, 'ctSteel', 0.62);
+    b.box('ctCrown', w, 0.34, d, o.x, y0 + legH, o.z);
+    ctCornerCols(b, o.x, o.z, w, d, y0 + legH, voidH, 'ctSteelD', 0.34);
+    const gy = y0 + legH + voidH * 0.34;
+    b.box('ctWalk2', w * 0.56, 0.20, d * 0.56, o.x, gy, o.z);
+    for (let i = 0; i < 5; i++) {
+      const a = (i / 5) * Math.PI * 2;
+      const px = o.x + Math.cos(a) * w * 0.20, pz = o.z + Math.sin(a) * d * 0.20;
+      b.cyl('ctPlant', 0.10, 0.10, 0.8, 5, px, gy + 0.50, pz);
+      b.sph('ctBandA', 0.34, px, gy + 1.05, pz, 1, 0.8, 1);
+    }
+    const sy = y0 + legH + voidH;
+    b.box('ctCrown', w, 0.34, d, o.x, sy, o.z);
+    b.box('ctT2', w, solidH, d, o.x, sy + solidH / 2, o.z);
+    b.box('ctWalk', w - 0.1, 0.05, d - 0.1, o.x, sy + solidH + 0.02, o.z);
+    ctFacadeOn(o.x, o.z, w, d, sy, solidH - 0.2, o.seed || 3, 2, 0.52, 1);
+    ctRim(b, o.x, o.z, w, d, sy + solidH + 0.06, 'ctNeonC', 0.14);
+    ctRim(b, o.x, o.z, w, d, y0 + legH + 0.20, 'ctNeonM', 0.10);
+    ctRim(b, o.x, o.z, w, d, sy - 0.20, 'ctNeonM', 0.10);
+    ctCrown(b, o.x, o.z, w, d, sy + solidH, 'frame', o.seed || 3);
+    ctGlow(o.x, y0 + legH + voidH * 0.6, o.z, 0x4dff9a, 6.0, 0.12);
+    return { top: sy + solidH + 2.2, w: w, d: d };
+  }
+
+  /* ⑦ 螺旋坡道塔 —— 中央实心筒 + 一圈绕升的悬挑板，
+     外缘挂发光边。从任何角度看都有一条斜向上的线。 */
+  function ctArtHelix(b, o) {
+    const y0 = o.y0 || 0, h = o.h, w = o.w, d = o.d;
+    const cw = w * 0.52, cd = d * 0.52;
+    b.cyl('ctT4', cw * 0.56, cw * 0.56, h, 8, o.x, y0 + h / 2, o.z, 0, Math.PI / 8, 0);
+    ctRingBands(b, o.x, o.z, cw * 0.56, y0, h, 8, Math.PI / 8, o.seed || 5, 3.6);
+    const R = Math.min(w, d) * 0.46, n = 26;
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2 * 1.6;
+      const yy = y0 + 0.8 + (h - 2.0) * (i / (n - 1));
+      const px = o.x + Math.cos(a) * R, pz = o.z + Math.sin(a) * R;
+      /* 踏板必须用亮金属：暗色板在俯视下被压成一条线，
+         整座塔就只剩「脚手架包着一根柱子」，看不出在旋。 */
+      b.box('ctFin', R * 1.02, 0.20, 0.86, px, yy, pz, 0, -a, 0);
+      b.box('ctNeonC', 0.30, 0.14, 0.86,
+        o.x + Math.cos(a) * (R + R * 0.42), yy + 0.12,
+        o.z + Math.sin(a) * (R + R * 0.42), 0, -a, 0);
+    }
+    for (let i = 0; i < 4; i++) {
+      const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
+      b.cyl('ctSteelD', 0.09, 0.11, h, 6,
+        o.x + Math.cos(a) * R * 1.38, y0 + h / 2, o.z + Math.sin(a) * R * 1.38);
+    }
+    ctCrown(b, o.x, o.z, cw, cd, y0 + h, 'disc', o.seed || 5);
+    return { top: y0 + h + 2.3, w: w, d: d };
+  }
+
+  /* ⑧ 楔形斜切塔 —— 方盒基座 + 四棱台收顶 + 一片斜挑檐。
+     斜线是这张图里最缺的东西。 */
+  function ctArtWedge(b, o) {
+    const y0 = o.y0 || 0, h = o.h, w = o.w, d = o.d;
+    const baseH = h * 0.62;
+    b.box('ctT3', w, baseH, d, o.x, y0 + baseH / 2, o.z);
+    ctFacadeOn(o.x, o.z, w, d, y0, baseH - 0.2, o.seed || 7, 1, 0.54, 1);
+    ctRim(b, o.x, o.z, w, d, y0 + baseH + 0.05, 'ctNeonM', 0.14);
+    const rt = Math.min(w, d) * 0.36, rb = Math.min(w, d) * 0.71;
+    const ph = h - baseH;
+    b.cyl('ctGlassB', rt, rb, ph, 4, o.x, y0 + baseH + ph / 2, o.z, 0, Math.PI / 4, 0);
+    for (let i = 1; i <= 3; i++) {
+      const f = i / 4, r = rb + (rt - rb) * f;
+      b.cyl('ctSteelD', r + 0.04, r + 0.04, 0.10, 4,
+        o.x, y0 + baseH + ph * f, o.z, 0, Math.PI / 4, 0);
+    }
+    b.box('ctCrown', w * 0.92, 0.26, d * 1.15, o.x, y0 + h + 0.30, o.z, 0, 0, 0.13);
+    ctRim(b, o.x, o.z, w * 0.92, d * 1.15, y0 + h + 0.45, 'ctNeonC', 0.12);
+    [-1, 1].forEach(function (s) {
+      b.to('ctSteelD', 0.09, o.x + s * w * 0.34, y0 + h - 1.4, o.z - d * 0.40,
+        o.x + s * w * 0.40, y0 + h + 0.25, o.z + d * 0.50, 5);
+    });
+    ctGlow(o.x, y0 + h * 0.8, o.z, 0x22e6ff, 7.0, 0.10);
+    return { top: y0 + h + 0.5, w: w, d: d };
+  }
+
+  /* 远景背板里也混两根圆柱 / 六棱塔，
+     否则远处一整排方盒会把近处造型塔的轮廓吃回去。 */
+  function ctArtFar(b, x, z, w, d, h, seed, kind) {
+    const R = Math.min(w, d) * 0.48;
+    if (kind === 'cyl') {
+      b.cyl('ctT3', R, R, h * 0.86, 12, x, h * 0.43, z);
+      ctRingBands(b, x, z, R, 0, h * 0.86, 12, 0, seed, 3.0);
+      b.cyl('ctCrown', R * 1.24, R * 1.24, 0.30, 12, x, h * 0.86, z);
+      b.cyl('ctSteelD', 0.05, 0.16, h * 0.14, 6, x, h * 0.93, z);
+    } else {
+      const seg = 6, rot = Math.PI / 6;
+      b.cyl('ctT2', R, R * 1.04, h * 0.80, seg, x, h * 0.40, z, 0, rot, 0);
+      ctRingBands(b, x, z, R * 1.04, 0, h * 0.80, seg, rot, seed, 3.0);
+      ctRibs(b, x, z, R * 1.05, 0, h * 0.80, seg, rot + Math.PI / seg, 'ctSteelD');
+      b.cyl('ctCrown', 0.02, R * 0.92, h * 0.20, 4, x, h * 0.90, z, 0, Math.PI / 4, 0);
+    }
+    return { top: h };
   }
 
   /* 檐口霓虹：四条细边，贴着女儿墙顶走一圈 */
@@ -7039,12 +7421,23 @@
     ];
     row.forEach(function (q, i) {
       const h = q[4];
-      const segs = [{ h: h * 0.62 }, { h: h * 0.22, w: 0.86, d: 0.86 }, { h: h * 0.16, w: 0.68, d: 0.68 }];
-      const r = ctTower(b, {
-        x: q[0], z: q[1], w: q[2], d: q[3], h: h, segs: segs,
-        key: i % 2 ? 'ctT3' : 'ctT2', style: 2, dens: 0.25, seed: 40 + i * 7,
-        op: 0.72, y0: 0.0, reg: false
-      });
+      let r;
+      /* 背板里也混两根圆柱 / 六棱塔，否则远处一整排方盒
+         会把近处造型塔的轮廓重新吃回去 */
+      if (i === 1) {
+        r = ctArtFar(b, q[0], q[1], q[2], q[3], h, 40 + i * 7, 'cyl');
+      } else if (i === 4) {
+        r = ctArtFar(b, q[0], q[1], q[2], q[3], h, 40 + i * 7, 'hex');
+      } else {
+        r = ctTower(b, {
+          x: q[0], z: q[1], w: q[2], d: q[3], h: h,
+          segs: [{ h: h * 0.62 }, { h: h * 0.22, w: 0.86, d: 0.86 },
+            { h: h * 0.16, w: 0.68, d: 0.68 }],
+          key: i % 2 ? 'ctT3' : 'ctT2', style: 2, dens: 0.25, seed: 40 + i * 7,
+          op: 0.72, y0: 0.0, reg: false,
+          crown: ['spire', '', 'dome', 'disc', '', 'blade'][i]
+        });
+      }
       /* 顶部航空灯 */
       b.box('ctTail', 0.12, 0.12, 0.12, q[0], r.top + 0.5, q[1]);
       b.cyl('ctSteelD', 0.03, 0.05, 1.0, 5, q[0], r.top + 0.2, q[1]);
@@ -7070,39 +7463,20 @@
       b.cyl('ctTank', 0.42, 0.42, 0.85, 8, q[0], 8.5, q[1]);
     });
 
-    /* T1：主塔，56 米 —— 全场唯一的制高点，四段退台收成塔尖 */
-    const t1 = ctTower(b, {
-      x: -24.4, z: -23.2, w: 7.6, d: 7.6, h: 56,
-      segs: [
-        { h: 26.0 },
-        { h: 13.0, w: 0.86, d: 0.86 },
-        { h: 11.0, w: 0.68, d: 0.68 },
-        { h: 6.0, w: 0.46, d: 0.46 }
-      ],
-      key: 'ctT1', style: 0, dens: 0.48, seed: 11
+    /* T1：主塔 —— 收分八棱塔 + 飞碟观景盘 + 针尖，56 米仍是唯一制高点 */
+    ctArtNeedle(b, {
+      x: -24.4, z: -23.2, w: 7.6, d: 7.6, h: 56, seed: 11
     });
-    /* 塔冠：一圈霓虹环 + 收尖的天线，远看就是这座城的「针」 */
-    ctRim(b, -24.4, -23.2, 3.5, 3.5, t1.top + 0.10, 'ctNeonM', 0.16);
-    b.cyl('ctSteelD', 0.10, 0.24, 5.4, 6, -24.4, t1.top + 2.7, -23.2);
-    b.box('ctTail', 0.16, 0.16, 0.16, -24.4, t1.top + 5.5, -23.2);
-    ctGlow(-24.4, t1.top + 0.4, -23.2, 0xff2d7a, 5.0, 0.22);
-    ctRoofKit(b, -24.4, -23.2, 5.0, 5.0, t1.top, 3);
 
-    /* T2：次塔，31 米 */
-    const t2 = ctTower(b, {
-      x: -24.2, z: -13.6, w: 6.6, d: 6.6, h: 31,
-      segs: [{ h: 17.0 }, { h: 14.0, w: 0.80, d: 0.80 }],
-      key: 'ctT2', style: 0, dens: 0.45, seed: 17
+    /* T2：次塔 —— 外露钢骨架，透空的「笼子」，和 T1 的实心棱柱对撞 */
+    ctArtFrame(b, {
+      x: -24.2, z: -13.6, w: 6.6, d: 6.6, h: 31, seed: 17
     });
-    ctRoofKit(b, -24.2, -13.6, 5.3, 5.3, t2.top, 7);
 
-    /* T3：靠侧巷的小塔，24 米 */
-    const t3 = ctTower(b, {
-      x: -17.0, z: -23.4, w: 4.9, d: 7.4, h: 24,
-      segs: [{ h: 14.0 }, { h: 10.0, w: 0.84, d: 0.86 }],
-      key: 'ctT4', style: 1, dens: 0.50, seed: 23
+    /* T3：靠侧巷的小塔 —— 四层错层悬挑，俯视像一摞错开的书 */
+    ctArtStagger(b, {
+      x: -17.0, z: -23.4, w: 5.4, d: 7.0, h: 24, seed: 23
     });
-    ctRoofKit(b, -17.0, -23.4, 4.1, 6.4, t3.top, 9);
 
     /* 塔间连廊 */
     ctBridge(b, -24.4, -19.3, -24.2, -16.9, 24.5, 2.0, 2.2, 'glass');
@@ -7115,11 +7489,12 @@
       b.box('ctWoodD', 0.12, 0.20, 2.8, -14.46, 2.42, z + 1.4);
     }
 
-    /* 竖向霓虹：塔身上的长条招牌 */
-    ctSign('新宿', 0xff2d7a, -20.24, 18.0, -19.0, 1.5, 7.6, Math.PI / 2, true, 0.95);
-    ctGlow(-20.0, 18.0, -19.0, 0xff2d7a, 7.0, 0.20);
-    ctSign('電脳', 0x22e6ff, -20.24, 12.0, -15.2, 1.0, 4.6, Math.PI / 2, true, 0.9);
-    ctNeonBar(-21.0, 26.5, -19.3, 0.10, 0.10, 7.4, 0xff2d7a, 0.30);
+    /* 竖向霓虹：塔身上的长条招牌。T1 换成八棱柱后，
+       原来的 x/z 会飘到塔身外面，重新贴回棱面与骨架塔东立面。 */
+    ctSign('新宿', 0xff2d7a, -20.55, 18.0, -21.0, 1.5, 7.6, Math.PI / 2, true, 0.95);
+    ctGlow(-20.35, 18.0, -21.0, 0xff2d7a, 7.0, 0.20);
+    ctSign('電脳', 0x22e6ff, -20.86, 12.0, -13.6, 1.0, 4.6, Math.PI / 2, true, 0.9);
+    ctNeonBar(-20.70, 26.5, -21.5, 0.10, 0.10, 7.4, 0xff2d7a, 0.30);
 
     b.build(g);
     return g;
@@ -7136,20 +7511,12 @@
     b.box('ctSteelD', 15.55, 0.24, 18.35, -3.70, 7.4, -18.25);
     ctFacadeOn(-3.70, -18.25, 15.4, 18.2, 0.0, 7.2, 31, 2, 0.62, 1);
 
-    /* 主体三段退台：7.4 → 24 → 31 → 35.5 */
-    const m1 = ctTower(b, {
-      x: -3.90, z: -18.60, w: 15.0, d: 14.2, h: 16.6, y0: 7.4,
-      key: 'ctT5', style: 0, dens: 0.46, seed: 33
+    /* 双塔连体：两根不等高细塔 + 三道空中连廊 + 顶部横跨门框。
+       原来这里是一块 15×14 的三段退台方盒，和 A 区的塔读起来一模一样；
+       拆成双塔之后，中间透出的天空成了这块地的「形状」。 */
+    ctArtTwin(b, {
+      x: -3.90, z: -18.60, w: 15.0, d: 14.2, h: 28.1, y0: 7.4, seed: 33
     });
-    const m2 = ctTower(b, {
-      x: -5.20, z: -19.60, w: 11.6, d: 11.2, h: 7.4, y0: 24.0,
-      key: 'ctT1', style: 0, dens: 0.50, seed: 37
-    });
-    const m3 = ctTower(b, {
-      x: -5.80, z: -20.30, w: 7.4, d: 7.0, h: 4.6, y0: 31.4,
-      key: 'ctT2', style: 0, dens: 0.42, seed: 41
-    });
-    ctRoofKit(b, -5.80, -20.30, 5.4, 5.2, m3.top, 12);
 
     /* 裙房沿街雨棚 + 二层通廊（贴在立面上，别悬空） */
     b.box('ctAwning', 1.7, 0.10, 17.6, 4.55, 3.44, -18.2);
@@ -7181,11 +7548,11 @@
       ctGlow(4.55, 6.0, q[0], q[1], 2.6, 0.22);
     });
 
-    /* 屋顶广告牌：B 的楼顶是全场最高处之一，得有个收头 */
-    b.box('ctSteelD', 0.18, 5.2, 9.0, -2.2, 33.2, -20.4);
+    /* 屋顶广告牌：贴在右塔朝 +x 的立面上，正对相机 */
+    b.box('ctSteelD', 0.18, 4.6, 7.0, 3.15, 20.5, -18.6);
     const bbTex = ctBoardTex(0xff2d7a, 0x22e6ff, 'ネオン', 'JAPANTOWN');
-    ctPlane(bbTex, 8.6, 4.9, -2.08, 33.2, -20.4, Math.PI / 2, 1, 6);
-    ctGlow(-2.0, 33.2, -20.4, 0xff2d7a, 11.0, 0.18);
+    ctPlane(bbTex, 6.6, 4.3, 3.26, 20.5, -18.6, Math.PI / 2, 1, 6);
+    ctGlow(3.30, 20.5, -18.6, 0xff2d7a, 9.0, 0.18);
 
     b.build(g);
     return g;
@@ -7245,35 +7612,25 @@
 
     /* C1：北段塔楼。往街区里退 2.8 米 —— 临街的「墙」交给裙房，
        高处才轮到塔。不这么退，主街在俯视角下永远被墙体封死。 */
-    const c1 = ctTower(b, {
-      x: 20.2, z: -22.8, w: 7.4, d: 9.0, h: 25.0,
-      segs: [{ h: 16.0 }, { h: 9.0, w: 0.84, d: 0.86 }],
-      key: 'ctT2', style: 0, dens: 0.48, seed: 51
-    });
-    ctRoofKit(b, 20.2, -22.8, 6.2, 7.7, c1.top, 15);
+    /* C1：北段塔楼 —— 圆柱塔 + 飞碟观景层 + 半球冠。
+       原来是一根 25 米方柱，换成圆柱后这片天际线才有曲线。 */
+    ctArtCyl(b, { x: 20.2, z: -22.8, w: 7.4, d: 9.0, h: 25.0, seed: 51 });
 
-    /* C2：北端第二栋，稍矮 */
-    const c2 = ctTower(b, {
+    /* C2：北端第二栋，稍矮 —— 方盒 + 金字塔顶 */
+    ctTower(b, {
       x: 26.6, z: -21.0, w: 6.4, d: 8.0, h: 17.0,
       segs: [{ h: 11.0 }, { h: 6.0, w: 0.86, d: 0.86 }],
-      key: 'ctT3', style: 1, dens: 0.51, seed: 57
+      key: 'ctT3', style: 1, dens: 0.51, seed: 57, dress: false, crown: 'pyramid'
     });
-    ctRoofKit(b, 26.6, -21.0, 5.5, 6.9, c2.top, 19);
 
-    /* C3：中段矮塔，天桥的东岸 */
-    const c3 = ctTower(b, {
-      x: 19.8, z: -11.6, w: 7.6, d: 12.2, h: 17.4,
-      segs: [{ h: 10.5 }, { h: 6.9, w: 0.88, d: 0.88 }],
-      key: 'ctT4', style: 2, dens: 0.56, seed: 63
-    });
-    ctRoofKit(b, 19.8, -11.6, 6.6, 10.7, c3.top, 23);
+    /* C3：中段 —— 镂空门洞塔，底部架空、中部整层透空做空中花园 */
+    ctArtVoid(b, { x: 19.8, z: -11.6, w: 7.6, d: 12.2, h: 17.4, seed: 63 });
 
-    /* C4：东侧补一栋，把天际线拉满 */
-    const c4 = ctTower(b, {
+    /* C4：东侧补一栋 —— 方盒 + 圆冠，把天际线拉满 */
+    ctTower(b, {
       x: 26.8, z: -10.4, w: 6.2, d: 7.6, h: 12.6,
-      key: 'ctT1', style: 1, dens: 0.48, seed: 69
+      key: 'ctT1', style: 1, dens: 0.48, seed: 69, dress: false, crown: 'dome'
     });
-    ctRoofKit(b, 26.8, -10.4, 5.4, 6.6, c4.top, 27);
 
     /* ★ 临街裙房：3.4 米进深的一排矮店屋，压到 6.5~9.5 米。
        它们才是「街墙」。有了这道矮墙，俯视角能一路看到街对面；
@@ -7310,25 +7667,22 @@
     ctSign('居酒屋', 0xffd23f, 15.60, 5.6, -14.6, 2.4, 0.86, -Math.PI / 2, false, 1);
     ctGlow(15.4, 5.6, -14.6, 0xffd23f, 4.0, 0.16);
 
-    /* 楼顶 LED 大屏（朝西南，正对相机） */
-    b.box('ctSteelD', 8.2, 4.0, 0.20, 20.2, 22.0, -18.2);
+    /* 楼顶 LED 大屏：C1 改成圆柱后，原来挂在 22 米的那块会穿进半球冠，
+       降到塔身中段、贴到圆柱南缘才挂得住 */
+    b.box('ctSteelD', 6.4, 3.2, 0.20, 20.2, 11.5, -19.42);
     const led = ctBoardTex(0x22e6ff, 0xff2d7a, '東京', 'SECTOR 07');
-    ctPlane(led, 7.6, 3.6, 20.2, 22.0, -18.34, Math.PI, 1, 6);
-    ctGlow(20.2, 22.0, -18.6, 0x22e6ff, 12.0, 0.16);
+    ctPlane(led, 5.9, 2.9, 20.2, 11.5, -19.54, Math.PI, 1, 6);
+    ctGlow(20.2, 11.5, -19.8, 0x22e6ff, 9.0, 0.16);
 
     /* C5/C6：把东侧补满。主街加宽后右半城空出一大片，
        没有这两栋，展台右缘会露出一块光秃秃的地。 */
-    const c5 = ctTower(b, {
-      x: 30.4, z: -19.4, w: 5.6, d: 8.4, h: 21.0,
-      segs: [{ h: 13.4 }, { h: 7.6, w: 0.82, d: 0.84 }],
-      key: 'ctT5', style: 0, dens: 0.44, seed: 73
-    });
-    ctRoofKit(b, 30.4, -19.4, 4.7, 7.1, c5.top, 31);
-    const c6 = ctTower(b, {
+    /* C5：螺旋坡道塔 —— 一条斜向上的线，和满城竖线错开 */
+    ctArtHelix(b, { x: 30.4, z: -19.4, w: 5.6, d: 8.4, h: 21.0, seed: 73 });
+    /* C6：方盒 + 斜切发光鳍 */
+    ctTower(b, {
       x: 30.2, z: -7.6, w: 5.4, d: 6.8, h: 14.2,
-      key: 'ctT3', style: 1, dens: 0.50, seed: 79
+      key: 'ctT3', style: 1, dens: 0.50, seed: 79, dress: false, crown: 'blade'
     });
-    ctRoofKit(b, 30.2, -7.6, 4.5, 5.8, c6.top, 35);
 
     b.build(g);
     return g;
@@ -7491,24 +7845,19 @@
     const b = new Builder();
 
     /* 北段：临主街的商厦（同样退到裙房之后） */
-    const f1 = ctTower(b, {
-      x: 21.6, z: 0.6, w: 11.4, d: 11.0, h: 15.6,
-      segs: [{ h: 9.2 }, { h: 6.4, w: 0.86, d: 0.86 }],
-      key: 'ctT4', style: 2, dens: 0.54, seed: 131
-    });
-    ctRoofKit(b, 21.6, 0.6, 9.8, 9.4, f1.top, 41);
+    /* F1：楔形斜切塔 —— 方盒基座 + 四棱台收顶 + 斜挑檐，
+       南半城最缺的就是斜线 */
+    ctArtWedge(b, { x: 21.6, z: 0.6, w: 11.4, d: 11.0, h: 15.6, seed: 131 });
 
-    /* 中段：两栋小楼拉开高差 */
-    const f2 = ctTower(b, {
+    /* 中段：两栋小楼拉开高差，塔冠也各不一样 */
+    ctTower(b, {
       x: 21.0, z: 11.6, w: 7.0, d: 8.6, h: 9.6,
-      key: 'ctT5', style: 1, dens: 0.56, seed: 137
+      key: 'ctT5', style: 1, dens: 0.56, seed: 137, dress: false, crown: 'step'
     });
-    ctRoofKit(b, 21.0, 11.6, 6.0, 7.4, f2.top, 45);
-    const f3 = ctTower(b, {
+    ctTower(b, {
       x: 26.4, z: 10.2, w: 5.6, d: 7.4, h: 12.4,
-      key: 'ctT2', style: 0, dens: 0.48, seed: 139
+      key: 'ctT2', style: 0, dens: 0.48, seed: 139, dress: false, crown: 'frame'
     });
-    ctRoofKit(b, 26.4, 10.2, 4.8, 6.3, f3.top, 49);
 
     /* 南段：矮楼 + 游戏厅，压到 6.4 米 */
     b.box('ctPodium2', 10.6, 6.4, 9.6, 21.4, 3.2, 21.6);
@@ -7564,11 +7913,11 @@
     ctCar(b, 23.3, 25.6, 0, 'ctBody3', { s: 0.94 });
 
     /* F4：东南角补一栋，别让展台右缘空着 */
-    const f4 = ctTower(b, {
+    /* F4：东南角补一栋 —— 方盒 + 飞碟冠，别让展台右缘空着 */
+    ctTower(b, {
       x: 30.0, z: 14.2, w: 5.8, d: 9.0, h: 10.8,
-      key: 'ctT1', style: 2, dens: 0.52, seed: 143
+      key: 'ctT1', style: 2, dens: 0.52, seed: 143, dress: false, crown: 'disc'
     });
-    ctRoofKit(b, 30.0, 14.2, 4.8, 7.7, f4.top, 57);
 
     /* F5：东南角商厦 + 屋顶广告塔。
        这块是画面的右下重角，一直空着会让整个构图往左上塌。 */

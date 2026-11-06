@@ -566,6 +566,9 @@
         ctGlassB: 0x3e6a8e, ctGlassT: 0x2a4260,
         ctPorc: 0xc8ccd6, ctCable: 0x1c1e26,
         ctTank: 0x585e6a, ctTankD: 0x3c424c, ctPipe: 0x565a64,
+        /* 造型塔专用：塔冠金属要比楼体亮一档，俯视时轮廓才跳得出来；
+           竖鳍是最亮的一路金属，用来在方盒上划出斜线。 */
+        ctCrown: 0x7c6a88, ctFin: 0x8a90a6,
 
         /* 木作 / 布 / 杂货 */
         ctWood: 0x6e563c, ctWoodD: 0x453324, ctCream: 0xd8cfba,
@@ -625,7 +628,12 @@
         ctAwn6: { c: 0x74408e, e: 0x8048a0 },
         /* 天桥里的车：玻璃管内部本来就暗，普通 toon 车身全糊成黑的。 */
         ctBodyL:  { c: 0x2a4a5e, e: 0x4c8aa8 },
-        ctBodyL2: { c: 0x5a4a20, e: 0xa8863a }
+        ctBodyL2: { c: 0x5a4a20, e: 0xa8863a },
+        /* 造型塔：玻璃核心筒必须自发光，否则骨架塔中间是一个黑洞；
+           环形窗带分冷/暖两路，圆柱塔才不会读成一根均匀灯管。 */
+        ctCore:   { c: 0x142a3e, e: 0x2e6c92 },
+        ctBandW:  { c: 0x182634, e: 0x4f9ac4 },
+        ctBandA:  { c: 0x2a2014, e: 0xc08a4a }
       },
       fog: { color: 0x1c1734, near: 92.0, far: 400.0 },
       light: {
