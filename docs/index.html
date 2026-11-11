@@ -9540,17 +9540,29 @@ window.PRESET = {
     b.box('ctCream', 0.38, 0.25, 0.02, x, CT_GY + 0.24, z + 0.038 * sg, -0.20 * sg, 0, 0);
   }
 
-  /* 低模小人：4 个 box + 1 个球。1.6 米的人在全景里只有十来个像素，
-     细节没有意义 —— 剪影、配色、朝向才是重点。 */
+  /* 城市行人：远处只有十来个像素，细节没意义，但「方盒身 + 肩膀横杠」
+     的剪影太生硬。改成锥台躯干 + 两条分开的腿 + 圆肩 + 细手臂，
+     材质仍严格保持 3 桶（衣 / 裤 / 肤），不增加动画 Group 的 draw call。 */
   function ctPed(b, x, z, ry, o) {
     o = o || {};
     const s = o.s || 1;
     const y0 = o.y === undefined ? CT_GY : o.y;
     const ck = o.coat || 'ctPedA';
-    b.box('ctPedP', 0.30 * s, 0.66 * s, 0.16 * s, x, y0 + 0.33 * s, z, 0, ry || 0, 0);
-    b.box(ck, 0.38 * s, 0.60 * s, 0.24 * s, x, y0 + 0.96 * s, z, 0, ry || 0, 0);
-    b.box(ck, 0.50 * s, 0.28 * s, 0.23 * s, x, y0 + 1.10 * s, z, 0, ry || 0, 0);
-    b.sph('ctPedS', 0.125 * s, x, y0 + 1.42 * s, z, 1.0, 1.05, 1.0);
+    const r = ry || 0, c = Math.cos(r), sn = Math.sin(r);
+    function P(lx, lz) { return [x + (lx * c + lz * sn) * s, z + (-lx * sn + lz * c) * s]; }
+    const t = P(0, 0);
+    [-1, 1].forEach(function (sg) {
+      const p = P(sg * 0.085, 0);
+      b.cyl('ctPedP', 0.052 * s, 0.060 * s, 0.66 * s, 7, p[0], y0 + 0.33 * s, p[1], 0, r, 0);
+    });
+    b.cyl(ck, 0.190 * s, 0.145 * s, 0.58 * s, 9, t[0], y0 + 0.95 * s, t[1], 0, r, 0);
+    b.sph(ck, 0.125 * s, t[0], y0 + 1.22 * s, t[1], 1.55, 0.52, 0.86);
+    [-1, 1].forEach(function (sg) {
+      const a = P(sg * 0.19, 0), d = P(sg * 0.235, 0.02);
+      b.to(ck, 0.045 * s, a[0], y0 + 1.20 * s, a[1], d[0], y0 + 0.86 * s, d[1], 6);
+    });
+    b.cyl('ctPedS', 0.048 * s, 0.048 * s, 0.10 * s, 7, t[0], y0 + 1.30 * s, t[1]);
+    b.sph('ctPedS', 0.118 * s, t[0], y0 + 1.44 * s, t[1], 1.0, 1.10, 0.94);
   }
 
   /* ================= 车流与行人：让城市动起来 =================
@@ -10431,17 +10443,111 @@ window.PRESET = {
     b.cyl('kfTrimD', 0.24 * sc, 0.24 * sc, 0.06 * sc, 10, x, 0.03 * sc, z);
   }
 
-  /* 低模小人：裤 / 衣 / 肩 / 头。1.5 米高，全景里只有十几个像素，不拆腿 */
+  /* ── 人物 v2 ─────────────────────────────────────────────────────
+     旧版「方盒身 + 球头 + 头顶一块方板」在近景里像积木：没脖子、没腰、
+     手臂贴身、腿是两根方柱。这里全部换成锥台 + 球 + 两点连线圆柱，
+     四肢可摆姿势，店员有围裙和帽子，顾客有肤色 / 发型 / 手提袋差异。
+     所有部件先按「面朝 +z」的局部坐标算，再整体绕 y 轴旋转到 ry。 */
   const KF_PEDK = ['kfPedA', 'kfPedB', 'kfPedC', 'kfPedD'];
-  function kfPed(b, x, z, y, coat, s, ry) {
-    s = s || 1;
-    b.box('kfPedP', 0.17 * s, 0.46 * s, 0.15 * s, x, y + 0.23 * s, z - 0.075 * s, 0, ry || 0, 0);
-    b.box('kfPedP', 0.17 * s, 0.46 * s, 0.15 * s, x, y + 0.23 * s, z + 0.075 * s, 0, ry || 0, 0);
-    b.box(coat, 0.36 * s, 0.56 * s, 0.24 * s, x, y + 0.76 * s, z, 0, ry || 0, 0);
-    b.box('kfPedS', 0.09 * s, 0.42 * s, 0.09 * s, x - 0.22 * s, y + 0.78 * s, z, 0, ry || 0, 0);
-    b.box('kfPedS', 0.09 * s, 0.42 * s, 0.09 * s, x + 0.22 * s, y + 0.78 * s, z, 0, ry || 0, 0);
-    b.sph('kfPedS', 0.145 * s, x, y + 1.16 * s, z, 1, 1.05, 1);
-    b.box('kfPedP', 0.27 * s, 0.09 * s, 0.27 * s, x, y + 1.28 * s, z);
+  const KF_SKIN = ['kfSkin1', 'kfSkin2', 'kfSkin3'];
+  const KF_HAIR = ['kfHair1', 'kfHair2', 'kfHair3', 'kfHair4'];
+
+  function kfPed(b, x, z, y, coat, s, ry, opt) {
+    s = s || 1; ry = ry || 0; opt = opt || {};
+    const Y = y || 0;
+    const sit = opt.pose === 'sit';
+    const walk = opt.pose === 'walk';
+    const staff = opt.role === 'staff';
+    const sk = KF_SKIN[(opt.skin || 0) % 3];
+    const hk = KF_HAIR[(opt.hair || 0) % 4];
+    const pants = opt.pants || 'kfPedP';
+    const c = Math.cos(ry), sn = Math.sin(ry);
+
+    const HY = sit ? 0.36 : 0.84;   // 髋
+    const TY = sit ? 0.62 : 1.06;   // 躯干中心
+    const SY = sit ? 0.84 : 1.28;   // 肩
+    const NY = sit ? 0.92 : 1.36;   // 颈
+    const HD = sit ? 1.07 : 1.51;   // 头中心
+
+    function V(lx, ly, lz) {
+      return [x + (lx * c + lz * sn) * s, Y + ly * s, z + (-lx * sn + lz * c) * s];
+    }
+    function L(k, r, a, d, seg) {
+      const p = V(a[0], a[1], a[2]), q = V(d[0], d[1], d[2]);
+      b.to(k, r * s, p[0], p[1], p[2], q[0], q[1], q[2], seg || 7);
+    }
+    function S(k, r, lx, ly, lz, sx, sy, sz) {
+      const p = V(lx, ly, lz);
+      b.sph(k, r * s, p[0], p[1], p[2], sx || 1, sy || 1, sz || 1);
+    }
+    function B(k, w, h, d, lx, ly, lz) {
+      const p = V(lx, ly, lz);
+      b.box(k, w * s, h * s, d * s, p[0], p[1], p[2], 0, ry, 0);
+    }
+    function C(k, rt, rb, h, lx, ly, lz, seg) {
+      const p = V(lx, ly, lz);
+      b.cyl(k, rt * s, rb * s, h * s, seg || 9, p[0], p[1], p[2], 0, ry, 0);
+    }
+
+    /* 腿与鞋：坐姿大腿水平前伸、小腿垂直下落；走姿前后错开 */
+    if (sit) {
+      [-1, 1].forEach(function (sg) {
+        L(pants, 0.076, [sg * 0.095, HY, 0.02], [sg * 0.095, HY - 0.02, 0.34]);
+        L(pants, 0.058, [sg * 0.095, HY - 0.02, 0.34], [sg * 0.095, 0.10, 0.34]);
+        S(pants, 0.066, sg * 0.095, HY - 0.02, 0.34);
+        B('kfShoe', 0.13, 0.09, 0.24, sg * 0.095, 0.05, 0.40);
+      });
+    } else {
+      const sw = walk ? 0.15 : 0.015;
+      [-1, 1].forEach(function (sg) {
+        const f = sg < 0 ? sw : -sw;
+        L(pants, 0.076, [sg * 0.095, HY, 0], [sg * 0.095, 0.46, f]);
+        L(pants, 0.058, [sg * 0.095, 0.46, f], [sg * 0.095, 0.10, f * 1.15]);
+        S(pants, 0.062, sg * 0.095, 0.46, f);
+        B('kfShoe', 0.13, 0.09, 0.24, sg * 0.095, 0.05, f * 1.15 + 0.05);
+      });
+    }
+    S(pants, 0.088, 0, HY, 0, 1.55, 0.72, 0.95);
+
+    /* 躯干：上宽下窄锥台 + 肩部椭球 + 脖子 */
+    C(coat, 0.205, 0.150, 0.46, 0, TY, 0, 10);
+    S(coat, 0.135, 0, SY, 0, 1.55, 0.55, 0.86);
+    C(sk, 0.052, 0.052, 0.12, 0, NY, 0, 8);
+
+    /* 手臂：上臂衣袖、前臂露肤色、球形手；走姿反相摆臂 */
+    const aw = walk ? 0.13 : (sit ? 0.14 : 0.06);
+    [-1, 1].forEach(function (sg) {
+      const f = sg < 0 ? aw : -aw;
+      const wy = sit ? 0.66 : 0.76;
+      const wz = sit ? 0.26 : f * 1.7 + 0.03;
+      L(coat, 0.062, [sg * 0.205, SY - 0.02, 0], [sg * 0.245, SY - 0.27, f * 0.5]);
+      L(sk, 0.050, [sg * 0.245, SY - 0.27, f * 0.5], [sg * 0.255, wy, wz]);
+      S(sk, 0.052, sg * 0.255, wy - 0.015, wz + 0.01);
+    });
+
+    /* 头、发型、五官 */
+    S(sk, 0.135, 0, HD, 0, 1.0, 1.10, 0.94);
+    if (!staff) {
+      /* 顶发必须偏后：盖到 z=+0.12 就会把眼睛糊掉，脸就白做了 */
+      S(hk, 0.138, 0, HD + 0.095, -0.045, 1.02, 0.44, 0.90);
+      S(hk, 0.120, 0, HD + 0.005, -0.080, 1.0, 0.95, 0.70);
+    }
+    S('kfEye', 0.019, -0.048, HD + 0.005, 0.130);
+    S('kfEye', 0.019, 0.048, HD + 0.005, 0.130);
+    S('kfRedD', 0.019, 0, HD - 0.060, 0.130, 1.5, 0.55, 0.4);
+
+    /* 店员：白围裙 + 红帽（帽檐朝脸） */
+    if (staff) {
+      B('kfApron', 0.30, 0.40, 0.035, 0, TY - 0.02, 0.147);
+      B('kfRed', 0.30, 0.045, 0.042, 0, TY + 0.17, 0.152);
+      C('kfRed', 0.132, 0.136, 0.10, 0, HD + 0.13, -0.012, 12);
+      B('kfRed', 0.21, 0.026, 0.17, 0, HD + 0.085, 0.115);
+      S(hk, 0.118, 0, HD + 0.015, -0.075, 1.0, 0.85, 0.7);
+    }
+    if (opt.bag) {
+      B('kfBag', 0.16, 0.20, 0.09, 0.30, 0.66, 0.03);
+      L('kfBag', 0.011, [0.24, 0.76, 0.03], [0.36, 0.76, 0.03], 5);
+    }
   }
 
   /* 球形行道树：低模三团叶 + 一根干，不用 willow/竹（那是水乡形制的） */
@@ -10781,13 +10887,37 @@ window.PRESET = {
     b.box('kfSteel', 0.62, 0.06, 0.62, KX1 - 0.70, KGY + 0.89, -0.60);
     b.box('kfTrimD', 0.44, 0.50, 0.44, KX1 - 0.72, KGY + 0.25, 0.42);
 
-    /* 店员 2 + 顾客 4 */
-    kfPed(b, -3.72, -1.80, KGY, KF_PEDK[0], 1.0, 0.3);
-    kfPed(b, -3.72, 1.90, KGY, KF_PEDK[1], 0.98, -0.3);
-    kfPed(b, -0.60, -1.20, KGY, KF_PEDK[2], 0.96, 1.4);
-    kfPed(b, -0.60, 1.30, KGY, KF_PEDK[3], 0.94, -1.2);
-    kfPed(b, 1.28, -3.10, KGY, KF_PEDK[1], 0.92, 0.8);
-    kfPed(b, 2.90, 0.10, KGY, KF_PEDK[0], 0.96, Math.PI);
+    /* 店员 2（围裙 + 红帽）+ 顾客 4（不同肤色 / 发型 / 走姿 / 手提袋） */
+    kfPed(b, -3.72, -1.80, KGY, KF_PEDK[0], 1.0, 0.3, { role: 'staff', skin: 0, hair: 0 });
+    kfPed(b, -3.72, 1.90, KGY, KF_PEDK[1], 0.98, -0.3, { role: 'staff', skin: 2, hair: 1 });
+    kfPed(b, -0.60, -1.20, KGY, KF_PEDK[2], 0.96, 1.4, { pose: 'walk', skin: 1, hair: 2, bag: 1 });
+    kfPed(b, -0.60, 1.30, KGY, KF_PEDK[3], 0.94, -1.2, { skin: 0, hair: 3 });
+    kfPed(b, 1.28, -3.10, KGY, KF_PEDK[1], 0.92, 0.8, { pose: 'walk', skin: 2, hair: 0 });
+    kfPed(b, 2.90, 0.10, KGY, KF_PEDK[0], 0.96, Math.PI, { skin: 1, hair: 1, bag: 1 });
+
+    /* ---- NVIDIA SimReady 开源资产（CC BY 4.0）----------------------
+       来源：NVIDIA/simready-foundation · sample_content/common_assets/props_general
+         obs_workbench_tool_a01        电工工作台
+         gen_appliance_toaster_v01_01 烤面包机
+         coffee_cup_grasp_a01         咖啡杯
+       tools/usd2nvr.py 把 geometries.usd 减面 + 按高度分段染色成
+       window.KFC_*，由 build.js 的 preset.asset 内联，仍是单文件离线。
+       几何层只有纯灰 displayColor，颜色是按高度重分的，不是资产自带材质。 */
+    function kfNV(A, x, yBase, z, ry, sc) {
+      if (!A) return;
+      sc = sc || 1;
+      /* NVR 保留资产原始坐标，底面未必在 0，按 bbox 把底面补到 yBase */
+      const bottom = A.bb[1] - A.bb[4] / 2;
+      addNV(g, A, x, yBase - bottom * sc, z, sc, ry || 0);
+    }
+    if (window.KFC_BENCH)  kfNV(window.KFC_BENCH, -6.20, KGY, 0.55, Math.PI / 2, 0.80);
+    if (window.KFC_TOASTER) kfNV(window.KFC_TOASTER, -4.02, KGY + 0.94, 2.55, 0.30, 1.0);
+    if (window.KFC_CUP) {
+      /* 室内桌 sc=0.92 → 台面约 0.735；户外桌 sc=1 → 0.795 */
+      kfNV(window.KFC_CUP, -0.90, 0.735, -3.78, 0.4, 1.0);
+      kfNV(window.KFC_CUP, 1.10, 0.735, 1.12, 1.2, 1.0);
+      kfNV(window.KFC_CUP, 5.83, 0.795, 2.54, 2.0, 1.0);
+    }
 
     b.build(g);
     return g;
@@ -10853,9 +10983,12 @@ window.PRESET = {
     });
     kfUmbrella(b, 4.60, 0.35, 1.0);
     kfUmbrella(b, 6.70, 0.35, 0.94);
-    /* 户外顾客 */
-    kfPed(b, 5.20, -0.62, 0.14, KF_PEDK[2], 0.98, 0.4);
-    kfPed(b, 6.10, 1.40, 0.14, KF_PEDK[3], 0.94, -0.8);
+    /* 坐姿两人必须放在「没有遮阳伞」的第三组圆桌：伞沿 1.02 m > 椅距 0.86 m，
+       放在有伞的桌子会把人的上半身整片切掉。椅子在桌心 ±0.608 处，座面 y=0.45 */
+    kfPed(b, 5.04, 2.09, 0.14, KF_PEDK[2], 0.96, 0.785, { pose: 'sit', skin: 0, hair: 2 });
+    kfPed(b, 6.26, 3.31, 0.14, KF_PEDK[0], 0.94, -2.356, { pose: 'sit', skin: 2, hair: 0 });
+    kfPed(b, 5.20, -1.30, 0.14, KF_PEDK[2], 0.98, 0.4, { pose: 'walk', skin: 1, hair: 3, bag: 1 });
+    kfPed(b, 6.10, 1.40, 0.14, KF_PEDK[3], 0.94, -0.8, { pose: 'walk', skin: 0, hair: 1 });
 
     /* ---- 停车场：3 辆车（车头朝店面）+ 灯柱 ---- */
     [[5.90, -7.40, 'kfCarA'], [5.90, -4.16, 'kfCarB'], [5.90, -2.54, 'kfCarC']].forEach(function (q) {
@@ -10913,7 +11046,8 @@ window.PRESET = {
       b.box('kfRed', 0.44, 0.44, 0.44, ex - 0.20, 0.78, ez);
       b.box('kfTrimD', 0.08, 0.56, 0.08, ex + 0.44, 0.74, ez);
       b.box('kfTrimD', 0.36, 0.05, 0.36, ex + 0.44, 1.02, ez);
-      kfPed(b, ex - 0.10, ez + 0.52, 0.14, KF_PEDK[1], 0.96, 0.2);
+      kfPed(b, ex - 0.10, ez + 0.52, 0.14, KF_PEDK[1], 0.96, 0.2,
+        { skin: 1, hair: 0, bag: 1, role: 'staff' });
     })();
 
     /* 旗杆：两面上校旗（用贴图 plane 做双面） */

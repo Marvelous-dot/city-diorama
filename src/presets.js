@@ -676,6 +676,7 @@
       title: '肯德基 · 得来速店',
       kfc: true,
       kfcName: 'KFC',
+      asset: 'src/kfc_assets.js',
       emis: 1.0,
       lampK: 1.0,
       sky: ['#fdfaf2', '#f1ede2', '#d9e0e3', '#c2cdd2'],
@@ -718,6 +719,10 @@
         /* 人 / 车 */
         kfPedA: 0x4a5872, kfPedB: 0xa85c6a, kfPedC: 0x6c7c60, kfPedD: 0xc0a882,
         kfPedP: 0x24262e, kfPedS: 0xc0a084,
+        /* 人物 v2：肤色 / 发色 / 鞋 / 五官 / 围裙 / 手提袋 */
+        kfSkin1: 0xf3cba8, kfSkin2: 0xd8a274, kfSkin3: 0xa9744d,
+        kfHair1: 0x2b2522, kfHair2: 0x6a4630, kfHair3: 0xa8834f, kfHair4: 0x4a4a52,
+        kfShoe: 0x2b2c32, kfEye: 0x2a2522, kfApron: 0xf6f2e7, kfBag: 0xd9b25c,
         kfCarA: 0xd8d3c8, kfCarB: 0x4c6c7c, kfCarC: 0xb8503c,
         kfCarGlass: 0x5d7480, kfTire: 0x35353a
       },
