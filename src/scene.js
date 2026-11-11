@@ -9827,12 +9827,783 @@
     return g;
   }
 
+  /* ================= 肯德基 · 快餐店（独立形制 kfc） =================
+     正面朝 +X（与 store / club / wh 一致），相机从 +X/+Z 象限斜俯看进来。
+     屋顶前半剖开 —— 微缩模型展示室内的常规做法，用餐区、点餐台、后厨
+     才能同时被读出来；后半只留一带平顶放设备，避免「没盖完的房子」。 */
+  const KFC = !!PS.kfc;
+  const KX0 = -7.40, KX1 = 2.30, KZ0 = -5.40, KZ1 = 5.40;
+  const KGY = 0.14, KH = 4.05, KS0 = 4.05, KS1 = 4.95;
+  const KROOF_X1 = -5.20;                 // 屋顶只盖后墙这一带
+  const KNAME = cfg(PS.kfcName, 'KFC');
+
+  /* ---------- 画布招牌：一店能被认出来，靠的是身份物 ---------- */
+  function kfStripes(c, x0, y0, w, h, n, c1, c2) {
+    for (let i = 0; i < n; i++) {
+      c.fillStyle = i % 2 ? c1 : c2;
+      c.fillRect(x0 + (w * i) / n, y0, w / n + 0.6, h);
+    }
+  }
+
+  /* 简笔上校：白发 / 白胡 / 黑框眼镜 / 黑领结。
+     远景只认「白块 + 两个黑点」的比例，画太细反而糊成一团。 */
+  function kfColonel(c, cx, cy, r) {
+    c.save(); c.translate(cx, cy);
+    c.fillStyle = '#f6f2e8';
+    c.beginPath(); c.ellipse(0, 0.02 * r, 0.60 * r, 0.70 * r, 0, 0, Math.PI * 2); c.fill();
+    /* 西装肩 */
+    c.fillStyle = '#22262c';
+    c.beginPath();
+    c.moveTo(-0.72 * r, 0.98 * r); c.lineTo(-0.48 * r, 0.52 * r);
+    c.lineTo(0.48 * r, 0.52 * r); c.lineTo(0.72 * r, 0.98 * r);
+    c.closePath(); c.fill();
+    /* 白发：顶部 + 两鬓 */
+    c.fillStyle = '#ffffff';
+    c.beginPath(); c.ellipse(0, -0.48 * r, 0.62 * r, 0.36 * r, 0, Math.PI, 0); c.fill();
+    c.beginPath(); c.ellipse(-0.56 * r, -0.08 * r, 0.16 * r, 0.34 * r, 0.18, 0, Math.PI * 2); c.fill();
+    c.beginPath(); c.ellipse(0.56 * r, -0.08 * r, 0.16 * r, 0.34 * r, -0.18, 0, Math.PI * 2); c.fill();
+    /* 白胡：八字 + 下巴 */
+    c.beginPath(); c.ellipse(-0.19 * r, 0.30 * r, 0.26 * r, 0.15 * r, 0.24, 0, Math.PI * 2); c.fill();
+    c.beginPath(); c.ellipse(0.19 * r, 0.30 * r, 0.26 * r, 0.15 * r, -0.24, 0, Math.PI * 2); c.fill();
+    c.beginPath(); c.ellipse(0, 0.56 * r, 0.30 * r, 0.22 * r, 0, 0, Math.PI * 2); c.fill();
+    /* 眼镜 */
+    c.strokeStyle = '#20242a'; c.lineWidth = 0.075 * r;
+    [[-0.25, -0.10], [0.25, -0.10]].forEach(function (q) {
+      c.beginPath(); c.arc(q[0] * r, q[1] * r, 0.20 * r, 0, Math.PI * 2); c.stroke();
+    });
+    c.beginPath(); c.moveTo(-0.05 * r, -0.10 * r); c.lineTo(0.05 * r, -0.10 * r); c.stroke();
+    c.fillStyle = '#20242a';
+    [[-0.25, -0.10], [0.25, -0.10]].forEach(function (q) {
+      c.beginPath(); c.arc(q[0] * r, q[1] * r, 0.062 * r, 0, Math.PI * 2); c.fill();
+    });
+    /* 领结 */
+    c.fillStyle = '#1f2329';
+    c.beginPath(); c.moveTo(-0.05 * r, 0.72 * r); c.lineTo(-0.34 * r, 0.60 * r);
+    c.lineTo(-0.34 * r, 0.86 * r); c.closePath(); c.fill();
+    c.beginPath(); c.moveTo(0.05 * r, 0.72 * r); c.lineTo(0.34 * r, 0.60 * r);
+    c.lineTo(0.34 * r, 0.86 * r); c.closePath(); c.fill();
+    c.restore();
+  }
+
+  TEX.kfSign = canvasTex(1600, 220, function (c, w, h) {
+    c.fillStyle = '#c8102e'; c.fillRect(0, 0, w, h);
+    /* 上下两道白细边，灯箱才有厚度 */
+    c.fillStyle = '#ffffff'; c.fillRect(0, 0, w, 9); c.fillRect(0, h - 9, w, 9);
+    /* 左侧头像圆章 */
+    c.fillStyle = '#ffffff';
+    c.beginPath(); c.arc(118, h / 2, 88, 0, Math.PI * 2); c.fill();
+    kfColonel(c, 118, h / 2 - 6, 78);
+    /* KFC 大字 */
+    c.fillStyle = '#ffffff';
+    c.textAlign = 'left'; c.textBaseline = 'middle';
+    c.font = '900 156px Arial Black, Arial, sans-serif';
+    c.fillText(KNAME, 232, h / 2 + 2);
+    /* 右侧中英文字 */
+    c.textAlign = 'right';
+    c.font = '700 52px "Microsoft YaHei", SimHei, sans-serif';
+    c.fillText('肯德基', w - 40, 78);
+    c.fillStyle = 'rgba(255,255,255,0.78)';
+    c.font = '600 24px Arial, sans-serif';
+    c.fillText('KENTUCKY  FRIED  CHICKEN', w - 40, 140);
+    c.fillText('SINCE  1952  ·  FINGER  LICKIN  GOOD', w - 40, 178);
+  });
+
+  TEX.kfBucket = canvasTex(512, 512, function (c, w, h) {
+    kfStripes(c, 0, 0, w, h, 14, '#ffffff', '#c8102e');
+    c.fillStyle = 'rgba(255,255,255,0.94)';
+    c.beginPath(); c.ellipse(w / 2, h / 2, 168, 128, 0, 0, Math.PI * 2); c.fill();
+    kfColonel(c, w / 2, h / 2 - 40, 74);
+    c.fillStyle = '#c8102e'; c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.font = '900 82px Arial Black, Arial, sans-serif';
+    c.fillText(KNAME, w / 2, h / 2 + 76);
+  });
+
+  TEX.kfPylon = canvasTex(420, 760, function (c, w, h) {
+    c.fillStyle = '#c8102e'; c.fillRect(0, 0, w, h);
+    c.fillStyle = '#ffffff'; c.fillRect(0, 0, w, 12); c.fillRect(0, h - 12, w, 12);
+    c.fillStyle = '#ffffff';
+    c.beginPath(); c.arc(w / 2, 132, 96, 0, Math.PI * 2); c.fill();
+    kfColonel(c, w / 2, 128, 84);
+    c.fillStyle = '#ffffff'; c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.font = '900 132px Arial Black, Arial, sans-serif';
+    c.fillText(KNAME, w / 2, 306);
+    c.font = '700 40px "Microsoft YaHei", SimHei, sans-serif';
+    c.fillText('全 家 桶 · 吮 指 原 味 鸡', w / 2, 386);
+    c.fillStyle = 'rgba(255,255,255,0.20)'; c.fillRect(40, 430, w - 80, 3);
+    c.fillStyle = '#ffffff';
+    c.font = '900 56px Arial, sans-serif';
+    c.fillText('24 HOURS', w / 2, 492);
+    c.font = '700 38px "Microsoft YaHei", SimHei, sans-serif';
+    c.fillText('得 来 速 车 道', w / 2, 560);
+    c.fillStyle = '#ffffff';
+    c.beginPath(); c.moveTo(w / 2 - 90, 640); c.lineTo(w / 2 + 90, 640);
+    c.lineTo(w / 2 + 90, 668); c.lineTo(w / 2 + 136, 668);
+    c.lineTo(w / 2, 726); c.lineTo(w / 2 - 136, 668);
+    c.lineTo(w / 2 - 90, 668); c.closePath(); c.fill();
+  });
+
+  TEX.kfSide = canvasTex(440, 300, function (c, w, h) {
+    c.fillStyle = '#c8102e'; c.fillRect(0, 0, w, h);
+    kfStripes(c, 0, h - 34, w, 34, 14, '#ffffff', '#c8102e');
+    c.fillStyle = '#ffffff'; c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.font = '900 112px Arial Black, Arial, sans-serif';
+    c.fillText(KNAME, w / 2, 96);
+    c.font = '700 34px "Microsoft YaHei", SimHei, sans-serif';
+    c.fillText('得 来 速  DRIVE  THRU', w / 2, 186);
+    c.font = '600 22px Arial, sans-serif';
+    c.fillText('ORDER  ·  PAY  ·  PICK  UP', w / 2, 230);
+  });
+
+  TEX.kfMenu = canvasTex(680, 460, function (c, w, h) {
+    c.fillStyle = '#f8f5ec'; c.fillRect(0, 0, w, h);
+    c.fillStyle = '#c8102e'; c.fillRect(0, 0, w, 78);
+    c.fillStyle = '#ffffff'; c.textAlign = 'left'; c.textBaseline = 'middle';
+    c.font = '900 46px Arial Black, Arial, sans-serif'; c.fillText('MENU', 28, 40);
+    c.font = '700 34px "Microsoft YaHei", SimHei, sans-serif';
+    c.textAlign = 'right'; c.fillText('点 餐 单', w - 28, 40);
+    const items = [
+      ['香辣鸡腿堡', '¥ 21', '#d99a3c'], ['吮指原味鸡', '¥ 12', '#c8762e'],
+      ['新奥尔良烤翅', '¥ 16', '#c05a2e'], ['全家桶', '¥ 89', '#c8102e'],
+      ['薯条（大）', '¥ 12', '#e0b64a'], ['可乐 / 雪碧', '¥ 9', '#4a6a8a']
+    ];
+    for (let i = 0; i < items.length; i++) {
+      const col = i % 2, row = Math.floor(i / 2);
+      const x = 28 + col * 330, y = 108 + row * 112;
+      c.fillStyle = items[i][2]; c.fillRect(x, y, 62, 62);
+      c.fillStyle = '#2a2a30'; c.textAlign = 'left';
+      c.font = '700 30px "Microsoft YaHei", SimHei, sans-serif';
+      c.fillText(items[i][0], x + 78, y + 22);
+      c.fillStyle = '#c8102e'; c.font = '800 30px Arial, sans-serif';
+      c.fillText(items[i][1], x + 78, y + 54);
+      c.fillStyle = 'rgba(0,0,0,0.10)'; c.fillRect(x, y + 88, 292, 2);
+    }
+  });
+
+  TEX.kfPoster = canvasTex(360, 500, function (c, w, h) {
+    c.fillStyle = '#c8102e'; c.fillRect(0, 0, w, h);
+    c.fillStyle = '#ffffff'; c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.font = '900 52px "Microsoft YaHei", SimHei, sans-serif';
+    c.fillText('吮 指 原 味 鸡', w / 2, 62);
+    c.font = '600 20px Arial, sans-serif';
+    c.fillText('ORIGINAL  RECIPE', w / 2, 108);
+    /* 炸鸡：三块不规则金黄团 */
+    c.fillStyle = '#d99a3c';
+    [[180, 250, 76, 62], [128, 316, 58, 48], [232, 322, 62, 52]].forEach(function (q) {
+      c.beginPath(); c.ellipse(q[0], q[1], q[2], q[3], 0.3, 0, Math.PI * 2); c.fill();
+    });
+    c.fillStyle = '#f0c070';
+    [[168, 236, 22], [196, 268, 16], [122, 306, 14], [240, 312, 15]].forEach(function (q) {
+      c.beginPath(); c.arc(q[0], q[1], q[2], 0, Math.PI * 2); c.fill();
+    });
+    c.fillStyle = '#ffffff';
+    c.font = '900 64px Arial Black, Arial, sans-serif';
+    c.fillText('¥ 12', w / 2, 418);
+    c.font = '600 20px "Microsoft YaHei", SimHei, sans-serif';
+    c.fillText('限 时 特 惠  ·  每 日 供 应', w / 2, 466);
+  });
+
+  TEX.kfLane = canvasTex(1024, 128, function (c, w, h) {
+    c.clearRect(0, 0, w, h);
+    c.fillStyle = 'rgba(255,255,255,0.86)';
+    c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.font = '900 76px Arial Black, Arial, sans-serif';
+    c.fillText('D R I V E   T H R U   →', w / 2, h / 2);
+  });
+
+  TEX.kfEntry = canvasTex(360, 140, function (c, w, h) {
+    c.fillStyle = '#c8102e'; c.fillRect(0, 0, w, h);
+    c.fillStyle = '#ffffff'; c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.font = '900 62px Arial Black, Arial, sans-serif'; c.fillText('OPEN', w / 2, 54);
+    c.font = '700 26px "Microsoft YaHei", SimHei, sans-serif';
+    c.fillText('营 业 中  ·  24H', w / 2, 108);
+  });
+
+  /* 立起来的贴图面（法线朝 +X 用 ry=Math.PI/2；贴地用 kfGround） */
+  function kfPlane(g, tex, w, h, x, y, z, ry, dbl) {
+    const m = new T.Mesh(new T.PlaneGeometry(w, h), new T.MeshBasicMaterial({
+      map: tex, side: dbl ? T.DoubleSide : T.FrontSide
+    }));
+    m.position.set(x, y, z); m.rotation.y = ry || 0; m.renderOrder = 3;
+    g.add(m); return m;
+  }
+  function kfGround(g, tex, w, d, x, y, z, rz) {
+    const m = new T.Mesh(new T.PlaneGeometry(w, d), new T.MeshBasicMaterial({
+      map: tex, transparent: true, depthWrite: false, side: T.DoubleSide
+    }));
+    m.rotation.set(-Math.PI / 2, 0, rz || 0);
+    m.position.set(x, y, z); m.renderOrder = 2;
+    g.add(m); return m;
+  }
+
+  /* ---------- 通用小件 ---------- */
+  /* 红白条纹柱：快餐店的经典识别件，四面都贴条纹才抗旋转 */
+  function kfStripePost(b, x, z, y0, h, w) {
+    b.box('kfWhite', w, h, w, x, y0 + h / 2, z);
+    const n = 5;
+    for (let i = 0; i < n; i++) {
+      const yy = y0 + (h * (i + 0.5)) / n;
+      b.box('kfRed', w + 0.02, h / n * 0.44, w + 0.02, x, yy, z);
+    }
+    b.box('kfTrimD', w + 0.10, 0.10, w + 0.10, x, y0 + 0.05, z);
+    b.box('kfTrimD', w + 0.10, 0.10, w + 0.10, x, y0 + h - 0.05, z);
+  }
+
+  /* 圆桌 + 四椅：桌面必须比椅背高一档，俯视才读得出「一组座」 */
+  function kfTableSet(b, x, z, seatKey, sc) {
+    sc = sc || 1;
+    b.cyl('kfTable', 0.54 * sc, 0.54 * sc, 0.07 * sc, 12, x, 0.76 * sc, z);
+    b.cyl('kfTableD', 0.46 * sc, 0.46 * sc, 0.03 * sc, 12, x, 0.715 * sc, z);
+    b.cyl('kfTrimD', 0.055 * sc, 0.075 * sc, 0.70 * sc, 8, x, 0.38 * sc, z);
+    b.cyl('kfTrimD', 0.30 * sc, 0.30 * sc, 0.035 * sc, 10, x, 0.045 * sc, z);
+    for (let i = 0; i < 4; i++) {
+      const a = i * Math.PI / 2 + Math.PI / 4;
+      const px = x + Math.cos(a) * 0.86 * sc, pz = z + Math.sin(a) * 0.86 * sc;
+      b.box(seatKey, 0.40 * sc, 0.06 * sc, 0.40 * sc, px, 0.45 * sc, pz, 0, -a, 0);
+      b.box(seatKey, 0.40 * sc, 0.44 * sc, 0.055 * sc,
+        px - Math.cos(a) * 0.19 * sc, 0.68 * sc, pz - Math.sin(a) * 0.19 * sc, 0, -a, 0);
+      b.cyl('kfTrimD', 0.025 * sc, 0.025 * sc, 0.42 * sc, 6, px, 0.22 * sc, pz);
+    }
+    /* 桌上托盘 + 一杯可乐，让「有人在吃」有出处 */
+    b.box('kfCream', 0.30 * sc, 0.018 * sc, 0.22 * sc, x + 0.08 * sc, 0.805 * sc, z);
+    b.cyl('kfCup', 0.055 * sc, 0.045 * sc, 0.17 * sc, 10, x + 0.02 * sc, 0.895 * sc, z);
+    b.cyl('kfCupL', 0.058 * sc, 0.058 * sc, 0.025 * sc, 10, x + 0.02 * sc, 0.99 * sc, z);
+    b.box('kfFries', 0.10 * sc, 0.13 * sc, 0.05 * sc, x + 0.19 * sc, 0.88 * sc, z);
+  }
+
+  /* 遮阳伞：红伞 + 白伞尖 + 白伞沿。伞面不铺满是为了不盖住桌上的东西 */
+  function kfUmbrella(b, x, z, sc) {
+    sc = sc || 1;
+    b.cyl('kfTrimD', 0.035 * sc, 0.035 * sc, 2.30 * sc, 8, x, 1.15 * sc, z);
+    b.cyl('kfRed', 0.045 * sc, 1.02 * sc, 0.34 * sc, 12, x, 2.34 * sc, z);
+    b.cyl('kfWhite', 1.02 * sc, 1.02 * sc, 0.025 * sc, 12, x, 2.18 * sc, z);
+    b.cyl('kfWhite', 0.055 * sc, 0.055 * sc, 0.14 * sc, 8, x, 2.58 * sc, z);
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2;
+      b.box('kfWhite', 0.05 * sc, 0.012 * sc, 1.00 * sc,
+        x + Math.cos(a) * 0.50 * sc, 2.28 * sc, z + Math.sin(a) * 0.50 * sc,
+        0, -a, 0);
+    }
+    b.cyl('kfTrimD', 0.24 * sc, 0.24 * sc, 0.06 * sc, 10, x, 0.03 * sc, z);
+  }
+
+  /* 低模小人：裤 / 衣 / 肩 / 头。1.5 米高，全景里只有十几个像素，不拆腿 */
+  const KF_PEDK = ['kfPedA', 'kfPedB', 'kfPedC', 'kfPedD'];
+  function kfPed(b, x, z, y, coat, s, ry) {
+    s = s || 1;
+    b.box('kfPedP', 0.17 * s, 0.46 * s, 0.15 * s, x, y + 0.23 * s, z - 0.075 * s, 0, ry || 0, 0);
+    b.box('kfPedP', 0.17 * s, 0.46 * s, 0.15 * s, x, y + 0.23 * s, z + 0.075 * s, 0, ry || 0, 0);
+    b.box(coat, 0.36 * s, 0.56 * s, 0.24 * s, x, y + 0.76 * s, z, 0, ry || 0, 0);
+    b.box('kfPedS', 0.09 * s, 0.42 * s, 0.09 * s, x - 0.22 * s, y + 0.78 * s, z, 0, ry || 0, 0);
+    b.box('kfPedS', 0.09 * s, 0.42 * s, 0.09 * s, x + 0.22 * s, y + 0.78 * s, z, 0, ry || 0, 0);
+    b.sph('kfPedS', 0.145 * s, x, y + 1.16 * s, z, 1, 1.05, 1);
+    b.box('kfPedP', 0.27 * s, 0.09 * s, 0.27 * s, x, y + 1.28 * s, z);
+  }
+
+  /* 球形行道树：低模三团叶 + 一根干，不用 willow/竹（那是水乡形制的） */
+  function kfTree(b, x, z, s) {
+    s = s || 1;
+    b.cyl('kfBark', 0.10 * s, 0.15 * s, 1.45 * s, 8, x, 0.72 * s, z);
+    [[0, 1.70, 0, 0.72, 'kfLeaf1'], [-0.42, 1.50, 0.14, 0.50, 'kfLeaf2'],
+     [0.40, 1.56, -0.12, 0.54, 'kfLeaf3'], [0.06, 2.14, 0, 0.44, 'kfLeaf1']].forEach(function (q) {
+      b.sph(q[4], q[3] * s, x + q[0] * s, q[1] * s, z + q[2] * s, 1, 0.86, 1);
+    });
+    b.cyl('kfGrass', 0.70 * s, 0.70 * s, 0.06 * s, 12, x, 0.03 * s, z);
+  }
+
+  /* ================= 1. Site：室外场地 ================= */
+  function buildKfcSite() {
+    const g = new T.Group(), b = new Builder();
+
+    /* 展台三层剖切 */
+    b.box('kfBase2', 21.0, 0.30, 19.6, 0.80, -1.82, 0);
+    b.box('kfBase', 20.4, 0.16, 19.0, 0.80, -1.58, 0);
+    b.box('stoneD', 19.8, 1.50, 18.4, 0.80, -0.75, 0);
+
+    /* 人行道：预制砖，三色随机 */
+    for (let x = 2.36; x < 3.52; x += 0.58) {
+      for (let z = -9.10; z < 9.10; z += 0.58) {
+        const m = (Math.round(x * 10) + Math.round(z * 10)) % 5;
+        b.box(m === 0 ? 'kfCream' : (m === 2 ? 'kfWalk2' : 'kfWalk'),
+          0.55, 0.14, 0.55, x + 0.28, 0.07, z + 0.28);
+      }
+    }
+    /* 路缘 */
+    b.box('kfCurb', 0.18, 0.20, 18.2, 3.58, 0.06, 0);
+    b.box('stoneD', 0.10, 0.10, 18.2, 3.70, 0.03, 0);
+
+    /* 沥青：停车场 + 得来速车道分开铺，颜色分两阶才有「车道」的读感 */
+    b.box('kfAsphalt', 6.60, 0.08, 18.2, 6.90, 0.04, -0.30);
+    b.box('kfLane', 18.4, 0.09, 2.60, 1.00, 0.045, 7.28);
+
+    /* 车位线：6 格沿 z 排，车头朝店面（-X） */
+    for (let i = 0; i <= 6; i++) {
+      const z = -8.60 + i * 1.62;
+      b.box('kfLine', 4.10, 0.012, 0.055, 6.05, 0.086, z);
+    }
+    b.box('kfLine', 0.055, 0.012, 9.72, 8.10, 0.086, -3.74);
+    /* 无障碍车位：黄斜纹 + 轮椅位留白 */
+    for (let i = 0; i < 5; i++) b.box('kfLineY', 0.30, 0.012, 0.055, 4.42 + i * 0.62, 0.088, 0.05, 0, 0.62, 0);
+
+    /* 得来速车道：双黄边线 + 三个方向箭头 + 地面字 */
+    b.box('kfLineY', 18.2, 0.012, 0.075, 1.00, 0.096, 6.02);
+    b.box('kfLine', 18.2, 0.012, 0.055, 1.00, 0.096, 8.54);
+    for (let i = 0; i < 3; i++) {
+      const x = 4.60 - i * 4.30;
+      b.box('kfLine', 0.90, 0.012, 0.09, x, 0.097, 7.28);
+      b.box('kfLine', 0.26, 0.012, 0.30, x - 0.48, 0.097, 7.28, 0, 0.70, 0);
+      b.box('kfLine', 0.26, 0.012, 0.30, x - 0.48, 0.097, 7.28, 0, -0.70, 0);
+    }
+    kfGround(g, TEX.kfLane, 4.80, 0.86, 5.30, 0.101, 7.28, 0);
+
+    /* 户外用餐区：一块浅色铺装把它从停车场里划出来 */
+    b.box('kfWalk2', 5.30, 0.09, 4.30, 6.20, 0.09, 1.90);
+    for (let i = 0; i < 6; i++) b.box('kfWalk', 5.20, 0.012, 0.035, 6.20, 0.138, -0.10 + i * 0.80);
+
+    /* 绿化带：建筑北侧（远侧），填掉否则是一大片空沥青 */
+    b.box('kfGrass2', 3.10, 0.10, 12.0, -7.85, 0.05, -0.20);
+    b.box('kfGrass', 12.6, 0.10, 2.30, -1.60, 0.05, -8.15);
+    b.box('kfGrass2', 2.10, 0.10, 3.40, 9.55, 0.05, -7.30);
+    /* 灌木：一排小球，比单棵树更填得住边角 */
+    for (let i = 0; i < 11; i++) {
+      const z = -8.40 + i * 1.10;
+      b.sph(i % 3 === 0 ? 'kfLeaf3' : 'kfLeaf2', 0.34 + (i % 3) * 0.06,
+        -8.30, 0.30, z, 1, 0.78, 1);
+    }
+    kfTree(b, -7.60, -6.90, 1.00);
+    kfTree(b, -7.60, 5.90, 0.86);
+    kfTree(b, 9.60, -7.20, 0.82);
+
+    /* 门口无障碍坡道 + 地垫 */
+    b.box('kfWalk', 1.10, 0.10, 1.60, 2.86, 0.10, -1.90, 0, 0, -0.09);
+    b.box('kfRedD', 0.90, 0.02, 1.70, 2.55, 0.155, 0.10);
+
+    b.build(g);
+    return g;
+  }
+
+  /* ================= 2. Shell：店壳、招牌、屋顶 ================= */
+  function buildKfcShell() {
+    const g = new T.Group(), b = new Builder();
+
+    /* 地坪：整块室内地面，四周留 0.1 边给墙 */
+    b.box('kfFloorIn', KX1 - KX0 - 0.10, 0.12, KZ1 - KZ0 - 0.10,
+      (KX0 + KX1) / 2, KGY - 0.06, 0);
+    for (let x = KX0 + 0.70; x < KX1 - 0.20; x += 0.94)
+      b.box('kfFloorLine', 0.016, 0.012, KZ1 - KZ0 - 0.30, x, KGY + 0.003, 0);
+    for (let z = KZ0 + 0.70; z < KZ1 - 0.20; z += 0.94)
+      b.box('kfFloorLine', KX1 - KX0 - 0.30, 0.012, 0.016, (KX0 + KX1) / 2, KGY + 0.003, z);
+
+    /* 后墙（实墙）+ 墙裙 */
+    b.box('kfWall', 0.24, KH, KZ1 - KZ0, KX0 + 0.12, KH / 2, 0);
+    b.box('kfRedD', 0.055, 0.92, KZ1 - KZ0 - 0.10, KX0 + 0.27, 0.46, 0);
+    /* 后墙竖肋 + 排风口 */
+    for (let i = 0; i < 6; i++) b.box('kfWallD', 0.04, KH - 1.0, 0.10, KX0 + 0.26, KH / 2 + 0.4, -4.20 + i * 1.68);
+    b.box('kfMetalD', 0.10, 0.70, 1.20, KX0 + 0.30, 2.90, 3.20);
+    for (let i = 0; i < 5; i++) b.box('kfMetal', 0.06, 0.06, 1.08, KX0 + 0.36, 2.62 + i * 0.14, 3.20);
+
+    /* 北墙（远侧实墙） */
+    b.box('kfWall', KX1 - KX0, KH, 0.24, (KX0 + KX1) / 2, KH / 2, KZ0 + 0.12);
+    b.box('kfRedD', KX1 - KX0 - 0.10, 0.92, 0.055, (KX0 + KX1) / 2, 0.46, KZ0 + 0.27);
+
+    /* 南墙（近侧）：得来速取餐窗要开洞，按 x 拆三段 + 门楣 */
+    const WX0 = -3.30, WX1 = -1.40, WY0 = 1.28, WY1 = 2.46;
+    b.box('kfWall', WX0 - KX0, KH, 0.24, (KX0 + WX0) / 2, KH / 2, KZ1 - 0.12);
+    b.box('kfWall', KX1 - WX1, KH, 0.24, (WX1 + KX1) / 2, KH / 2, KZ1 - 0.12);
+    b.box('kfWall', WX1 - WX0, WY0, 0.24, (WX0 + WX1) / 2, WY0 / 2, KZ1 - 0.12);
+    b.box('kfWall', WX1 - WX0, KH - WY1, 0.24, (WX0 + WX1) / 2, (KH + WY1) / 2, KZ1 - 0.12);
+    /* 窗框 + 台板 + 推拉玻璃（玻璃独立 mesh，不进 Builder） */
+    b.box('kfTrim', 0.09, WY1 - WY0, 0.10, WX0, (WY0 + WY1) / 2, KZ1 + 0.04);
+    b.box('kfTrim', 0.09, WY1 - WY0, 0.10, WX1, (WY0 + WY1) / 2, KZ1 + 0.04);
+    b.box('kfTrim', WX1 - WX0, 0.09, 0.10, (WX0 + WX1) / 2, WY0, KZ1 + 0.04);
+    b.box('kfTrim', WX1 - WX0, 0.09, 0.10, (WX0 + WX1) / 2, WY1, KZ1 + 0.04);
+    b.box('kfTrim', WX1 - WX0, 0.10, 0.44, (WX0 + WX1) / 2, WY0 - 0.04, KZ1 + 0.26);
+    pane(g, WX1 - WX0 - 0.12, WY1 - WY0 - 0.14, (WX0 + WX1) / 2, (WY0 + WY1) / 2, KZ1 + 0.045, 0);
+    /* 取餐窗上的小灯箱 */
+    b.box('kfSignBox', 2.30, 0.44, 0.10, (WX0 + WX1) / 2, 2.92, KZ1 + 0.14);
+    kfPlane(g, TEX.kfSide, 2.24, 0.38, (WX0 + WX1) / 2, 2.92, KZ1 + 0.20, 0);
+
+    /* 正面玻璃幕：竖梃 + 横档 + 独立玻璃。中间两扇是自动门 */
+    const GX = KX1 + 0.02, GY0 = 0.14, GY1 = KH - 0.10;
+    pane(g, KZ1 - KZ0 - 0.20, GY1 - GY0, GX, (GY0 + GY1) / 2, 0, Math.PI / 2);
+    glare(g, 1.10, GY1 - GY0 - 0.20, GX + 0.015, (GY0 + GY1) / 2, -3.30, Math.PI / 2, 0.30);
+    glare(g, 0.70, GY1 - GY0 - 0.20, GX + 0.015, (GY0 + GY1) / 2, 2.60, Math.PI / 2, 0.30);
+    for (let i = 0; i <= 6; i++) {
+      const z = KZ0 + 0.10 + (KZ1 - KZ0 - 0.20) * i / 6;
+      b.box('kfTrim', 0.11, GY1 - GY0, 0.11, GX, (GY0 + GY1) / 2, z);
+    }
+    [1.02, 2.18, 3.34].forEach(function (y) {
+      b.box('kfTrim', 0.09, 0.075, KZ1 - KZ0 - 0.10, GX, y, 0);
+    });
+    /* 自动门：红框 + 两扇玻璃 + 推杆 + 门楣 OPEN 灯箱 */
+    b.box('kfRed', 0.16, 2.42, 0.10, GX + 0.04, 1.30, -1.02);
+    b.box('kfRed', 0.16, 2.42, 0.10, GX + 0.04, 1.30, 1.02);
+    b.box('kfRed', 0.16, 0.12, 2.14, GX + 0.04, 2.48, 0);
+    b.box('kfTrimD', 0.08, 0.045, 0.82, GX + 0.10, 1.08, -0.55);
+    b.box('kfTrimD', 0.08, 0.045, 0.82, GX + 0.10, 1.08, 0.55);
+    b.box('kfSignBox', 0.20, 0.46, 1.70, GX + 0.10, 2.78, 0);
+    kfPlane(g, TEX.kfEntry, 1.62, 0.40, GX + 0.205, 2.78, 0, Math.PI / 2);
+
+    /* 招牌带：左右两块灯箱，中间整段留空 —— 背板也必须跟着拆，
+       否则俯视时一条 1.3 米高的红板会把用餐区前半压掉。 */
+    const SX = KX1 + 0.58;   // 招牌挑出立面，俯视投影落在人行道上，不再横切室内
+    [[-3.62, 3.30], [3.62, 3.30]].forEach(function (q) {
+      b.box('kfRedD', 0.30, KS1 - KS0, q[1] + 0.16, SX, (KS0 + KS1) / 2, q[0]);
+      b.box('kfTrim', 0.08, 0.80, q[1] + 0.10, SX + 0.17, (KS0 + KS1) / 2, q[0]);
+      kfPlane(g, TEX.kfSign, q[1], 0.78, SX + 0.22, (KS0 + KS1) / 2, q[0], Math.PI / 2);
+    });
+    [-3.62, 3.62].forEach(function (z) {
+      b.to('kfTrimD', 0.04, KX1 + 0.10, KS0 - 0.42, z, SX, KS0 - 0.02, z, 6);
+    });
+    /* 顶檐也按两段拆，中间 4.2 米彻底通透，门正上方才看得进店里 */
+    [-3.62, 3.62].forEach(function (z) {
+      b.box('kfRed', 0.20, 0.20, 3.46, SX, KS1 + 0.10, z);
+    });
+    /* 招牌带下沿一排红白竖条（门店最经典的那一道），两侧才有 */
+    for (let i = 0; i < 22; i++) {
+      const z = KZ0 + 0.20 + (KZ1 - KZ0 - 0.40) * i / 22;
+      if (Math.abs(z) < 2.10) continue;
+      b.box(i % 2 ? 'kfWhite' : 'kfRed', 0.10, 0.30, 0.42, SX + 0.06, KS0 - 0.16, z);
+    }
+
+    /* 正面雨棚：只做门上方 3.4 米一段。做成整条会像一块 1.5 米宽的
+       悬挑板，30° 俯视下能把室内整整 2.6 米进深盖住。 */
+    b.box('kfTrimD', 1.50, 0.10, 3.50, KX1 + 0.72, 3.42, 0);
+    for (let i = 0; i < 6; i++) {
+      const z = -1.46 + i * 0.58;
+      b.box(i % 2 ? 'kfWhite' : 'kfRed', 1.46, 0.055, 0.57, KX1 + 0.72, 3.48, z);
+    }
+    b.box('kfWhite', 1.56, 0.10, 0.10, KX1 + 1.46, 3.40, 0);
+    [-1.60, 1.60].forEach(function (z) {
+      b.to('kfTrimD', 0.035, KX1 + 0.10, 3.92, z, KX1 + 1.40, 3.44, z, 6);
+    });
+
+    /* 四角条纹柱 + 侧墙腰线 */
+    kfStripePost(b, KX1 + 0.16, KZ0 + 0.16, 0, KH, 0.36);
+    kfStripePost(b, KX1 + 0.16, KZ1 - 0.16, 0, KH, 0.36);
+    b.box('kfRed', KX1 - KX0, 0.18, 0.06, (KX0 + KX1) / 2, 2.92, KZ0 + 0.26);
+    b.box('kfRed', KX1 - WX1, 0.18, 0.06, (WX1 + KX1) / 2, 2.92, KZ1 - 0.26);
+
+    /* 屋顶：只盖后墙一带（剖切式），上面放设备 */
+    b.box('kfRoof', KROOF_X1 - KX0 + 0.30, 0.16, KZ1 - KZ0 + 0.30,
+      (KX0 + KROOF_X1) / 2, KH + 0.08, 0);
+    b.box('kfTrimD', KROOF_X1 - KX0 + 0.36, 0.16, 0.14, (KX0 + KROOF_X1) / 2, KH + 0.21, KZ1 - 0.06);
+    /* 檐框只有正面那条是红的。两条沿 x 的红色长边在俯视下会斜穿
+       整个室内，把用餐区切成条状 —— 改深灰并压到 0.14 高。 */
+    b.box('kfRed', 0.20, 0.20, KZ1 - KZ0 + 0.36, KX1 + 0.08, KH + 0.18, 0);
+    b.box('kfTrimD', KX1 - KX0, 0.14, 0.16, (KX0 + KX1) / 2, KH + 0.15, KZ0 + 0.08);
+    b.box('kfTrimD', KX1 - KX0, 0.14, 0.16, (KX0 + KX1) / 2, KH + 0.15, KZ1 - 0.08);
+    /* 空调机组 + 排烟管 + 太阳能板，屋顶才不是一块光板 */
+    [-3.60, 0.40, 3.60].forEach(function (z, i) {
+      b.box('kfMetalD', 1.10, 0.62, 1.00, KX0 + 1.10, KH + 0.48, z);
+      b.box('kfMetal', 1.16, 0.07, 1.06, KX0 + 1.10, KH + 0.82, z);
+      b.cyl('kfTrimD', 0.30, 0.30, 0.06, 12, KX0 + 1.10, KH + 0.89, z);
+      b.box('kfTrimD', 0.16, 0.16, 0.16, KX0 + 1.10, KH + 0.96, z);
+    });
+    b.cyl('kfMetal', 0.22, 0.22, 0.94, 10, KX0 + 1.90, KH + 0.62, -1.90);
+    b.cyl('kfTrimD', 0.30, 0.24, 0.26, 10, KX0 + 1.90, KH + 1.18, -1.90);
+    b.box('kfTrimD', 1.70, 0.06, 1.20, KX0 + 1.40, KH + 0.34, 2.00, 0, 0, 0.22);
+    /* 敞口区上方三道钢梁 + 吊灯杆：暗示屋顶被剖开，也给室内一层横向线条 */
+    for (let i = 0; i < 3; i++) {
+      const x = -4.40 + i * 2.20;
+      b.box('kfBeam', 0.12, 0.14, KZ1 - KZ0 - 0.20, x, KH - 0.06, 0);
+    }
+
+    /* 屋顶小全家桶（独立 mesh 才能贴条纹 UV） */
+    (function () {
+      const bx = -3.30, bz = -3.60;
+      b.cyl('kfTrimD', 0.09, 0.09, 1.60, 8, bx, KH + 0.96, bz);
+      const bucket = new T.Mesh(new T.CylinderGeometry(0.86, 0.62, 1.28, 20, 1, true),
+        new T.MeshBasicMaterial({ map: TEX.kfBucket, side: T.DoubleSide }));
+      bucket.position.set(bx, KH + 2.36, bz);
+      g.add(bucket);
+      b.cyl('kfWhite', 0.88, 0.88, 0.10, 20, bx, KH + 3.04, bz);
+      b.cyl('kfRed', 0.90, 0.90, 0.06, 20, bx, KH + 3.12, bz);
+    })();
+
+    b.build(g, { noOutline: ['kfTube'] });
+    return g;
+  }
+
+  /* ================= 3. Interior：点餐台 / 后厨 / 用餐区 ================= */
+  function buildKfcInterior() {
+    const g = new T.Group(), b = new Builder();
+
+    /* 吊顶灯带：只沿后厨 + 用餐区两列，压在梁下不贴顶 */
+    [-5.60, -2.20, 0.90].forEach(function (z) {
+      for (let x = -6.60; x < 1.90; x += 1.70) {
+        b.box('kfTube', 1.20, 0.055, 0.13, x, KH - 0.24, z);
+      }
+    });
+    /* 后厨天花（唯一有顶的一段） */
+    b.box('kfCeil', KROOF_X1 - KX0 - 0.10, 0.08, KZ1 - KZ0 - 0.20,
+      (KX0 + KROOF_X1) / 2, KH - 0.10, 0);
+
+    /* ---- 点餐台：L 形，横段沿 z，纵段沿 x ---- */
+    const CX = -3.30, CZ = 0.0;
+    b.box('kfCounter', 0.78, 1.02, 6.60, CX, KGY + 0.51, CZ);
+    b.box('kfRed', 0.06, 0.68, 6.52, CX + 0.42, KGY + 0.52, CZ);
+    b.box('kfCounterTop', 1.02, 0.09, 6.80, CX + 0.12, KGY + 1.06, CZ);
+    b.box('kfTrimD', 1.04, 0.04, 6.86, CX + 0.12, KGY + 1.12, CZ);
+    /* 纵段（靠北墙） */
+    b.box('kfCounter', 2.60, 1.02, 0.76, CX - 1.20, KGY + 0.51, -3.30);
+    b.box('kfCounterTop', 2.72, 0.09, 0.96, CX - 1.20, KGY + 1.06, -3.30);
+    /* 三台收银机 + 托盘架 + 桌面餐盘 */
+    [-2.30, 0, 2.30].forEach(function (z, i) {
+      b.box('kfScreen', 0.10, 0.44, 0.52, CX - 0.10, KGY + 1.36, z, 0, 0, -0.22);
+      b.box('kfMenuW', 0.03, 0.32, 0.42, CX - 0.16, KGY + 1.37, z, 0, 0, -0.22);
+      b.box('kfTrimD', 0.30, 0.16, 0.34, CX + 0.16, KGY + 1.20, z);
+      b.box('kfCream', 0.34, 0.02, 0.26, CX + 0.30, KGY + 1.14, z + 0.70);
+      if (i === 1) {
+        b.box('kfBucket', 0.26, 0.30, 0.26, CX + 0.30, KGY + 1.30, z + 0.70);
+        b.cyl('kfWhite', 0.14, 0.14, 0.03, 10, CX + 0.30, KGY + 1.47, z + 0.70);
+      }
+    });
+    /* 后墙三块菜单屏：店内最有信息量的一面墙 */
+    [-3.30, 0, 3.30].forEach(function (z) {
+      b.box('kfSignBox', 0.12, 1.52, 2.10, KX0 + 0.34, 2.62, z);
+      kfPlane(g, TEX.kfMenu, 2.00, 1.42, KX0 + 0.42, 2.62, z, Math.PI / 2);
+      b.box('kfTube', 0.06, 0.05, 2.16, KX0 + 0.42, 3.42, z);
+    });
+    /* 海报 + 墙上 KFC 圆章 */
+    kfPlane(g, TEX.kfPoster, 1.10, 1.54, KX1 - 0.34, 2.30, KZ0 + 0.30, -Math.PI / 2, true);
+
+    /* ---- 后厨：炸炉 / 保温柜 / 组装台 / 油烟罩 / 冷柜 ---- */
+    [-4.20, -2.70].forEach(function (z) {
+      b.box('kfSteelD', 1.10, 0.90, 1.10, -6.20, KGY + 0.45, z);
+      b.box('kfSteel', 1.16, 0.08, 1.16, -6.20, KGY + 0.94, z);
+      b.box('kfFryer', 0.86, 0.10, 0.86, -6.20, KGY + 1.00, z);
+      b.box('kfOil', 0.70, 0.02, 0.70, -6.20, KGY + 1.06, z);
+      b.box('kfTrimD', 0.08, 0.42, 0.08, -6.62, KGY + 1.18, z);
+      b.box('kfTrimD', 0.08, 0.42, 0.08, -5.78, KGY + 1.18, z);
+      b.box('kfTrimD', 0.94, 0.06, 0.08, -6.20, KGY + 1.40, z);
+      /* 炸篮里的鸡块 */
+      for (let i = 0; i < 3; i++)
+        b.sph('kfChicken', 0.11, -6.42 + i * 0.22, KGY + 1.10, z - 0.12 + (i % 2) * 0.20, 1, 0.8, 1);
+    });
+    /* 油烟罩 + 排烟管 */
+    b.box('kfMetal', 2.20, 0.30, 3.00, -6.20, 2.74, -3.45);
+    b.box('kfMetalD', 2.30, 0.08, 3.10, -6.20, 2.56, -3.45);
+    b.box('kfMetalD', 0.60, 1.10, 0.60, -6.20, 3.40, -3.45);
+    /* 保温柜（透过玻璃能看到一排炸鸡） */
+    b.box('kfSteelD', 0.90, 1.10, 2.40, -4.72, KGY + 0.55, -2.10);
+    b.box('kfWarm', 0.82, 0.06, 2.30, -4.72, KGY + 0.94, -2.10);
+    for (let i = 0; i < 6; i++)
+      b.sph('kfChicken', 0.16, -4.72, KGY + 1.06, -3.10 + i * 0.40, 1, 0.72, 1);
+    b.box('kfSteel', 0.10, 0.90, 2.46, -4.20, KGY + 1.56, -2.10);
+    /* 汉堡组装台 + 面包 / 生菜 / 肉饼色块 */
+    b.box('kfSteelD', 1.40, 0.86, 2.00, -4.40, KGY + 0.43, 1.70);
+    b.box('kfSteel', 1.48, 0.08, 2.08, -4.40, KGY + 0.90, 1.70);
+    [['kfBun', -4.80], ['kfLeaf2', -4.35], ['kfChickenD', -3.90]].forEach(function (q) {
+      for (let i = 0; i < 3; i++) b.box(q[0], 0.28, 0.06, 0.28, q[1], KGY + 0.97, 1.10 + i * 0.58);
+    });
+    /* 冷柜：空壳（背板 + 层板 + 商品），不能写成整块 box */
+    b.box('kfSteelD', 0.10, 1.70, 1.90, -6.60, KGY + 0.85, 3.30);
+    [-6.20].forEach(function (x) {
+      [0.30, 0.85, 1.40].forEach(function (y) {
+        b.box('kfSteel', 0.72, 0.05, 1.86, x, KGY + y, 3.30);
+        for (let i = 0; i < 5; i++)
+          b.cyl('kfCup', 0.075, 0.065, 0.24, 8, x, KGY + y + 0.15, 2.60 + i * 0.36);
+      });
+    });
+
+    /* ---- 用餐区：4 组圆桌 + 1 组卡座 + 儿童区 ---- */
+    [[-1.10, -3.60], [-1.10, -1.20], [-1.10, 1.30], [0.90, -3.60], [0.90, 1.30]].forEach(function (q, i) {
+      kfTableSet(b, q[0], q[1], i % 2 ? 'kfSeatD' : 'kfSeat', 0.92);
+    });
+    /* 卡座：长凳 + 长桌 + 靠背，沿南墙 */
+    b.box('kfBooth', 0.52, 0.44, 3.20, 1.42, KGY + 0.22, 2.90);
+    b.box('kfBooth', 0.14, 0.92, 3.20, 1.68, KGY + 0.64, 2.90);
+    b.box('kfBooth', 0.52, 0.44, 3.20, -0.30, KGY + 0.22, 2.90);
+    b.box('kfTable', 1.90, 0.08, 3.00, 0.56, KGY + 0.76, 2.90);
+    b.box('kfTableD', 1.94, 0.03, 3.04, 0.56, KGY + 0.71, 2.90);
+    b.cyl('kfTrimD', 0.10, 0.12, 0.72, 8, 0.56, KGY + 0.36, 2.90);
+    /* 儿童游乐区：小滑梯 + 球池 + 彩球，是「家庭快餐店」的身份物 */
+    b.box('kfPlay3', 2.20, 0.16, 1.90, -0.20, KGY + 0.08, KZ0 + 1.20);
+    b.box('kfPlay1', 0.16, 0.42, 1.90, -1.26, KGY + 0.29, KZ0 + 1.20);
+    b.box('kfPlay2', 0.16, 0.42, 1.90, 0.86, KGY + 0.29, KZ0 + 1.20);
+    b.box('kfPlay1', 1.40, 1.10, 0.50, -0.20, KGY + 0.55, KZ0 + 0.34);
+    b.box('kfPlay2', 1.20, 0.10, 1.10, -0.20, KGY + 1.05, KZ0 + 0.92, 0, 0, -0.42);
+    for (let i = 0; i < 14; i++) {
+      const a = i * 2.40;
+      b.sph(['kfPlay1', 'kfPlay2', 'kfPlay3'][i % 3], 0.11,
+        -0.80 + (i % 5) * 0.30, KGY + 0.25, KZ0 + 1.00 + Math.sin(a) * 0.55, 1, 1, 1);
+    }
+    /* 自助饮料机 + 纸巾台 + 托盘回收 + 垃圾桶 */
+    b.box('kfRed', 0.62, 1.70, 1.30, KX1 - 0.70, KGY + 0.85, -2.20);
+    b.box('kfScreen', 0.07, 0.52, 0.94, KX1 - 0.34, KGY + 1.30, -2.20);
+    for (let i = 0; i < 3; i++) b.box('kfTrimD', 0.09, 0.16, 0.16, KX1 - 0.28, KGY + 0.86, -2.56 + i * 0.36);
+    b.box('kfSteelD', 0.58, 0.86, 0.58, KX1 - 0.70, KGY + 0.43, -0.60);
+    b.box('kfSteel', 0.62, 0.06, 0.62, KX1 - 0.70, KGY + 0.89, -0.60);
+    b.box('kfTrimD', 0.44, 0.50, 0.44, KX1 - 0.72, KGY + 0.25, 0.42);
+
+    /* 店员 2 + 顾客 4 */
+    kfPed(b, -3.72, -1.80, KGY, KF_PEDK[0], 1.0, 0.3);
+    kfPed(b, -3.72, 1.90, KGY, KF_PEDK[1], 0.98, -0.3);
+    kfPed(b, -0.60, -1.20, KGY, KF_PEDK[2], 0.96, 1.4);
+    kfPed(b, -0.60, 1.30, KGY, KF_PEDK[3], 0.94, -1.2);
+    kfPed(b, 1.28, -3.10, KGY, KF_PEDK[1], 0.92, 0.8);
+    kfPed(b, 2.90, 0.10, KGY, KF_PEDK[0], 0.96, Math.PI);
+
+    b.build(g);
+    return g;
+  }
+
+  /* ================= 4. Props：室外道具与得来速 ================= */
+  function buildKfcProps() {
+    const g = new T.Group(), b = new Builder();
+
+    /* ---- 得来速：点餐亭 + 格栅雨棚（不铺满，否则俯视把车道全盖住） ---- */
+    const PX = 3.30;
+    b.box('kfTrimD', 0.62, 0.16, 0.62, PX, 0.08, 8.62);
+    b.box('kfRed', 0.16, 2.60, 0.16, PX, 1.38, 8.62);
+    b.box('kfSignBox', 0.20, 1.65, 1.50, PX, 2.30, 8.62);
+    kfPlane(g, TEX.kfSide, 1.44, 1.55, PX + 0.11, 2.30, 8.62, Math.PI / 2);
+    b.box('kfTrimD', 0.24, 0.52, 0.26, PX - 0.42, 1.30, 8.62);
+    b.box('kfScreen', 0.06, 0.34, 0.18, PX - 0.30, 1.34, 8.62);
+    /* 雨棚：只有横梁 + 几片条板，留缝 */
+    [-4.40, 1.50].forEach(function (x) {
+      b.cyl('kfTrimD', 0.055, 0.055, 3.10, 8, x, 1.55, 7.60);
+      b.box('kfTrimD', 0.20, 0.14, 2.40, x, 3.10, 6.64);
+    });
+    b.box('kfTrimD', 6.10, 0.12, 0.12, -1.45, 3.10, KZ1 + 0.16);
+    b.box('kfTrimD', 6.10, 0.12, 0.12, -1.45, 3.10, 7.60);
+    for (let i = 0; i < 6; i++) {
+      const x = -4.30 + i * 1.02;
+      b.box(i % 2 ? 'kfWhite' : 'kfRed', 0.42, 0.055, 0.94, x, 3.18, 7.10);
+    }
+    /* 取餐窗口外的一块小站牌 */
+    b.box('kfRedD', 0.12, 1.30, 0.12, -2.30, 0.65, 8.70);
+    b.box('kfSignBox', 0.10, 0.52, 0.86, -2.30, 1.46, 8.70);
+    kfPlane(g, TEX.kfEntry, 0.80, 0.46, -2.24, 1.46, 8.70, Math.PI / 2, true);
+
+    /* ---- 立柱招牌：双面 + 顶上一个会转的全家桶 ---- */
+    (function () {
+      const px = 10.00, pz = 0.60;
+      b.box('kfWalk2', 1.50, 0.16, 1.50, px, 0.08, pz);
+      b.box('kfTrimD', 1.16, 0.22, 1.16, px, 0.27, pz);
+      b.box('kfRed', 0.42, 5.20, 0.42, px, 2.98, pz);
+      /* 贴片必须落在立柱外侧：柱宽 0.42，贴片放 ±0.14 时柱会从
+         牌面正中穿过，把 KFC 的 F 吃掉，读成「K | C」。 */
+      b.box('kfTrimD', 0.56, 2.34, 1.96, px, 4.86, pz);
+      kfPlane(g, TEX.kfPylon, 1.78, 2.26, px + 0.30, 4.86, pz, Math.PI / 2);
+      kfPlane(g, TEX.kfPylon, 1.78, 2.26, px - 0.30, 4.86, pz, -Math.PI / 2);
+      b.box('kfRed', 0.34, 0.34, 1.94, px, 6.10, pz);
+      /* 顶部旋转桶：独立 Group，用 CT_ANIM 推 rotation */
+      const bg = new T.Group();
+      const bm = new T.Mesh(new T.CylinderGeometry(0.50, 0.36, 0.84, 20, 1, true),
+        new T.MeshBasicMaterial({ map: TEX.kfBucket, side: T.DoubleSide }));
+      bg.add(bm);
+      const cap = new T.Mesh(new T.CylinderGeometry(0.52, 0.52, 0.08, 20),
+        new T.MeshToonMaterial({ color: PAL.kfWhite !== undefined ? PAL.kfWhite : 0xffffff, gradientMap: GRAD }));
+      cap.position.y = 0.46; bg.add(cap);
+      bg.position.set(px, 7.00, pz);
+      g.add(bg);
+      CT_ANIM.push(function (t) { bg.rotation.y = t * 0.22; });
+      b.box('kfTube', 0.10, 0.10, 1.96, px, 6.28, pz);
+    })();
+
+    /* ---- 户外座位：3 组圆桌 + 2 把伞 ---- */
+    [[4.60, 0.35], [6.70, 0.35], [5.65, 2.70]].forEach(function (q, i) {
+      kfTableSet(b, q[0], q[1], i % 2 ? 'kfSeat' : 'kfSeatD', 1.0);
+    });
+    kfUmbrella(b, 4.60, 0.35, 1.0);
+    kfUmbrella(b, 6.70, 0.35, 0.94);
+    /* 户外顾客 */
+    kfPed(b, 5.20, -0.62, 0.14, KF_PEDK[2], 0.98, 0.4);
+    kfPed(b, 6.10, 1.40, 0.14, KF_PEDK[3], 0.94, -0.8);
+
+    /* ---- 停车场：3 辆车（车头朝店面）+ 灯柱 ---- */
+    [[5.90, -7.40, 'kfCarA'], [5.90, -4.16, 'kfCarB'], [5.90, -2.54, 'kfCarC']].forEach(function (q) {
+      b.box(q[2], 3.40, 0.60, 1.52, q[0], 0.42, q[1]);
+      b.box(q[2], 2.10, 0.50, 1.40, q[0] - 0.20, 0.96, q[1]);
+      b.box('kfCarGlass', 1.90, 0.36, 1.42, q[0] - 0.20, 1.00, q[1]);
+      [[1.10, 0.72], [1.10, -0.72], [-1.10, 0.72], [-1.10, -0.72]].forEach(function (w) {
+        b.cyl('kfTire', 0.30, 0.30, 0.18, 10, q[0] + w[0], 0.30, q[1] + w[1], Math.PI / 2, 0, 0);
+      });
+      b.box('kfCream', 0.06, 0.12, 0.30, q[0] - 1.72, 0.50, q[1] + 0.50);
+      b.box('kfRed', 0.06, 0.12, 0.30, q[0] + 1.72, 0.50, q[1] + 0.50);
+    });
+    /* 得来速车道上一辆正在取餐的车 */
+    (function () {
+      const cx = -0.60, cz = 7.28;
+      b.box('kfCarB', 3.40, 0.60, 1.52, cx, 0.42, cz);
+      b.box('kfCarB', 2.10, 0.50, 1.40, cx - 0.20, 0.96, cz);
+      b.box('kfCarGlass', 1.90, 0.36, 1.42, cx - 0.20, 1.00, cz);
+      [[1.10, 0.72], [1.10, -0.72], [-1.10, 0.72], [-1.10, -0.72]].forEach(function (w) {
+        b.cyl('kfTire', 0.30, 0.30, 0.18, 10, cx + w[0], 0.30, cz + w[1], Math.PI / 2, 0, 0);
+      });
+    })();
+
+    /* 灯柱：只在场地端头，不挡正面玻璃 */
+    [[9.60, -5.60], [9.60, 4.60], [-8.30, 7.90]].forEach(function (q) {
+      b.cyl('kfTrimD', 0.075, 0.10, 5.20, 8, q[0], 2.60, q[1]);
+      b.box('kfTrimD', 0.90, 0.10, 0.14, q[0] - 0.42, 5.18, q[1]);
+      b.box('kfLamp', 0.46, 0.10, 0.30, q[0] - 0.78, 5.10, q[1]);
+      b.box('kfTrimD', 0.42, 0.20, 0.42, q[0], 0.10, q[1]);
+    });
+
+    /* 门口：垃圾桶 / 外卖取餐柜 / 立牌 / 外卖电动车 */
+    b.box('kfTrimD', 0.46, 0.82, 0.46, 2.90, 0.55, -3.30);
+    b.box('kfRed', 0.48, 0.10, 0.48, 2.90, 1.00, -3.30);
+    b.box('kfSignBox', 0.12, 0.56, 0.82, 2.86, 1.86, 2.40);
+    kfPlane(g, TEX.kfEntry, 0.78, 0.50, 2.92, 1.86, 2.40, Math.PI / 2, true);
+    b.box('kfTrimD', 0.10, 0.44, 0.10, 2.86, 1.52, 2.40);
+    /* 外卖取餐柜：一格一格的小门 */
+    b.box('kfRed', 0.56, 1.70, 1.40, 2.86, 0.99, 3.80);
+    /* 小门必须贴在朝相机的 +x / +z 两面；贴在背面等于一块纯红板 */
+    for (let i = 0; i < 6; i++) {
+      const yy = 0.52 + (i % 3) * 0.50, zz = 3.24 + Math.floor(i / 3) * 0.66;
+      b.box('kfWhite', 0.04, 0.40, 0.56, 3.16, yy, zz);
+      b.box('kfWhite', 0.56, 0.40, 0.04, 2.86, yy, 4.52);
+      b.box('kfTrimD', 0.05, 0.05, 0.12, 3.19, yy, zz - 0.18);
+    }
+    b.box('kfSignBox', 0.60, 0.30, 1.44, 2.86, 1.92, 3.80);
+    kfPlane(g, TEX.kfEntry, 1.38, 0.26, 3.18, 1.92, 3.80, Math.PI / 2);
+    /* 外卖电动车 + 骑手 */
+    (function () {
+      const ex = 3.02, ez = -5.60;
+      b.cyl('kfTire', 0.26, 0.26, 0.12, 10, ex - 0.52, 0.26, ez, Math.PI / 2, 0, 0);
+      b.cyl('kfTire', 0.26, 0.26, 0.12, 10, ex + 0.56, 0.26, ez, Math.PI / 2, 0, 0);
+      b.box('kfTrimD', 1.20, 0.09, 0.16, ex, 0.48, ez);
+      b.box('kfRed', 0.44, 0.44, 0.44, ex - 0.20, 0.78, ez);
+      b.box('kfTrimD', 0.08, 0.56, 0.08, ex + 0.44, 0.74, ez);
+      b.box('kfTrimD', 0.36, 0.05, 0.36, ex + 0.44, 1.02, ez);
+      kfPed(b, ex - 0.10, ez + 0.52, 0.14, KF_PEDK[1], 0.96, 0.2);
+    })();
+
+    /* 旗杆：两面上校旗（用贴图 plane 做双面） */
+    [[-9.00, -3.20], [-9.00, 2.60]].forEach(function (q) {
+      b.cyl('kfTrimD', 0.045, 0.055, 4.60, 8, q[0], 2.30, q[1]);
+      b.box('kfTrimD', 0.40, 0.20, 0.40, q[0], 0.10, q[1]);
+      kfPlane(g, TEX.kfSide, 0.74, 0.52, q[0] + 0.39, 4.10, q[1], Math.PI / 2, true);
+    });
+
+    /* 侧墙小招牌（北墙朝 -z，相机看不到，只做南墙与正面） */
+    kfPlane(g, TEX.kfSide, 2.30, 1.50, 1.10, 2.42, KZ1 + 0.32, 0, true);
+    /* 背板必须和贴片同向：贴片 ry=0 时宽度沿 x，背板若沿 z 铺就会
+       露出一块没贴图的纯红大板 */
+    b.box('kfSignBox', 2.36, 1.56, 0.10, 1.10, 2.42, KZ1 + 0.26);
+    /* 侧墙一道红白竖条腰线：一面白墙太空，给个能读出「连锁店」的横带 */
+    for (let i = 0; i < 12; i++) {
+      const x = -4.20 + i * 0.52;
+      b.box(i % 2 ? 'kfWhite' : 'kfRed', 0.50, 0.16, 0.06, x, 3.42, KZ1 + 0.27);
+    }
+
+    b.build(g);
+    return g;
+  }
+
   /* ================= 组装 ================= */
   const TOWER = !!PS.tower;
   const STORE = !!PS.store;
   const CLUB = !!PS.club;
   const WRH = !!PS.wh;
-  if (CTY) {
+  if (KFC) {
+    scene.add(buildKfcSite());
+    scene.add(buildKfcShell());
+    scene.add(buildKfcInterior());
+    scene.add(buildKfcProps());
+  } else   if (CTY) {
     scene.add(buildCtBase());
     scene.add(buildCtExterior());
     scene.add(buildCtSkyline());
@@ -9911,7 +10682,26 @@
 
   /* 室内暖光 */
   const LAMPK = cfg(PS.lampK, 1);
-  if (CTY) {
+  if (KFC) {
+    /* 店内冷白顶光 + 门口暖光 + 招牌泛光。点光压在梁下，别贴吊顶 */
+    const kfL = [
+      [-6.20, 3.20, -3.30, 16, 7.0], [-6.20, 3.20, 1.80, 15, 7.0],
+      [-3.20, 3.20, -3.00, 14, 7.0], [-3.20, 3.20, 2.60, 13, 7.0],
+      [-0.40, 3.20, -2.60, 14, 7.0], [-0.40, 3.20, 2.20, 13, 7.0],
+      [1.60, 3.20, -0.40, 12, 6.0]
+    ];
+    for (let i = 0; i < kfL.length; i++) {
+      const q = kfL[i];
+      const lp = new T.PointLight(0xf4f8ff, q[3] * LAMPK, q[4], 2);
+      lp.position.set(q[0], q[1], q[2]); scene.add(lp);
+    }
+    const kd = new T.PointLight(0xfff2dc, 9 * LAMPK, 5.0, 2);
+    kd.position.set(2.90, 2.60, 0.10); scene.add(kd);
+    [[-3.40], [3.40]].forEach(function (q) {
+      const lp = new T.PointLight(0xffe6d0, 7 * LAMPK, 5.4, 2);
+      lp.position.set(2.90, 4.90, q[0]); scene.add(lp);
+    });
+  } else   if (CTY) {
     /* 城市尺度的点光：只放在「有招牌的地方」，靠自发光和加色片铺满全场 */
     const ctL = [
       [-3.70, 6.50, 0.00, 0xffb060, 26.0, 22.0],   // 广场钠灯
@@ -10068,23 +10858,23 @@
   }
 
   const VEG = PS.veg || {};
-  const willowPos = cfg(VEG.willows, (STORE || CLUB || JD || CYB) ? [] : [[4.0, -4.35, 0.95], [-6.5, 1.95, 0.72]]);
+  const willowPos = cfg(VEG.willows, (STORE || CLUB || JD || CYB || KFC) ? [] : [[4.0, -4.35, 0.95], [-6.5, 1.95, 0.72]]);
   for (let i = 0; i < willowPos.length; i++) {
     scene.add(willow(willowPos[i][0], willowPos[i][1], willowPos[i][2]));
   }
 
-  if (!STORE && !CLUB && !WRH && !JD && !CYB) {
+  if (!STORE && !CLUB && !WRH && !JD && !CYB && !KFC) {
     boatGroup = buildBoat(5.9, 1.15, Math.PI / 2 + 0.05);
     scene.add(boatGroup);
   }
 
-  const bamPos = cfg(VEG.bamboo, (STORE || CLUB || WRH || JD || CYB) ? [] : [[-7.0, -4.6, 1.0], [-6.9, 6.9, 0.75]]);
+  const bamPos = cfg(VEG.bamboo, (STORE || CLUB || WRH || JD || CYB || KFC) ? [] : [[-7.0, -4.6, 1.0], [-6.9, 6.9, 0.75]]);
   for (let i = 0; i < bamPos.length; i++) scene.add(bamboo(bamPos[i][0], bamPos[i][1], bamPos[i][2]));
-  const potPos = cfg(VEG.pots, (STORE || CLUB || WRH || JD || CYB) ? [] : [[1.85, 2.35], [2.1, -2.55]]);
+  const potPos = cfg(VEG.pots, (STORE || CLUB || WRH || JD || CYB || KFC) ? [] : [[1.85, 2.35], [2.1, -2.55]]);
   for (let i = 0; i < potPos.length; i++) scene.add(pot(potPos[i][0], potPos[i][1]));
 
   /* ================= 招牌 / 布幡 / 晾布 ================= */
-  if (!STORE && !CLUB && !WRH && !JD && !CYB) {
+  if (!STORE && !CLUB && !WRH && !JD && !CYB && !KFC) {
   const plaqueMat = new T.MeshBasicMaterial({ map: TEX.plaque });
   const psz = cfg(PS.plaqueSize, [1.55, 0.46]);
   const plaque = new T.Mesh(new T.PlaneGeometry(psz[0], psz[1]), plaqueMat);
@@ -10108,7 +10898,7 @@
     'uniform sampler2D map; varying vec2 vUv;\n' +
     'void main(){ gl_FragColor = texture2D(map, vUv); }';
 
-  if (!TOWER && !STORE && !CLUB && !WRH && !JD && !CYB) {
+  if (!TOWER && !STORE && !CLUB && !WRH && !JD && !CYB && !KFC) {
   const bannerMat = new T.ShaderMaterial({
     uniforms: { uTime: bannerUni.uTime, uAmp: { value: 0.11 }, map: { value: TEX.banner } },
     vertexShader: clothVert, fragmentShader: clothFrag, side: T.DoubleSide
@@ -10136,14 +10926,14 @@
     vertexShader: clothVert, fragmentShader: clothFrag, side: T.DoubleSide
   });
   const cloths = [];
-  if (!TOWER && !STORE && !CLUB && !WRH && !JD && !CYB) for (let i = 0; i < 2; i++) {
+  if (!TOWER && !STORE && !CLUB && !WRH && !JD && !CYB && !KFC) for (let i = 0; i < 2; i++) {
     const c = new T.Mesh(new T.PlaneGeometry(0.7, 1.05, 4, 6), clothMat);
     c.position.set(2.62 + i * 0.86, 1.5 - i * 0.05, -1.95);
     c.rotation.y = -0.04 + i * 0.08;
     scene.add(c);
     cloths.push(c);
   }
-  if (!TOWER && !STORE && !CLUB && !WRH && !JD && !CYB) (function () {
+  if (!TOWER && !STORE && !CLUB && !WRH && !JD && !CYB && !KFC) (function () {
     const b = new Builder();
     const g = new T.Group();
     b.cyl('woodDark', 0.055, 0.065, 2.15, 6, 2.24, 1.07, -1.95);
@@ -10164,7 +10954,7 @@
   /* ================= 屋檐铜铃 ================= */
   const bells = [];
   (function () {
-    const pos = (STORE || CLUB || JD || CYB) ? [] : cfg(PS.bellPos, [[2.78, 5.86, 3.08], [2.78, 5.86, -3.86], [-5.98, 5.86, 3.08], [-5.98, 5.86, -3.86]]);
+    const pos = (STORE || CLUB || JD || CYB || KFC) ? [] : cfg(PS.bellPos, [[2.78, 5.86, 3.08], [2.78, 5.86, -3.86], [-5.98, 5.86, 3.08], [-5.98, 5.86, -3.86]]);
     for (let i = 0; i < pos.length; i++) {
       const g = new T.Group();
       g.position.set(pos[i][0], pos[i][1], pos[i][2]);
@@ -10195,7 +10985,7 @@
     patches.push({ m: p, base: op, x0: x, z0: z });
     return p;
   }
-  if (STORE || CLUB) {
+  if (STORE || CLUB || KFC) {
     // 玻璃幕面，不做木格窗光斑
   } else if (TOWER) {
     addPatch(4.4, 4.4, -2.05 + 3.2, 1.24, -0.2, 0.1, 0.18);
@@ -10244,7 +11034,10 @@
       it.s.scale.setScalar((0.08 + t * 0.42) * this.sc);
     }
   };
-  if (CTY) {
+  if (KFC) {
+    /* 厨房油烟罩一缕，锚点挂在排烟管口，别挂在屋脊正中 */
+    smokes.push(new Smoke(-5.50, KH + 1.60, -1.90, 0.85, 7));
+  } else   if (CTY) {
     /* 城市里的蒸汽：市场口、井盖、拉面摊，三缕就够，多了糊成雾 */
     smokes.push(new Smoke(-8.40, 1.10, 7.70, 1.30, 8));
     smokes.push(new Smoke(8.60, 0.10, -9.40, 1.50, 7));
@@ -10256,7 +11049,7 @@
     smokes.push(new Smoke(-3.10, 2.20, 6.10, 0.70, 5));
   } else if (JD) {
     smokes.push(new Smoke(DHCX + 0.30, DH_RG + 0.92, DW1 - 0.62, 1.15, 7));
-  } else if (!TOWER && !STORE && !CLUB && !WRH && !CYB) {
+  } else if (!TOWER && !STORE && !CLUB && !WRH && !CYB && !KFC) {
     smokes.push(new Smoke(-1.62, FL + 0.88, 0.73, 1.0, 6));
     smokes.push(new Smoke(-3.55, FL + 0.66, -2.3, 1.2, 7));
     smokes.push(new Smoke(2.3, F2 + 0.8, -0.5, 0.9, 5));

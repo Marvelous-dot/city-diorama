@@ -665,6 +665,88 @@
       },
       veg: { willows: [], bamboo: [], pots: [] },
       cam: { theta: 0.90, phi: 1.06, dist: 232.0, target: [3.0, 13.0, 3.0] }
+    },
+
+    /* ---------------------------------------------------------
+       肯德基 · 得来速店（快餐店形制）
+       红白招牌 + 剖开的前半屋顶（室内全可见）+ 户外座位 + 得来速车道
+       --------------------------------------------------------- */
+    kfc: {
+      id: 'kfc',
+      title: '肯德基 · 得来速店',
+      kfc: true,
+      kfcName: 'KFC',
+      emis: 1.0,
+      lampK: 1.0,
+      sky: ['#fdfaf2', '#f1ede2', '#d9e0e3', '#c2cdd2'],
+      vig: 'rgba(34,46,52,0.20)',
+      distMax: 90,
+      targetR: 20,
+      shadowSpan: 18,
+      shadowFar: 90,
+      palette: {
+        /* 展台 / 场地 */
+        kfBase: 0x4c5157, kfBase2: 0x3b4045,
+        kfAsphalt: 0x56595d, kfLane: 0x484c52,
+        kfLine: 0xe8e5d8, kfLineY: 0xdcb23c,
+        kfWalk: 0xc0beb2, kfWalk2: 0xaeaca2, kfCurb: 0xc8c6ba,
+        kfGrass: 0x6d844e, kfGrass2: 0x5b7139,
+        kfLeaf1: 0x7d9c50, kfLeaf2: 0x5f7c3c, kfLeaf3: 0x97b064, kfBark: 0x6a5742,
+        /* 品牌三色：红是唯一重色，白与米白负责留出呼吸 */
+        kfRed: 0xc8102e, kfRedD: 0x9c0d24,
+        kfWhite: 0xfaf8f2, kfCream: 0xf0ece0,
+        kfWall: 0xf1eee5, kfWallD: 0xdcd8cc,
+        kfTrim: 0x3a4048, kfTrimD: 0x262b31,
+        kfRoof: 0x9a9d9a,
+        /* 室内 */
+        kfFloorIn: 0xc9c5b8, kfFloorLine: 0xb0aca0,
+        kfCeil: 0xf0efe9, kfBeam: 0x8a8d90, kfTube: 0xffffff,
+        kfCounter: 0xc8102e, kfCounterTop: 0xe8e3d6,
+        kfMenuW: 0x2f4a58, kfScreen: 0x243746, kfSignBox: 0xc8102e,
+        kfLamp: 0xfff2d0,
+        /* 后厨不锈钢与食物 */
+        kfSteel: 0xb8bec2, kfSteelD: 0x7e858a,
+        kfMetal: 0xb0b6ba, kfMetalD: 0x6e757a,
+        kfFryer: 0x596066, kfOil: 0xc89530, kfWarm: 0xffc970,
+        kfChicken: 0xd99a3c, kfChickenD: 0xa9662c,
+        kfBucket: 0xc8102e, kfCup: 0xe8e2d4, kfCupL: 0xffffff,
+        kfFries: 0xe8b83c, kfBun: 0xd9a860,
+        /* 家具 / 儿童区 */
+        kfTable: 0xd8cbb0, kfTableD: 0xa89472,
+        kfSeat: 0xc8102e, kfSeatD: 0x3f6a86, kfBooth: 0x8a5c42,
+        kfPlay1: 0xe8b83c, kfPlay2: 0x3aa0c8, kfPlay3: 0x63b46a,
+        /* 人 / 车 */
+        kfPedA: 0x4a5872, kfPedB: 0xa85c6a, kfPedC: 0x6c7c60, kfPedD: 0xc0a882,
+        kfPedP: 0x24262e, kfPedS: 0xc0a084,
+        kfCarA: 0xd8d3c8, kfCarB: 0x4c6c7c, kfCarC: 0xb8503c,
+        kfCarGlass: 0x5d7480, kfTire: 0x35353a
+      },
+      emit: {
+        /* 玻璃外面是强光，室内不给底光会被压成灰黑；
+           e 取很低的值，只是防死黑，不是提亮 */
+        kfTube:     { c: 0xffffff, e: 0xffffff },
+        kfCeil:     { c: 0xf0efe9, e: 0x2a2a26 },
+        kfFloorIn:  { c: 0xc9c5b8, e: 0x141418 },
+        kfMenuW:    { c: 0x2f4a58, e: 0x2a4c60 },
+        kfScreen:   { c: 0x243746, e: 0x24485c },
+        kfSignBox:  { c: 0xc8102e, e: 0x40101a },
+        kfLamp:     { c: 0xfff2d0, e: 0xfff0c8 },
+        kfCounter:  { c: 0xc8102e, e: 0x220408 },
+        kfSteel:    { c: 0xb8bec2, e: 0x1e2224 },
+        kfTable:    { c: 0xd8cbb0, e: 0x1c1a16 },
+        kfSeat:     { c: 0xc8102e, e: 0x1c0408 },
+        kfCupL:     { c: 0xffffff, e: 0x303030 },
+        kfWarm:     { c: 0xffc970, e: 0x60401a },
+        kfCarGlass: { c: 0x5d7480, e: 0x101820 }
+      },
+      light: {
+        sun:  { color: 0xffeed0, i: 2.00, pos: [16.0, 18.5, 13.0] },
+        fill: { color: 0x9ec0d8, i: 0.60, pos: [-13, 9, -12] },
+        hemi: { sky: 0xc0d9e7, ground: 0xd8d2c2, i: 0.90 },
+        amb:  { color: 0x9bb0bc, i: 0.30 }
+      },
+      veg: { willows: [], bamboo: [], pots: [] },
+      cam: { theta: 0.62, phi: 0.98, dist: 32.0, target: [0.0, 1.70, 0.60] }
     }
 
   };

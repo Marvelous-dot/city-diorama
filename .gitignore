@@ -1,7 +1,7 @@
 # 依赖
 node_modules/
 
-# 构建产物：docs/index.html 是唯一提交的成品，其余由 `node build.js` 重新生成
+# 构建产物：docs/ 下的在线演示是提交的成品，其余由 `node build.js` 重新生成
 dist/
 
 # 本机专属的网络配置 / 凭据脚本（不入库，见 .local/github/）
