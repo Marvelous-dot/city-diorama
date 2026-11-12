@@ -755,73 +755,82 @@
     },
 
     /* ---------------------------------------------------------
-       烟雨 · 湖亭独钓（rainlake 形制）
-       水盘 + 三层远山 + 六角攒尖亭 + 一叶孤舟蓑笠翁 + 斜雨
-       阴雨的关键不是把灯调暗，是「压掉饱和 + 分层起雾 + 留白」
+       寒江雪 · 孤舟独钓（rainlake 形制）
+       柳宗元《江雪》：千山鸟飞绝，万径人踪灭。
+       88×64 米江面几乎不留岸，六层递远覆雪山脊，人踪只剩远角一座
+       将没入雪雾的小亭与三株枯树，一叶孤舟是全画面唯一浓墨。
+       「寒」靠留白 + 低饱和冷灰，不靠把灯调暗。
        --------------------------------------------------------- */
     rainlake: {
       id: 'rainlake',
-      title: '烟雨 · 湖亭独钓',
+      title: '寒江雪 · 孤舟独钓',
       rainlake: true,
       emis: 0.92,
       lampK: 0.85,
-      sky: ['#f2f6f5', '#e2eaea', '#c6d4d4', '#a8bcbe'],
-      vig: 'rgba(38,56,60,0.30)',
-      distMax: 100,
-      targetR: 24,
-      shadowSpan: 20,
-      shadowFar: 110,
-      camFar: 500,
-      fog: { color: 0xb5c6c7, near: 24.0, far: 95.0 },
-      rlRainN: 1300,
-      rlRainOp: 0.30,
+      sky: ['#f6f9fa', '#e8eff1', '#d5e0e3', '#bccbd0'],
+      vig: 'rgba(52,68,74,0.14)',
+      distMax: 340,
+      targetR: 130,
+      shadowSpan: 76,
+      shadowFar: 340,
+      camFar: 1200,
+      fog: { color: 0xdde6e8, near: 46.0, far: 250.0 },
+      rlSnowN: 900,
+      rlSnowOp: 0.40,
       rlWater: {
-        deep: [0.255, 0.335, 0.345],
-        shal: [0.385, 0.465, 0.465],
-        hi: [0.680, 0.745, 0.738],
-        fog: [0.690, 0.755, 0.755]
+        deep: [0.660, 0.722, 0.742],
+        shal: [0.806, 0.852, 0.864],
+        hi: [0.925, 0.945, 0.945],
+        fog: [0.802, 0.845, 0.854]
       },
       palette: {
-        /* 水盘底座 */
-        rlBase: 0x6f7d7c, rlBaseD: 0x4c5a5a, rlBaseL: 0x8b9896,
-        /* 远山三层：越远越淡，雾再吃掉一层 */
-        rlMtn1: 0xa8bcbc, rlMtn2: 0x8aa2a3, rlMtn3: 0x6b8586,
-        rlMtnL: 0xb9cccc, rlPine: 0x4a6660,
-        /* 岸土 / 石板 / 山石 */
-        rlBank: 0x8a9084, rlBankD: 0x5d6862,
-        rlPave: 0xa9b1aa, rlPaveD: 0x8e9992, rlPaveW: 0xc3cdc6,
-        rlStone: 0x929c98, rlStoneD: 0x6c7874, rlStoneL: 0x98a49f,
-        /* 亭：暗朱柱 + 青灰瓦，饱和度压到最低 */
-        rlWood: 0x6b5642, rlWoodD: 0x4a3c30, rlWoodL: 0x8c7458,
-        rlPillar: 0x7b4a3c, rlTile: 0x53666b, rlTileD: 0x3c4c51,
-        rlTileL: 0x6e8388, rlBrass: 0xa08b58,
-        /* 舟与蓑笠翁 */
-        rlBoat: 0x9c7950, rlBoatD: 0x53402e, rlBoatL: 0x3d3024,
-        rlStraw: 0xd0bd8d, rlStrawD: 0x6d5d3c,
+        /* 底座：淡墨压边，避免 88 米大盘出现黑框 */
+        rlBase: 0xbcc9cb, rlBaseD: 0xa9b8ba, rlBaseL: 0xd2dcdd,
+        /* 千山六层：越远越淡，最远一层几乎与雪天同色 */
+        rlMtn1: 0x5f757b, rlMtn2: 0x879da2, rlMtn3: 0xafbfc3,
+        rlMtn4: 0xc8d6d9, rlMtn5: 0xd8e2e4, rlMtnL: 0xe6eeef,
+        rlSnow: 0xf2f7f7, rlSnowD: 0xdde7e8, rlInk: 0x2c3436,
+        rlPine: 0x4a6660,
+        /* 远岸 / 石板 / 礁石 */
+        rlBank: 0x9aa8ab, rlBankD: 0x9dacae,
+        rlPave: 0xaab7b9, rlPaveD: 0x92a1a4, rlPaveW: 0xcbd7d8,
+        rlStone: 0x8e9b9e, rlStoneD: 0x647276, rlStoneL: 0xa8b5b7,
+        /* 远处小亭：木作压到近乎剪影，顶覆雪 */
+        rlWood: 0x6c7b7e, rlWoodD: 0x465356, rlWoodL: 0x87969a,
+        rlPillar: 0x4d5b5e, rlTile: 0x6a7a7e, rlTileD: 0x4b5a5e,
+        rlTileL: 0x85959a, rlBrass: 0x9aa6a8,
+        /* 孤舟与蓑笠翁：浓墨 + 唯一一点暖褐蓑衣 */
+        rlBoat: 0x606b6d, rlBoatD: 0x2e383a, rlBoatL: 0x242c2e,
+        rlStraw: 0x7d6b4c, rlStrawD: 0x4d4331,
         rlCanopy: 0x4d5a58, rlCanopyR: 0xb9c6bd,
         rlSkin: 0xd8b492, rlCloth: 0x4e5a5c,
-        rlRod: 0x9a9968, rlBasket: 0xa4854e,
-        /* 草木：全场暖色只留给荷花与灯笼 */
-        rlLeaf: 0x6f8a5e, rlLeafD: 0x5b7650, rlWillowW: 0x769265, rlBark: 0x615345,
-        rlReed: 0x7f9266, rlReedD: 0xa8a071,
+        rlRod: 0x7b8789, rlBasket: 0xa4854e,
+        /* 旧形制遗留键：保留以防材质 fallback 成洋红 */
+        rlLeaf: 0x6f8a5e, rlLeafD: 0x5b7650, rlWillowW: 0x769265,
+        rlBark: 0x615345, rlReed: 0x7f9266, rlReedD: 0xa8a071,
         rlPad: 0x5d8068, rlPadD: 0x7f9c7e,
         rlBloom: 0xd9a6ad, rlBloomD: 0xe8d09a,
         rlLamp: 0xffd9a2, rlSail: 0xd7e0dc
       },
       emit: {
-        /* 阴雨里自发光只用来「防死黑」，不是提亮 */
+        /* 雪要真的白：自发光只用来防死黑，不用来提亮整体 */
+        rlSnow:   { c: 0xe9f1f2, e: 0x2a3436 },
+        rlSnowD:  { c: 0xe6eeef, e: 0x1e282a },
         rlLamp:   { c: 0xffd9a2, e: 0x6a4520 },
         rlSail:   { c: 0xd7e0dc, e: 0x20282a },
         rlPaveW:  { c: 0xc3cdc6, e: 0x151c1c }
       },
       light: {
-        sun:  { color: 0xe4eeee, i: 0.95, pos: [16.0, 22.0, 15.0] },
-        fill: { color: 0x9dbcc4, i: 0.55, pos: [-15, 11, -13] },
-        hemi: { sky: 0xd3e0e0, ground: 0x6b7a76, i: 1.15 },
-        amb:  { color: 0xa9bcbd, i: 0.30 }
+        sun:  { color: 0xf2f7f8, i: 0.88, pos: [26.0, 38.0, 22.0] },
+        fill: { color: 0xb8cbd0, i: 0.46, pos: [-24, 18, -20] },
+        hemi: { sky: 0xeaf1f2, ground: 0x8e9c9e, i: 1.26 },
+        amb:  { color: 0xcbd8da, i: 0.32 }
       },
       veg: { willows: [], bamboo: [], pots: [] },
-      cam: { theta: 0.76, phi: 1.10, dist: 46.0, target: [0.0, 1.20, -1.00] }
+      /* 立轴式三段构图：theta≈1.50 正对 -z 群山，近水平俯角，
+         孤舟在近景偏左，右侧大片留白。theta=0 会变成从 +x 侧看，
+         横贯的群山会被拧成右侧一条斜带 —— 别再改回去。 */
+      cam: { theta: 1.50, phi: 1.32, dist: 70.0, target: [0.0, 3.0, -2.0] }
     }
 
   };
