@@ -11083,6 +11083,930 @@ window.PRESET = {
    构图关键：相机 theta≈1.50（正对 -z），phi≈1.32（近水平俯角），
    远山横贯上缘、江面占下半、孤舟在近景偏左 —— 立轴式三段，不是俯视盆景。
    ===================================================================== */
+/* =====================================================================
+   千灯 · 上元灯会（lantern / LN）—— 第 13 套独立形制
+   ---------------------------------------------------------------------
+   与寒江雪恰好相反：那边是「极静 / 留白 / 一点浓墨」，
+   这边是「极闹 / 满铺 / 万点暖光」。主角不是房子，是灯。
+   构图：暮色远山 + 落日在上，临水灯街在中，寒河与河灯在下；
+   石拱桥斜跨，桥上人潮只作单色剪影（不画脸、不画肤色）。
+   三类 GPU 粒子：花灯辉光呼吸 / 河灯顺流 / 孔明灯升空。
+   ===================================================================== */
+const LN = !!PS.lantern;
+const LN_X0 = -34.0, LN_X1 = 34.0;
+const LN_Z0 = -24.0, LN_Z1 = 17.5;
+const LN_WY = -0.12;      // 河面
+const LN_LY = 0.16;       // 岸顶
+const LN_BT = -0.66;      // 底座顶
+const LN_BB = -1.62;      // 底座底
+const LN_RZ0 = -1.60, LN_RZ1 = 9.60;   // 河道（沿 x 横贯）
+
+/* 黄昏描边压成暖墨褐，别用民居的纯黑、也别用雪景的冷灰 */
+if (LN) OUTLINE.uniforms.uColor.value.set(0x402c30);
+
+/* 确定性伪随机：每轮构建、每张截图完全一致 */
+function lnR(seed) {
+  const x = Math.sin(seed * 127.1 + 311.7) * 43758.5453;
+  return x - Math.floor(x);
+}
+
+/* 任意折线 → 水平棱柱（Shape 在 XY，绕 X -90° 后挤出量变成世界 y） */
+function lnSlab(b, key, pts, y0, y1) {
+  const sh = new T.Shape();
+  sh.moveTo(pts[0][0], -pts[0][1]);
+  for (let i = 1; i < pts.length; i++) sh.lineTo(pts[i][0], -pts[i][1]);
+  sh.closePath();
+  const g = new T.ExtrudeGeometry(sh, {
+    depth: y1 - y0, bevelEnabled: false, curveSegments: 1, steps: 1
+  });
+  g.rotateX(-Math.PI / 2);
+  g.translate(0, y0, 0);
+  b.add(key, g);
+}
+
+/* 竖立山板：折线画在 XY，沿 z 挤出厚度 */
+function lnRidge(b, key, xs, hs, z, dep, foot) {
+  /* 山脚一律沉到 -6，只留脊线在画面里；两端延伸到 ±72 出画，
+     否则 Shape 两端的竖直边会在画面里形成「台阶状纸片」。 */
+  const sh = new T.Shape();
+  sh.moveTo(xs[0], foot);
+  for (let i = 0; i < xs.length; i++) sh.lineTo(xs[i], hs[i]);
+  sh.lineTo(xs[xs.length - 1], foot);
+  sh.closePath();
+  const g = new T.ExtrudeGeometry(sh, { depth: dep, bevelEnabled: false, curveSegments: 1, steps: 1 });
+  g.translate(0, 0, z);
+  b.add(key, g);
+}
+
+/* ------------------------------------------------------------ 柔光纹理 */
+const lnSoftTex = canvasTex(128, 128, function (c, w, h) {
+  const g = c.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2);
+  g.addColorStop(0, 'rgba(255,255,255,1)');
+  g.addColorStop(0.16, 'rgba(255,255,255,0.82)');
+  g.addColorStop(0.42, 'rgba(255,255,255,0.28)');
+  g.addColorStop(1, 'rgba(255,255,255,0)');
+  c.fillStyle = g; c.fillRect(0, 0, w, h);
+});
+const lnCloudTex = canvasTex(256, 96, function (c, w, h) {
+  const g = c.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2);
+  g.addColorStop(0, 'rgba(255,255,255,0.72)');
+  g.addColorStop(0.55, 'rgba(255,255,255,0.26)');
+  g.addColorStop(1, 'rgba(255,255,255,0)');
+  c.fillStyle = g; c.fillRect(0, 0, w, h);
+});
+const lnPlaqueTex = canvasTex(512, 168, function (c, w, h) {
+  c.fillStyle = '#4a2318'; c.fillRect(0, 0, w, h);
+  c.strokeStyle = '#d8a44c'; c.lineWidth = 7;
+  c.strokeRect(10, 10, w - 20, h - 20);
+  c.strokeStyle = 'rgba(216,164,76,0.45)'; c.lineWidth = 2;
+  c.strokeRect(22, 22, w - 44, h - 44);
+  c.fillStyle = '#f4d489';
+  c.font = '600 104px KaiTi, STKaiti, SimSun, serif';
+  c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.fillText('上元燈市', w / 2, h / 2 + 5);
+});
+const lnRiddleTex = canvasTex(160, 200, function (c, w, h) {
+  c.fillStyle = '#f2d9a2'; c.fillRect(0, 0, w, h);
+  c.strokeStyle = '#9b4b2c'; c.lineWidth = 8;
+  c.strokeRect(7, 7, w - 14, h - 14);
+  c.fillStyle = '#6d2a1c';
+  c.font = '600 106px KaiTi, STKaiti, SimSun, serif';
+  c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.fillText('謎', w / 2, h / 2 + 6);
+});
+
+/* 加色光片：不吃雾、不写深度，压在几何之上 */
+function lnGlowPlane(w, h, x, y, z, color, op, ry) {
+  const m = new T.Mesh(new T.PlaneGeometry(w, h), new T.MeshBasicMaterial({
+    map: lnSoftTex, color: color, transparent: true, opacity: op,
+    blending: T.AdditiveBlending, depthWrite: false, fog: false,
+    side: T.DoubleSide
+  }));
+  m.position.set(x, y, z);
+  if (ry) m.rotation.y = ry;
+  m.renderOrder = 4;
+  scene.add(m);
+  return m;
+}
+
+/* ------------------------------------------------------------ 灯位登记 */
+/* 每个实体灯笼登记一个光点，交给一个 Points 统一画辉光 + 呼吸，
+   否则几百盏灯要么没光、要么要几百个点光把场景洗成白天。 */
+const LN_LAMPS = [];
+function lnLamp(b, x, y, z, r, key, tassel) {
+  const k = key || 'lnLantern';
+  b.sph(k, r, x, y, z, 1, 1.16, 1);
+  b.cyl('lnLanternD', r * 0.42, r * 0.42, 0.055, 8, x, y + r * 1.10, z);
+  b.cyl('lnLanternD', r * 0.38, r * 0.38, 0.050, 8, x, y - r * 1.10, z);
+  if (tassel !== false) {
+    b.to('lnTassel', 0.017, x, y - r * 1.14, z, x, y - r * 1.14 - r * 0.78, z, 4);
+  }
+  const ci = k === 'lnLanternW' ? 2 : (k === 'lnLanternY' ? 1 : 0);
+  LN_LAMPS.push([x, y, z, r * 3.55, ci]);
+}
+
+/* ---------------------------------------------------------------- 底座 */
+function lnBase(b) {
+  /* 漆盘式底座：暗赭而不是纯黑，侧沿压一线暖金，别出现「托盘黑框」 */
+  b.box('lnBase', 88.0, 0.46, 60.0, 0, (LN_BT + LN_BB) / 2 + 0.06, -3.25);
+  b.box('lnBaseD', 88.0, 0.11, 60.0, 0, LN_BB + 0.06, -3.25);
+  b.box('lnBaseL', 88.3, 0.040, 60.3, 0, LN_BT - 0.02, -3.25);
+
+  /* 远岸（灯街）与近岸两块台地，中间留出河道；顶面与水面的落差就是驳岸 */
+  lnSlab(b, 'lnQuay', [
+    [LN_X0, LN_Z0], [LN_X1, LN_Z0], [LN_X1, LN_RZ0], [LN_X0, LN_RZ0]
+  ], LN_BT, LN_LY);
+  lnSlab(b, 'lnQuay', [
+    [LN_X0, LN_RZ1], [LN_X1, LN_RZ1], [LN_X1, LN_Z1], [LN_X0, LN_Z1]
+  ], LN_BT, LN_LY);
+
+  /* 驳岸压边：一条深色石线，别做成一圈白珍珠 */
+  b.box('lnQuayD', 68.0, 0.16, 0.34, 0, LN_LY - 0.06, LN_RZ0 - 0.15);
+  b.box('lnQuayD', 68.0, 0.16, 0.34, 0, LN_LY - 0.06, LN_RZ1 + 0.15);
+
+  /* 临水石板街：横向铺装，用错缝避免「条纹地毯」 */
+  for (let i = 0; i < 27; i++) {
+    const x = -32.4 + i * 2.48;
+    for (let j = 0; j < 3; j++) {
+      const z = -5.9 + j * 1.42;
+      const k = (i + j) % 5 === 0 ? 'lnPaveD' : 'lnPave';
+      b.box(k, 2.34, 0.045, 1.30, x, LN_LY + 0.022, z);
+    }
+  }
+  /* 近岸步道 */
+  for (let i = 0; i < 27; i++) {
+    b.box('lnPaveD', 2.34, 0.045, 1.20, -32.4 + i * 2.48, LN_LY + 0.022, 11.05);
+  }
+}
+
+/* ------------------------------------------------- 暮色：落日 / 云 / 远山 */
+function lnSky() {
+  /* 落日：加色柔盘沉在远山之后，被山脊自然切掉下缘。
+     用加色而非纯色板，才不会在暮色里变成一块贴纸。 */
+  const sun = new T.Mesh(new T.PlaneGeometry(15.0, 15.0), new T.MeshBasicMaterial({
+    map: lnSoftTex, color: 0xffb96a, transparent: true, opacity: 0.92,
+    blending: T.AdditiveBlending, depthWrite: false, fog: false
+  }));
+  sun.position.set(-13.0, 15.2, -43.0);
+  sun.renderOrder = 1;
+  scene.add(sun);
+  const core = new T.Mesh(new T.PlaneGeometry(5.4, 5.4), new T.MeshBasicMaterial({
+    map: lnSoftTex, color: 0xffe6b0, transparent: true, opacity: 0.85,
+    blending: T.AdditiveBlending, depthWrite: false, fog: false
+  }));
+  core.position.set(-13.0, 15.2, -42.8);
+  core.renderOrder = 2;
+  scene.add(core);
+
+  /* 暮云：普通半透明片（不加色，会过曝），横向拉长、错落三层 */
+  const clouds = [
+    [-24, 17.2, -41, 20, 3.0, 0.30], [4, 15.4, -40, 25, 2.5, 0.24],
+    [22, 18.6, -42, 18, 2.2, 0.20], [-6, 20.4, -43, 27, 2.0, 0.16]
+  ];
+  for (let i = 0; i < clouds.length; i++) {
+    const q = clouds[i];
+    const m = new T.Mesh(new T.PlaneGeometry(q[3], q[4]), new T.MeshBasicMaterial({
+      map: lnCloudTex, color: 0x8b5c72, transparent: true, opacity: q[5],
+      depthWrite: false, fog: false, side: T.DoubleSide
+    }));
+    m.position.set(q[0], q[1], q[2]);
+    m.renderOrder = 1;
+    scene.add(m);
+  }
+}
+
+function lnMountains(b) {
+  function ridge(base, amp, f1, f2, f3, seed) {
+    const X = [], H = [];
+    for (let x = -72.0; x <= 72.001; x += 0.86) {
+      X.push(x);
+      H.push(Math.max(1.4, base
+        + amp * Math.sin(x * f1 + 0.7 + seed)
+        + amp * 0.47 * Math.sin(x * f2 - 1.1 + seed * 0.6)
+        + amp * 0.21 * Math.sin(x * f3 + 2.2)
+        + 2.9 * Math.exp(-Math.pow((x + 17.0) / 11.0, 2))));
+    }
+    return { x: X, h: H };
+  }
+  const L3 = ridge(11.6, 2.45, 0.087, 0.191, 0.413, 0.4);
+  const L2 = ridge(8.40, 1.92, 0.121, 0.263, 0.547, 1.7);
+  const L1 = ridge(5.60, 1.36, 0.173, 0.361, 0.733, 3.1);
+  lnRidge(b, 'lnMtn3', L3.x, L3.h, -38.4, 0.70, -6.0);
+  lnRidge(b, 'lnMtn2', L2.x, L2.h, -34.0, 0.80, -6.0);
+  lnRidge(b, 'lnMtn1', L1.x, L1.h, -29.6, 0.95, -6.0);
+}
+
+/* ---------------------------------------------- 临水灯街：一栋二层楼阁 */
+function lnHouse(b, x, z, w, d, ev, seed) {
+  const y0 = LN_LY;
+  const rg = ev + 1.55;
+  const x0 = x - w / 2, x1 = x + w / 2;
+  const zf = z + d / 2, zb = z - d / 2;      // 正面朝 +z（朝河）
+
+  b.box('lnStoneD', w + 0.30, 0.26, d + 0.30, x, y0 + 0.13, z);
+  /* 一层：木柱 + 粉墙 + 暖格窗（窗走 emit，夜里自己亮） */
+  b.box('lnWall', w - 0.22, ev - 0.30, d - 0.22, x, y0 + 0.26 + (ev - 0.30) / 2, z);
+  for (let i = 0; i < 4; i++) {
+    const px = x0 + 0.16 + i * (w - 0.32) / 3;
+    b.cyl('lnPillar', 0.115, 0.13, ev - 0.10, 7, px, y0 + 0.26 + (ev - 0.10) / 2, zf - 0.08);
+  }
+  /* 一层格窗：三开间，每间一块发光面 + 两根竖棂 */
+  for (let i = 0; i < 3; i++) {
+    const wx = x0 + w * (0.20 + i * 0.30);
+    b.box('lnWin', w * 0.215, 1.44, 0.055, wx, y0 + 1.28, zf + 0.025);
+    for (let j = -1; j <= 1; j++) {
+      b.box('lnWoodD', 0.045, 1.50, 0.075, wx + j * w * 0.072, y0 + 1.28, zf + 0.07);
+    }
+    b.box('lnWoodD', w * 0.235, 0.06, 0.075, wx, y0 + 2.02, zf + 0.07);
+  }
+  /* 门洞：中间开一门，深色内胆 + 半扇暖光 */
+  const dx = x0 + w * 0.50;
+  b.box('lnDoor', w * 0.20, 1.86, 0.075, dx, y0 + 1.06, zf + 0.05);
+  b.box('lnWinW', w * 0.085, 1.60, 0.030, dx + w * 0.045, y0 + 1.02, zf + 0.095);
+
+  /* 二层挑廊：腰檐 + 栏杆 + 上层墙 + 一排格窗 */
+  b.box('lnTileD', w + 0.66, 0.16, d + 0.62, x, y0 + ev - 0.02, z);
+  b.box('lnWood', w + 0.42, 0.16, 0.62, x, y0 + ev + 0.10, zf + 0.16);
+  for (let i = 0; i <= 8; i++) {
+    const px = x0 + 0.12 + i * (w - 0.24) / 8;
+    b.cyl('lnRail', 0.030, 0.034, 0.66, 5, px, y0 + ev + 0.49, zf + 0.42);
+  }
+  b.box('lnRail', w - 0.10, 0.070, 0.085, x, y0 + ev + 0.80, zf + 0.42);
+  const h2 = 1.62;
+  b.box('lnWallD', w - 0.42, h2, d - 0.50, x, y0 + ev + 0.20 + h2 / 2, z - 0.10);
+  for (let i = 0; i < 3; i++) {
+    const wx = x0 + w * (0.24 + i * 0.26);
+    b.box('lnWinW', w * 0.17, 0.94, 0.05, wx, y0 + ev + 1.02, zf + 0.06);
+    b.box('lnWoodD', 0.040, 1.00, 0.07, wx, y0 + ev + 1.02, zf + 0.095);
+  }
+
+  /* 双坡瓦顶：两片旋转 box 做真坡面 + 正脊 + 两端翘角 */
+  const half = (d + 1.10) / 2;
+  const slope = Math.atan2(rg - (ev + 0.20 + h2), half);
+  const L = Math.sqrt(half * half + Math.pow(rg - (ev + 0.20 + h2), 2));
+  const cy = y0 + ev + 0.20 + h2 + (rg - (ev + 0.20 + h2)) / 2;
+  for (const s of [-1, 1]) {
+    b.box('lnTile', w + 0.72, 0.20, L, x, cy, z + s * half / 2,
+      s > 0 ? slope : -slope, 0, 0);
+  }
+  b.cyl('lnTileD', 0.135, 0.135, w + 0.92, 8, x, y0 + rg, z, 0, 0, Math.PI / 2);
+  for (const s of [-1, 1]) {
+    b.to('lnTileL', 0.075, x - w / 2 - 0.36, y0 + rg - 0.05, z + s * half / 2,
+      x - w / 2 - 0.72, y0 + rg + 0.42, z + s * (half + 0.30) / 2, 5);
+    b.to('lnTileL', 0.075, x + w / 2 + 0.36, y0 + rg - 0.05, z + s * half / 2,
+      x + w / 2 + 0.72, y0 + rg + 0.42, z + s * (half + 0.30) / 2, 5);
+  }
+  /* 瓦垄：每坡 5 道，半径 0.055 才不会被描边吃掉 */
+  for (let i = 1; i <= 5; i++) {
+    const px = x0 + i * w / 6;
+    for (const s of [-1, 1]) {
+      b.to('lnTileL', 0.055, px, y0 + rg - 0.02, z,
+        px, y0 + ev + 0.20 + h2 + 0.10, z + s * half, 5);
+    }
+  }
+
+  /* 檐下灯笼：一栋 4 盏，色分朱 / 蜜 / 白，不搞彩虹 */
+  const keys = ['lnLantern', 'lnLanternY', 'lnLanternW', 'lnLanternY',
+    'lnLantern', 'lnLanternW'];
+  for (let i = 0; i < 6; i++) {
+    const lx = x0 + 0.52 + i * (w - 1.04) / 5;
+    const ly = y0 + ev - 0.44;
+    b.to('lnCord', 0.014, lx, y0 + ev - 0.10, zf + 0.30,
+      lx, ly + 0.30, zf + 0.30, 4);
+    lnLamp(b, lx, ly, zf + 0.30, 0.235 + lnR(seed + i) * 0.035, keys[i], true);
+  }
+  return { x: x, z: z, w: w, d: d, ev: ev, rg: rg };
+}
+
+/* ------------------------------------------------------------ 灯街总成 */
+function lnStreet(b) {
+  const HS = [];
+  /* 第 4 项是前后错落量。九栋等高排成一条线会变成舞台布景，
+     必须让檐口高低起伏、临河面前后参差，才有「街」的纵深。 */
+  const specs = [
+    [-29.2, 6.6, 4.62, 0.55], [-22.0, 7.4, 5.35, -0.75], [-14.4, 6.2, 4.30, 0.30],
+    [-6.80, 7.8, 6.55, 0.00], [1.20, 6.8, 4.46, -0.85], [8.60, 7.2, 5.10, 0.45],
+    [16.2, 6.4, 4.24, -0.65], [23.4, 7.6, 5.75, 0.25], [30.2, 6.0, 3.92, -0.40]
+  ];
+  for (let i = 0; i < specs.length; i++) {
+    const q = specs[i];
+    HS.push(lnHouse(b, q[0], -9.70 + q[3], q[1], 6.60, q[2], i * 3.7 + 1.3));
+  }
+
+  /* 跨街灯串：沿 x 铺 9 段垂弧，每段挂 6 盏小灯。
+     灯串要「连成片」才有灯会感，但每段之间留缺口，别做成一整块彩色顶棚。 */
+  for (let s = 0; s < 9; s++) {
+    const x0 = -33.0 + s * 7.4, x1 = x0 + 7.4;
+    if (s === 4) continue;             // 给牌楼让出一段天
+    const spans = 10;
+    let px = x0, py = 6.55;
+    for (let j = 0; j <= spans; j++) {
+      const nx = x0 + (x1 - x0) * j / spans;
+      const ny = 6.55 - 1.05 * Math.sin(Math.PI * j / spans);
+      if (j > 0) b.to('lnCord', 0.017, px, py, -3.05, nx, ny, -3.05, 4);
+      px = nx; py = ny;
+    }
+    for (let j = 1; j < spans; j++) {
+      if (j % 5 === 0) continue;
+      const nx = x0 + (x1 - x0) * j / spans;
+      const ny = 6.55 - 1.05 * Math.sin(Math.PI * j / spans);
+      const k = j % 3 === 0 ? 'lnLanternY' : (j % 3 === 1 ? 'lnLantern' : 'lnLanternW');
+      lnLamp(b, nx, ny - 0.32, -3.05, 0.155, k, false);
+    }
+  }
+  /* 灯串两端立柱 */
+  for (let s = 0; s <= 9; s++) {
+    const x = -33.0 + s * 7.4;
+    b.cyl('lnWoodD', 0.070, 0.095, 6.60, 6, x, 3.30, -3.05);
+    b.box('lnStoneD', 0.34, 0.22, 0.34, x, 0.11, -3.05);
+  }
+
+  /* 临河灯柱：每 6.2 米一根，柱顶一盏大灯 + 柱身灯谜牌 */
+  for (let i = 0; i < 11; i++) {
+    const x = -31.0 + i * 6.2;
+    const z = -1.95;
+    b.box('lnStoneD', 0.44, 0.20, 0.44, x, LN_LY + 0.10, z);
+    b.cyl('lnWoodDeep', 0.075, 0.10, 3.55, 6, x, LN_LY + 1.98, z);
+    b.box('lnWoodDeep', 0.12, 0.10, 0.72, x, LN_LY + 3.70, z + 0.30);
+    lnLamp(b, x, LN_LY + 3.32, z + 0.60, 0.30, i % 4 === 0 ? 'lnLanternW' : 'lnLantern', true);
+    if (i % 2 === 0) {
+      const p = new T.Mesh(new T.PlaneGeometry(0.52, 0.65), new T.MeshBasicMaterial({
+        map: lnRiddleTex, side: T.DoubleSide
+      }));
+      p.position.set(x, LN_LY + 2.42, z + 0.14);
+      scene.add(p);
+    }
+  }
+  return HS;
+}
+
+/* --------------------------------------------------------- 上元牌楼 */
+function lnGate(b) {
+  const x = -6.60, z = -2.55, W = 8.40, H = 7.25;
+  for (const s of [-1, 1]) {
+    const px = x + s * W / 2;
+    b.box('lnStoneD', 0.92, 0.34, 0.92, px, LN_LY + 0.17, z);
+    b.cyl('lnPillar', 0.235, 0.275, H - 0.30, 9, px, LN_LY + 0.30 + (H - 0.30) / 2, z);
+    b.box('lnGateD', 0.60, 0.22, 0.60, px, LN_LY + H - 0.18, z);
+  }
+  b.box('lnGate', W + 1.10, 0.42, 0.52, x, LN_LY + H - 0.70, z);
+  b.box('lnGate', W + 0.40, 0.28, 0.44, x, LN_LY + H - 1.72, z);
+  /* 双坡小顶 */
+  const half = 1.30, rise = 0.92;
+  const L = Math.sqrt(half * half + rise * rise);
+  for (const s of [-1, 1]) {
+    b.box('lnTile', W + 1.70, 0.18, L, x, LN_LY + H + rise / 2 + 0.10,
+      z + s * half / 2, s > 0 ? Math.atan2(rise, half) : -Math.atan2(rise, half), 0, 0);
+  }
+  b.cyl('lnTileD', 0.12, 0.12, W + 1.90, 8, x, LN_LY + H + rise + 0.12, z, 0, 0, Math.PI / 2);
+
+  /* 匾额：真字 + 挑出式，牌楼是本场景唯一「一句话定性」的身份物 */
+  const pl = new T.Mesh(new T.PlaneGeometry(3.55, 1.16), new T.MeshBasicMaterial({
+    map: lnPlaqueTex, side: T.DoubleSide
+  }));
+  pl.position.set(x, LN_LY + H - 1.23, z + 0.31);
+  scene.add(pl);
+  lnGlowPlane(5.6, 2.5, x, LN_LY + H - 1.23, z + 0.16, 0xffb260, 0.20);
+
+  for (let i = 0; i < 5; i++) {
+    const lx = x - 2.70 + i * 1.35;
+    lnLamp(b, lx, LN_LY + H - 2.20, z + 0.34, 0.215,
+      i % 2 ? 'lnLanternY' : 'lnLantern', true);
+  }
+}
+
+/* --------------------------------------------------------- 石拱桥 */
+/* 人只做单色剪影：锥台身 + 球头，不画脸、不画四肢。
+   远景里 1 米高只有十几像素，剪影比细节更有效，也避开「人物太丑」。 */
+function lnFigure(b, x, y, z, s, key) {
+  const k = key || 'lnFigure';
+  /* 剪影不像人的根因是「锥台太粗 + 球头太大」，远看就是一排瓶子。
+     收窄躯干、缩小头、补一道肩线，再靠提灯的光点证明这是人。 */
+  b.cyl(k, 0.100 * s, 0.152 * s, 0.76 * s, 6, x, y + 0.42 * s, z);
+  b.box(k, 0.285 * s, 0.062 * s, 0.105 * s, x, y + 0.735 * s, z);
+  b.sph(k, 0.116 * s, x, y + 0.905 * s, z, 1, 1.08, 1);
+  b.box(k, 0.058 * s, 0.30 * s, 0.085 * s, x - 0.072 * s, y + 0.15 * s, z);
+  b.box(k, 0.058 * s, 0.30 * s, 0.085 * s, x + 0.072 * s, y + 0.15 * s, z);
+}
+
+function lnBridge(b) {
+  /* 桥沿 z 跨河，正面机位下会被透视压成一条竖线。
+     让桥轴线在 x 上斜移 10 米，屏幕上才是一条能读出桥面的斜带。 */
+  const z0 = LN_RZ0 - 1.30, z1 = LN_RZ1 + 1.30;
+  const X0 = 4.60, X1 = 15.40;
+  const W = 5.40, N = 16;
+  const bX = function (u) { return X0 + (X1 - X0) * u; };
+  const deckY = function (u) { return LN_LY + 0.30 + 3.05 * (1 - Math.pow(2 * u - 1, 2)); };
+  const DX = X1 - X0, DZ = z1 - z0;
+  const ry = Math.atan2(DX, DZ);
+  const HYP = Math.sqrt(DX * DX + DZ * DZ);
+
+  for (let i = 0; i < N; i++) {
+    const u0 = i / N, u1 = (i + 1) / N;
+    const za = z0 + DZ * u0, zb = z0 + DZ * u1;
+    const xa = bX(u0), xb = bX(u1);
+    const ya = deckY(u0), yb = deckY(u1);
+    const len = Math.sqrt(Math.pow(xb - xa, 2) + Math.pow(zb - za, 2) + Math.pow(yb - ya, 2));
+    const ang = Math.atan2(yb - ya, HYP / N);
+    const cx = (xa + xb) / 2, cz = (za + zb) / 2, cy = (ya + yb) / 2;
+    b.box('lnStoneL', W, 0.30, len + 0.12, cx, cy, cz, -ang, ry, 0);
+    b.box('lnBridgeD', W + 0.05, 0.045, 0.080, cx, cy + 0.165,
+      za + 0.03, -ang, ry, 0);
+  }
+  /* 桥墩与拱券立柱 */
+  for (const u of [0.045, 0.955]) {
+    b.box('lnBridgeD', W + 0.28, 1.30, 1.00, bX(u), LN_WY + 0.28, z0 + DZ * u, 0, ry, 0);
+  }
+  for (let i = 1; i <= 3; i++) {
+    const u = i / 4, yy = deckY(u);
+    for (const sg of [-1, 1]) {
+      const o = sg * (W / 2 - 0.16);
+      b.box('lnBridgeD', 0.30, 0.52, 0.46,
+        bX(u) + o * Math.cos(ry), yy - 0.28,
+        z0 + DZ * u - o * Math.sin(ry), 0, ry, 0);
+    }
+  }
+  for (const u of [-0.045, 1.045]) {
+    b.box('lnStoneL', W + 0.65, 0.16, 0.78, bX(u), LN_LY + 0.08,
+      z0 + DZ * u, 0, ry, 0);
+  }
+  /* 栏杆：立柱 / 横杆 / 每两柱一盏灯 */
+  for (const sg of [-1, 1]) {
+    for (let i = 0; i <= 15; i++) {
+      const u = i / 15, z = z0 + DZ * u, yy = deckY(u);
+      const px = bX(u) + sg * (W / 2 - 0.10) * Math.cos(ry);
+      const pz = z - sg * (W / 2 - 0.10) * Math.sin(ry);
+      b.cyl('lnStoneL', 0.055, 0.068, 0.80, 5, px, yy + 0.51, pz);
+      b.sph('lnStoneL', 0.080, px, yy + 0.93, pz);
+      if (i % 2 === 0) lnLamp(b, px, yy + 1.30, pz, 0.180, 'lnLanternY', false);
+    }
+    for (let i = 0; i < 15; i++) {
+      const u0 = i / 15, u1 = (i + 1) / 15;
+      const o = sg * (W / 2 - 0.10);
+      b.to('lnStoneL', 0.040,
+        bX(u0) + o * Math.cos(ry), deckY(u0) + 0.71, z0 + DZ * u0 - o * Math.sin(ry),
+        bX(u1) + o * Math.cos(ry), deckY(u1) + 0.71, z0 + DZ * u1 - o * Math.sin(ry), 5);
+    }
+  }
+  /* 桥上人潮：细剪影 + 提灯，别铺成一排黑柱 */
+  for (let i = 0; i < 26; i++) {
+    const u = 0.05 + 0.90 * lnR(i * 2.7 + 4.1);
+    const off = (lnR(i * 5.3 + 1.2) - 0.5) * (W - 1.30);
+    const x = bX(u) + off * Math.cos(ry);
+    const z = z0 + DZ * u - off * Math.sin(ry);
+    const sc = 0.84 + lnR(i * 7.9 + 2.6) * 0.26;
+    lnFigure(b, x, deckY(u) + 0.15, z, sc, i % 5 === 0 ? 'lnFigureD' : 'lnFigure');
+    if (i % 3 === 0) {
+      b.sph('lnLanternY', 0.095 * sc, x + 0.26 * sc,
+        deckY(u) + 0.55 * sc, z + 0.06, 1, 1.08, 1);
+    }
+  }
+}
+
+/* ------------------------------------------------------- 近岸与配景 */
+function lnTree(b, x, z, s) {
+  const y = LN_LY;
+  b.to('lnBark', 0.135 * s, x, y, z, x + 0.10 * s, y + 2.30 * s, z, 6);
+  const blobs = [[-0.90, 0.20, 3.05, 1.10], [0.85, -0.15, 2.90, 1.02],
+    [0.05, 0.55, 3.55, 1.16], [-0.30, -0.72, 2.82, 0.92]];
+  for (let i = 0; i < blobs.length; i++) {
+    const q = blobs[i];
+    b.sph(i % 2 ? 'lnTree' : 'lnTreeD', 0.94 * s * q[3],
+      x + q[0] * s, y + q[2] * s, z + q[1] * s, 1.15, 0.78, 1.05);
+  }
+  /* 垂枝只给 5 根粗一些的，别做成黑色流苏 */
+  for (let i = 0; i < 5; i++) {
+    const a = i * 1.31;
+    const bx = x + Math.cos(a) * 1.05 * s, bz = z + Math.sin(a) * 0.85 * s;
+    b.to('lnTree', 0.032 * s, bx, y + 2.72 * s, bz,
+      bx + 0.10 * s, y + 1.62 * s, bz + 0.05 * s, 4);
+  }
+}
+
+function lnStall(b, x, z, idx) {
+  const cw = 3.50, cd = 2.20, y = LN_LY;
+  const awning = ['lnStall1', 'lnStall2', 'lnStall3'][idx % 3];
+  b.box('lnStoneD', cw + 0.20, 0.14, cd + 0.20, x, y + 0.07, z);
+  for (const sx of [-1, 1]) {
+    for (const sz of [-1, 1]) {
+      b.cyl('lnWoodD', 0.055, 0.065, 2.42, 5,
+        x + sx * (cw / 2 - 0.16), y + 1.28, z + sz * (cd / 2 - 0.14));
+    }
+  }
+  /* 柜台朝河（+z），台上摆货，别做成空盒子 */
+  b.box('lnWood', cw - 0.34, 0.72, 0.58, x, y + 0.44, z + cd / 2 - 0.42);
+  b.box('lnWoodDeep', cw - 0.34, 0.08, 0.66, x, y + 0.83, z + cd / 2 - 0.42);
+  for (let j = 0; j < 5; j++) {
+    const gx = x - 1.20 + j * 0.60;
+    b.box(j % 2 ? 'lnLanternY' : 'lnLantern', 0.26, 0.30, 0.26,
+      gx, y + 1.02, z + cd / 2 - 0.42);
+  }
+  /* 双坡棚布：每四座空一座，连续盖满就是一块彩色地板 */
+  if (idx % 4 !== 3) {
+    const half = cd / 2 + 0.24, rise = 0.62;
+    const L = Math.sqrt(half * half + rise * rise);
+    const a = Math.atan2(rise, half);
+    for (const sg of [-1, 1]) {
+      b.box(awning, cw + 0.24, 0.09, L, x, y + 2.46 + rise / 2,
+        z + sg * half / 2, sg > 0 ? a : -a, 0, 0);
+    }
+    b.box('lnWoodDeep', cw + 0.30, 0.10, 0.14, x, y + 2.46 + rise, z);
+  }
+  /* 檐下三盏灯 + 一片地面暖光 */
+  for (let j = 0; j < 3; j++) {
+    const lx = x - 1.10 + j * 1.10;
+    b.to('lnCord', 0.014, lx, y + 2.40, z + cd / 2, lx, y + 2.06, z + cd / 2, 4);
+    lnLamp(b, lx, y + 1.86, z + cd / 2 + 0.05, 0.20,
+      j === 1 ? 'lnLanternW' : 'lnLantern', false);
+  }
+  lnGlowPlane(4.6, 3.2, x, y + 0.035, z + 1.20, 0xffa648, 0.16);
+}
+
+function lnNearBank(b) {
+  /* 下河石阶 + 系船石 */
+  for (let i = 0; i < 5; i++) {
+    b.box('lnStone', 3.10, 0.14, 0.56, -19.0, LN_LY - i * 0.13, LN_RZ1 + 0.42 + i * 0.50);
+  }
+  for (let i = 0; i < 3; i++) {
+    b.cyl('lnStoneD', 0.24, 0.30, 0.52, 7, -22.0 + i * 3.4, LN_LY + 0.26, LN_RZ1 + 0.34);
+  }
+  /* 临河石栏：柱距 2.4 米，隔三根挂一盏灯 */
+  for (let i = 0; i <= 28; i++) {
+    const x = -33.6 + i * 2.40;
+    if (x > 12.4 && x < 19.0) continue;    // 让开斜桥桥头 x≈13~18
+    b.cyl('lnStoneL', 0.062, 0.078, 0.92, 5, x, LN_LY + 0.46, LN_RZ1 + 0.36);
+    if (i > 0 && i % 3 === 0) lnLamp(b, x - 1.20, LN_LY + 1.30,
+      LN_RZ1 + 0.36, 0.185, i % 2 ? 'lnLanternY' : 'lnLantern', false);
+  }
+  for (let i = 0; i < 28; i++) {
+    const x0 = -33.6 + i * 2.40, x1 = x0 + 2.40;
+    if (x1 > 12.4 && x0 < 19.0) continue;
+    b.to('lnStoneL', 0.040, x0, LN_LY + 0.70, LN_RZ1 + 0.36,
+      x1, LN_LY + 0.70, LN_RZ1 + 0.36, 5);
+  }
+  /* 灯市：九座摊子沿 z=13.4 铺开 */
+  for (let i = 0; i < 9; i++) {
+    lnStall(b, -29.0 + i * 7.25, 13.40, i);
+  }
+  /* 树：错开摊子，别堵在正中 */
+  lnTree(b, -32.0, 16.0, 0.94);
+  lnTree(b, -4.20, 16.2, 0.80);
+  lnTree(b, 26.0, 15.8, 0.90);
+  lnTree(b, 32.0, 11.6, 0.72);
+  /* 近岸落地灯 */
+  for (let i = 0; i < 7; i++) {
+    const x = -31.0 + i * 10.2;
+    b.box('lnStoneD', 0.40, 0.18, 0.40, x, LN_LY + 0.09, 10.30);
+    b.cyl('lnWoodDeep', 0.065, 0.085, 2.55, 6, x, LN_LY + 1.40, 10.30);
+    lnLamp(b, x, LN_LY + 2.92, 10.30, 0.265,
+      i % 3 === 0 ? 'lnLanternW' : 'lnLantern', true);
+  }
+  /* 看灯人潮：成组、带提灯，剪影单色不画脸 */
+  for (let i = 0; i < 38; i++) {
+    const x = -32.0 + 64.0 * lnR(i * 3.31 + 7.7);
+    const z = 10.9 + 5.6 * lnR(i * 6.71 + 2.2);
+    if (x > 12.4 && x < 19.0) continue;
+    const sc = 0.82 + lnR(i * 4.43 + 1.1) * 0.24;
+    lnFigure(b, x, LN_LY, z, sc, i % 4 === 0 ? 'lnFigureD' : 'lnFigure');
+    if (i % 3 === 0) {
+      b.sph('lnLanternY', 0.105 * sc, x + 0.30 * sc, LN_LY + 0.58 * sc, z + 0.06, 1, 1.08, 1);
+    }
+  }
+  /* 灯市洒在石板上的暖光：屏幕下半留出呼吸，但别是一整块素色 */
+  for (let i = 0; i < 6; i++) {
+    lnGlowPlane(8.2, 4.6, -27.0 + i * 10.8, LN_LY + 0.038, 15.90,
+      0xffa04c, 0.11);
+  }
+  for (let i = 0; i < 14; i++) {
+    const x = -31.0 + 62.0 * lnR(i * 8.13 + 3.7);
+    const z = 15.10 + 1.80 * lnR(i * 4.77 + 6.2);
+    if (x > 12.4 && x < 19.0) continue;
+    const sc = 0.80 + lnR(i * 2.91) * 0.22;
+    lnFigure(b, x, LN_LY, z, sc, i % 3 === 0 ? 'lnFigureD' : 'lnFigure');
+  }
+
+  /* 街面行人剪影 */
+  for (let i = 0; i < 30; i++) {
+    const x = -31.0 + 62.0 * lnR(i * 3.13 + 7.7);
+    const z = -5.6 + 2.4 * lnR(i * 6.71 + 2.2);
+    lnFigure(b, x, LN_LY, z, 0.82 + lnR(i * 4.4) * 0.22,
+      i % 4 === 0 ? 'lnFigureD' : 'lnFigure');
+    if (i % 4 === 0) {
+      b.sph('lnLanternY', 0.095, x + 0.24, LN_LY + 0.52, z + 0.05, 1, 1.08, 1);
+    }
+  }
+}
+
+/* ------------------------------------------------------ 河面（灯影） */
+const lnWaterUni = { uTime: { value: 0 } };
+function lnWater() {
+  const W = PS.lnWater || {};
+  const d = cfg(W.deep, [0.105, 0.118, 0.215]);
+  const sh = cfg(W.shal, [0.190, 0.190, 0.275]);
+  const gl = cfg(W.glow, [1.000, 0.610, 0.270]);
+  const fg = cfg(W.fog, [0.290, 0.250, 0.330]);
+  lnWaterUni.uDeep = { value: new T.Vector3(d[0], d[1], d[2]) };
+  lnWaterUni.uShal = { value: new T.Vector3(sh[0], sh[1], sh[2]) };
+  lnWaterUni.uGlow = { value: new T.Vector3(gl[0], gl[1], gl[2]) };
+  lnWaterUni.uFog = { value: new T.Vector3(fg[0], fg[1], fg[2]) };
+  const m = new T.ShaderMaterial({
+    uniforms: lnWaterUni,
+    vertexShader:
+      'varying vec2 vUv;\n' +
+      'void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
+    fragmentShader:
+      'uniform float uTime; uniform vec3 uDeep,uShal,uGlow,uFog; varying vec2 vUv;\n' +
+      'void main(){\n' +
+      '  vec2 uv=vUv; float t=uTime;\n' +
+      /* 暮色寒河：极低频横纹，别做成条纹地毯 */
+      '  float band=sin(uv.y*18.0+t*0.20+sin(uv.x*5.0)*0.8)*0.5\n' +
+      '         +sin(uv.y*7.0-t*0.13+uv.x*2.6)*0.5;\n' +
+      '  vec3 col=mix(uDeep,uShal,smoothstep(0.0,1.0,uv.y)*0.62+0.10);\n' +
+      '  col+=vec3(0.055,0.048,0.052)*smoothstep(0.55,0.98,band)*0.20;\n' +
+      /* 对岸灯火的竖长抖动倒影：22 列，每列独立闪烁，越近越强 */
+      '  float cidx=floor(uv.x*22.0);\n' +
+      '  float cx=fract(uv.x*22.0);\n' +
+      '  float lamp=exp(-pow((cx-0.5)*5.6,2.0));\n' +
+      '  float flick=0.62+0.38*sin(t*2.1+cidx*1.73);\n' +
+      '  float shk=0.55+0.45*sin(uv.y*42.0+t*1.6+cidx*2.3)*0.5\n' +
+      '           +0.22*sin(uv.y*17.0-t*0.9);\n' +
+      '  float vm=1.0-smoothstep(0.30,0.98,uv.y);\n' +
+      '  col+=uGlow*lamp*flick*shk*vm*0.36;\n' +
+      /* 河灯自身的小光晕：稀疏同心点，跟实体河灯对上 */
+      '  float e=smoothstep(0.0,0.045,uv.x)*smoothstep(1.0,0.955,uv.x)\n' +
+      '         *smoothstep(0.0,0.05,uv.y)*smoothstep(1.0,0.95,uv.y);\n' +
+      '  col=mix(uFog,col,0.20+0.80*e);\n' +
+      '  gl_FragColor=vec4(col,1.0);\n' +
+      '}'
+  });
+  const mesh = new T.Mesh(new T.PlaneGeometry(68.0, 11.20, 1, 1), m);
+  mesh.rotation.x = -Math.PI / 2;
+  mesh.position.set(0, LN_WY, (LN_RZ0 + LN_RZ1) / 2);
+  mesh.renderOrder = 0;
+  CT_ANIM.push(function (t) { lnWaterUni.uTime.value = t; });
+  return mesh;
+}
+
+/* ------------------------------------------- GPU 粒子：花灯辉光呼吸 */
+const LN_PT_COLORS = [[1.00, 0.52, 0.26], [1.00, 0.76, 0.36], [1.00, 0.91, 0.70]];
+function lnLampGlow() {
+  const n = LN_LAMPS.length;
+  if (!n) return;
+  const pos = new Float32Array(n * 3), col = new Float32Array(n * 3);
+  const size = new Float32Array(n), ph = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const q = LN_LAMPS[i];
+    pos[i * 3] = q[0]; pos[i * 3 + 1] = q[1]; pos[i * 3 + 2] = q[2];
+    const c = LN_PT_COLORS[q[4]] || LN_PT_COLORS[0];
+    col[i * 3] = c[0]; col[i * 3 + 1] = c[1]; col[i * 3 + 2] = c[2];
+    size[i] = q[3]; ph[i] = lnR(i * 1.71 + 0.3) * 6.283;
+  }
+  const g = new T.BufferGeometry();
+  g.setAttribute('position', new T.BufferAttribute(pos, 3));
+  g.setAttribute('aCol', new T.BufferAttribute(col, 3));
+  g.setAttribute('aSize', new T.BufferAttribute(size, 1));
+  g.setAttribute('aPh', new T.BufferAttribute(ph, 1));
+  const uni = { uTime: { value: 0 } };
+  const m = new T.ShaderMaterial({
+    uniforms: uni,
+    vertexShader:
+      'attribute vec3 aCol; attribute float aSize; attribute float aPh;\n' +
+      'uniform float uTime; varying vec3 vCol; varying float vA;\n' +
+      'void main(){ vec4 mv=modelViewMatrix*vec4(position,1.0);\n' +
+      '  float br=0.84+0.16*sin(uTime*2.0+aPh);\n' +
+      '  vCol=aCol; vA=br;\n' +
+      '  gl_PointSize=clamp(aSize*br*1500.0/max(1.0,-mv.z),3.0,72.0);\n' +
+      '  gl_Position=projectionMatrix*mv; }',
+    fragmentShader:
+      'varying vec3 vCol; varying float vA;\n' +
+      'void main(){ vec2 p=gl_PointCoord-0.5; float r=length(p);\n' +
+      '  float a=exp(-r*r*10.0)*vA*0.86;\n' +
+      '  if(a<0.006) discard;\n' +
+      '  gl_FragColor=vec4(vCol*a,a); }',
+    transparent: true, blending: T.AdditiveBlending, depthWrite: false
+  });
+  const pts = new T.Points(g, m);
+  pts.frustumCulled = false;
+  pts.renderOrder = 5;
+  scene.add(pts);
+  CT_ANIM.push(function (t) { uni.uTime.value = t; });
+}
+
+/* ---------------------------------------------- GPU 粒子：河灯顺流 */
+function lnRiverLamps() {
+  const N = cfg(PS.lnRiverN, 190);
+  const pos = new Float32Array(N * 3), col = new Float32Array(N * 3);
+  const spd = new Float32Array(N), size = new Float32Array(N), ph = new Float32Array(N);
+  for (let i = 0; i < N; i++) {
+    const x = -33.0 + 66.0 * lnR(i * 2.13 + 1.7);
+    const z = LN_RZ0 + 0.7 + (LN_RZ1 - LN_RZ0 - 1.4) * lnR(i * 5.77 + 4.2);
+    pos[i * 3] = x; pos[i * 3 + 1] = LN_WY + 0.06; pos[i * 3 + 2] = z;
+    col[i * 3] = 1.0; col[i * 3 + 1] = 0.66 + 0.22 * lnR(i * 3.9); col[i * 3 + 2] = 0.34;
+    spd[i] = 0.42 + 0.55 * lnR(i * 7.31 + 2.4);
+    size[i] = 0.55 + 1.05 * Math.pow(lnR(i * 4.47 + 9.1), 1.6);
+    ph[i] = lnR(i * 8.19 + 0.8) * 6.283;
+  }
+  const g = new T.BufferGeometry();
+  g.setAttribute('position', new T.BufferAttribute(pos, 3));
+  g.setAttribute('aCol', new T.BufferAttribute(col, 3));
+  g.setAttribute('aSpd', new T.BufferAttribute(spd, 1));
+  g.setAttribute('aSize', new T.BufferAttribute(size, 1));
+  g.setAttribute('aPh', new T.BufferAttribute(ph, 1));
+  const uni = { uTime: { value: 0 } };
+  const m = new T.ShaderMaterial({
+    uniforms: uni,
+    vertexShader:
+      'attribute vec3 aCol; attribute float aSpd,aSize,aPh;\n' +
+      'uniform float uTime; varying vec3 vCol; varying float vA;\n' +
+      'void main(){ vec3 p=position;\n' +
+      '  p.x=mod(p.x+uTime*aSpd+34.0,68.0)-34.0;\n' +
+      '  p.z+=sin(uTime*0.65+aPh)*0.14;\n' +
+      '  vec4 mv=modelViewMatrix*vec4(p,1.0);\n' +
+      '  vCol=aCol; vA=0.72+0.28*sin(uTime*1.7+aPh);\n' +
+      '  gl_PointSize=clamp(aSize*430.0/max(1.0,-mv.z),1.6,11.0);\n' +
+      '  gl_Position=projectionMatrix*mv; }',
+    fragmentShader:
+      'varying vec3 vCol; varying float vA;\n' +
+      'void main(){ vec2 p=gl_PointCoord-0.5; float r=length(p);\n' +
+      '  float core=exp(-r*r*30.0); float halo=exp(-r*r*7.0)*0.34;\n' +
+      '  float a=(core+halo)*vA; if(a<0.008) discard;\n' +
+      '  gl_FragColor=vec4(vCol*a,a); }',
+    transparent: true, blending: T.AdditiveBlending, depthWrite: false
+  });
+  const pts = new T.Points(g, m);
+  pts.frustumCulled = false; pts.renderOrder = 5;
+  scene.add(pts);
+  CT_ANIM.push(function (t) { uni.uTime.value = t; });
+
+  /* 近景 10 只实体纸河灯：小纸船 + 一簇火，让「漂流」有可读的形状。
+     每只一个 Group，靠 CT_ANIM 逐帧推 x，端点回卷。 */
+  for (let i = 0; i < 10; i++) {
+    const g2 = new T.Group();
+    const bb = new Builder();
+    bb.box('lnBoat', 0.52, 0.10, 0.34, 0, 0, 0);
+    bb.box('lnBoatD', 0.34, 0.16, 0.24, 0, 0.11, 0);
+    bb.sph('lnLanternY', 0.105, 0, 0.24, 0, 1, 1.05, 1);
+    bb.build(g2, { noOutline: ['lnLanternY', 'lnBoatD'] });
+    const x0 = -30.0 + 6.2 * i;
+    const z = 1.1 + 6.6 * lnR(i * 3.7 + 5.5);
+    g2.position.set(x0, LN_WY + 0.05, z);
+    scene.add(g2);
+    const sp = 0.42 + 0.36 * lnR(i * 9.3 + 1.1);
+    CT_ANIM.push(function (t) {
+      g2.position.x = -34.0 + ((x0 + 34.0 + t * sp) % 68.0);
+      g2.position.y = LN_WY + 0.05 + Math.sin(t * 1.4 + i) * 0.012;
+    });
+  }
+}
+
+/* -------------------------------------------- GPU 粒子：孔明灯升空 */
+function lnSkyLanterns() {
+  const N = cfg(PS.lnSkyN, 110);
+  const pos = new Float32Array(N * 3), spd = new Float32Array(N);
+  const size = new Float32Array(N), ph = new Float32Array(N);
+  for (let i = 0; i < N; i++) {
+    pos[i * 3] = -33.0 + 66.0 * lnR(i * 2.91 + 3.3);
+    pos[i * 3 + 1] = 1.0 + 27.0 * lnR(i * 6.13 + 7.7);
+    pos[i * 3 + 2] = -30.0 + 34.0 * lnR(i * 4.29 + 1.9);
+    spd[i] = 0.55 + 0.85 * lnR(i * 8.77 + 2.8);
+    size[i] = 0.55 + 1.10 * Math.pow(lnR(i * 5.31 + 4.4), 1.5);
+    ph[i] = lnR(i * 9.71 + 0.6) * 6.283;
+  }
+  const g = new T.BufferGeometry();
+  g.setAttribute('position', new T.BufferAttribute(pos, 3));
+  g.setAttribute('aSpd', new T.BufferAttribute(spd, 1));
+  g.setAttribute('aSize', new T.BufferAttribute(size, 1));
+  g.setAttribute('aPh', new T.BufferAttribute(ph, 1));
+  const uni = { uTime: { value: 0 } };
+  const m = new T.ShaderMaterial({
+    uniforms: uni,
+    vertexShader:
+      'attribute float aSpd,aSize,aPh; uniform float uTime;\n' +
+      'varying float vA;\n' +
+      'void main(){ vec3 p=position;\n' +
+      '  float u=mod(p.y+uTime*aSpd,28.0);\n' +
+      '  p.y=u+1.0;\n' +
+      '  p.x+=sin(uTime*0.31+aPh)*1.55;\n' +
+      '  p.z+=sin(uTime*0.22+aPh*1.7)*0.85;\n' +
+      '  vec4 mv=modelViewMatrix*vec4(p,1.0);\n' +
+      '  vA=(0.55+0.45*sin(uTime*1.5+aPh))*(0.55+0.45*smoothstep(0.0,7.0,u))\n' +
+      '     *(1.0-smoothstep(21.0,28.0,u)*0.72);\n' +
+      '  gl_PointSize=clamp(aSize*1150.0/max(1.0,-mv.z),2.4,21.0);\n' +
+      '  gl_Position=projectionMatrix*mv; }',
+    fragmentShader:
+      'varying float vA;\n' +
+      'void main(){ vec2 p=gl_PointCoord-0.5; float r=length(p);\n' +
+      '  float a=exp(-r*r*9.0)*vA*0.92; if(a<0.008) discard;\n' +
+      '  gl_FragColor=vec4(vec3(1.0,0.68,0.36)*a,a); }',
+    transparent: true, blending: T.AdditiveBlending, depthWrite: false
+  });
+  const pts = new T.Points(g, m);
+  pts.frustumCulled = false; pts.renderOrder = 5;
+  scene.add(pts);
+  CT_ANIM.push(function (t) { uni.uTime.value = t; });
+
+  /* 近景 9 盏实体孔明灯：圆台纸罩 + 发光芯，独立 Group 循环上升 */
+  for (let i = 0; i < 7; i++) {
+    const g2 = new T.Group();
+    const bb = new Builder();
+    bb.sph('lnLantern', 0.36, 0, 0, 0, 1, 1.22, 1);
+    bb.cyl('lnLanternD', 0.19, 0.19, 0.045, 10, 0, -0.42, 0);
+    bb.sph('lnLanternW', 0.13, 0, -0.30, 0, 1, 1, 1);
+    bb.build(g2, { noOutline: ['lnLantern', 'lnLanternW', 'lnLanternD'] });
+    const x = -26.0 + 6.4 * i + 2.0 * lnR(i * 3.3);
+    const z = -14.0 - 9.0 * lnR(i * 5.1);
+    const y0 = 3.0 + 16.0 * lnR(i * 7.7);
+    const sp = 0.30 + 0.24 * lnR(i * 4.9);
+    g2.position.set(x, y0, z);
+    scene.add(g2);
+    CT_ANIM.push(function (t) {
+      g2.position.y = 2.0 + ((y0 - 2.0 + t * sp) % 20.0);
+      g2.position.x = x + Math.sin(t * 0.28 + i) * 0.85;
+      g2.rotation.z = Math.sin(t * 0.5 + i) * 0.045;
+    });
+  }
+}
+
+/* ------------------------------------------ 移动提灯人：让街真的在动 */
+function lnWalkers() {
+  const paths = [
+    [-31, -4.6, 31, -4.6, 22.0], [-30, -2.9, 30, -2.9, 26.0],
+    [-28, 11.1, 28, 11.1, 30.0], [5.00, -2.4, 15.00, 10.0, 15.0]
+  ];
+  for (let i = 0; i < paths.length; i++) {
+    const q = paths[i];
+    for (let j = 0; j < 2; j++) {
+      const g2 = new T.Group();
+      const bb = new Builder();
+      lnFigure(bb, 0, 0, 0, 0.84, 'lnFigureD');
+      /* 手里一盏提灯：移动的光比移动的形体更能证明「有人在走」 */
+      bb.sph('lnLanternY', 0.105, 0.26, 0.44, 0.10, 1, 1.1, 1);
+      bb.build(g2, { noOutline: ['lnFigureD', 'lnLanternY'] });
+      const y = q[4] === 15.0 ? LN_LY + 1.0 : LN_LY;
+      g2.position.set(q[0], y, q[1]);
+      scene.add(g2);
+      const dx = q[2] - q[0], dz = q[3] - q[1];
+      const len = Math.sqrt(dx * dx + dz * dz);
+      const T0 = len / (0.85 + 0.18 * i);
+      const ph = (i * 0.37 + j * 0.51) % 1;
+      g2.rotation.y = Math.atan2(dx, dz);
+      CT_ANIM.push(function (t) {
+        const u = (t / T0 + ph) % 1;
+        g2.position.x = q[0] + dx * u;
+        g2.position.z = q[1] + dz * u;
+        g2.position.y = y + Math.abs(Math.sin(t * 5.2 + ph * 9)) * 0.035;
+        g2.visible = u > 0.02 && u < 0.98;
+      });
+    }
+  }
+}
+
+/* ------------------------------------------------------------- 组装 */
+function buildLnAll() {
+  /* 屏幕空间暖色底光：写在 CSS 里而不是 3D 平面，
+     永远不会像平面那样在天空里露出边缘。 */
+  const haze = document.createElement('div');
+  haze.style.cssText = 'position:fixed;inset:0;pointer-events:none;' +
+    'background:linear-gradient(to top, rgba(255,146,64,0.14) 0%,' +
+    'rgba(186,84,96,0.065) 20%, rgba(0,0,0,0) 46%)';
+  document.body.appendChild(haze);
+
+  const b = new Builder();
+  lnBase(b);
+  lnMountains(b);
+  const HS = lnStreet(b);
+  lnGate(b);
+  lnBridge(b);
+  lnNearBank(b);
+  b.build(scene, {
+    noOutline: ['lnMtn1', 'lnMtn2', 'lnMtn3', 'lnCord', 'lnTassel',
+      'lnTree', 'lnTreeD', 'lnFigure', 'lnFigureD', 'lnWin', 'lnWinW',
+      'lnLantern', 'lnLanternY', 'lnLanternW']
+  });
+  lnSky();
+  scene.add(lnWater());
+  lnLampGlow();
+  lnRiverLamps();
+  lnSkyLanterns();
+  lnWalkers();
+
+  /* 灯街的暖点光只放 6 盏，其余亮度全交给自发光 + 加色辉光。
+     点光一多，黄昏的暗部被抬平，「夜」就没了。 */
+  const LK = cfg(PS.lampK, 1);
+  const pts = [
+    [-24, 3.6, -4.4, 12, 12], [-8, 4.2, -3.0, 15, 14],
+    [8, 3.8, -4.0, 12, 12], [22, 4.0, -4.4, 11, 11],
+    [10.6, 3.4, 3.6, 10, 10], [-6.6, 6.0, -2.2, 12, 11]
+  ];
+  for (let i = 0; i < pts.length; i++) {
+    const q = pts[i];
+    const lp = new T.PointLight(0xffb066, q[3] * LK, q[4], 2);
+    lp.position.set(q[0], q[1], q[2]);
+    scene.add(lp);
+  }
+  if (window.__expose) window.__lnLamps = LN_LAMPS.length;
+}
+
 const RL = !!PS.rainlake;
 const RL_X0 = -58.0, RL_X1 = 58.0, RL_Z0 = -46.0, RL_Z1 = 46.0;
 const RL_WY = -0.10;      // 江面标高
@@ -11544,7 +12468,9 @@ function buildRlAll() {
   const STORE = !!PS.store;
   const CLUB = !!PS.club;
   const WRH = !!PS.wh;
-  if (RL) {
+  if (LN) {
+    buildLnAll();
+  } else if (RL) {
     buildRlAll();
   } else if (KFC) {
     scene.add(buildKfcSite());
@@ -11630,7 +12556,9 @@ function buildRlAll() {
 
   /* 室内暖光 */
   const LAMPK = cfg(PS.lampK, 1);
-  if (RL) {
+  if (LN) {
+    /* 灯街的 6 盏暖点光已在 buildLnAll() 内按灯位布置 */
+  } else if (RL) {
     /* 寒江雪不设任何点光：暖光会毁掉「寒」，全靠天光 + 低饱和材质 */
   } else if (KFC) {
     /* 店内冷白顶光 + 门口暖光 + 招牌泛光。点光压在梁下，别贴吊顶 */
@@ -11808,23 +12736,23 @@ function buildRlAll() {
   }
 
   const VEG = PS.veg || {};
-  const willowPos = cfg(VEG.willows, (STORE || CLUB || JD || CYB || KFC || RL) ? [] : [[4.0, -4.35, 0.95], [-6.5, 1.95, 0.72]]);
+  const willowPos = cfg(VEG.willows, (STORE || CLUB || JD || CYB || KFC || RL || LN) ? [] : [[4.0, -4.35, 0.95], [-6.5, 1.95, 0.72]]);
   for (let i = 0; i < willowPos.length; i++) {
     scene.add(willow(willowPos[i][0], willowPos[i][1], willowPos[i][2]));
   }
 
-  if (!STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL) {
+  if (!STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN) {
     boatGroup = buildBoat(5.9, 1.15, Math.PI / 2 + 0.05);
     scene.add(boatGroup);
   }
 
-  const bamPos = cfg(VEG.bamboo, (STORE || CLUB || WRH || JD || CYB || KFC || RL) ? [] : [[-7.0, -4.6, 1.0], [-6.9, 6.9, 0.75]]);
+  const bamPos = cfg(VEG.bamboo, (STORE || CLUB || WRH || JD || CYB || KFC || RL || LN) ? [] : [[-7.0, -4.6, 1.0], [-6.9, 6.9, 0.75]]);
   for (let i = 0; i < bamPos.length; i++) scene.add(bamboo(bamPos[i][0], bamPos[i][1], bamPos[i][2]));
-  const potPos = cfg(VEG.pots, (STORE || CLUB || WRH || JD || CYB || KFC || RL) ? [] : [[1.85, 2.35], [2.1, -2.55]]);
+  const potPos = cfg(VEG.pots, (STORE || CLUB || WRH || JD || CYB || KFC || RL || LN) ? [] : [[1.85, 2.35], [2.1, -2.55]]);
   for (let i = 0; i < potPos.length; i++) scene.add(pot(potPos[i][0], potPos[i][1]));
 
   /* ================= 招牌 / 布幡 / 晾布 ================= */
-  if (!STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL) {
+  if (!STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN) {
   const plaqueMat = new T.MeshBasicMaterial({ map: TEX.plaque });
   const psz = cfg(PS.plaqueSize, [1.55, 0.46]);
   const plaque = new T.Mesh(new T.PlaneGeometry(psz[0], psz[1]), plaqueMat);
@@ -11848,7 +12776,7 @@ function buildRlAll() {
     'uniform sampler2D map; varying vec2 vUv;\n' +
     'void main(){ gl_FragColor = texture2D(map, vUv); }';
 
-  if (!TOWER && !STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL) {
+  if (!TOWER && !STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN) {
   const bannerMat = new T.ShaderMaterial({
     uniforms: { uTime: bannerUni.uTime, uAmp: { value: 0.11 }, map: { value: TEX.banner } },
     vertexShader: clothVert, fragmentShader: clothFrag, side: T.DoubleSide
@@ -11876,14 +12804,14 @@ function buildRlAll() {
     vertexShader: clothVert, fragmentShader: clothFrag, side: T.DoubleSide
   });
   const cloths = [];
-  if (!TOWER && !STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL) for (let i = 0; i < 2; i++) {
+  if (!TOWER && !STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN) for (let i = 0; i < 2; i++) {
     const c = new T.Mesh(new T.PlaneGeometry(0.7, 1.05, 4, 6), clothMat);
     c.position.set(2.62 + i * 0.86, 1.5 - i * 0.05, -1.95);
     c.rotation.y = -0.04 + i * 0.08;
     scene.add(c);
     cloths.push(c);
   }
-  if (!TOWER && !STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL) (function () {
+  if (!TOWER && !STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN) (function () {
     const b = new Builder();
     const g = new T.Group();
     b.cyl('woodDark', 0.055, 0.065, 2.15, 6, 2.24, 1.07, -1.95);
@@ -11904,7 +12832,7 @@ function buildRlAll() {
   /* ================= 屋檐铜铃 ================= */
   const bells = [];
   (function () {
-    const pos = (STORE || CLUB || JD || CYB || KFC || RL) ? [] : cfg(PS.bellPos, [[2.78, 5.86, 3.08], [2.78, 5.86, -3.86], [-5.98, 5.86, 3.08], [-5.98, 5.86, -3.86]]);
+    const pos = (STORE || CLUB || JD || CYB || KFC || RL || LN) ? [] : cfg(PS.bellPos, [[2.78, 5.86, 3.08], [2.78, 5.86, -3.86], [-5.98, 5.86, 3.08], [-5.98, 5.86, -3.86]]);
     for (let i = 0; i < pos.length; i++) {
       const g = new T.Group();
       g.position.set(pos[i][0], pos[i][1], pos[i][2]);
@@ -11935,7 +12863,7 @@ function buildRlAll() {
     patches.push({ m: p, base: op, x0: x, z0: z });
     return p;
   }
-  if (STORE || CLUB || KFC || RL) {
+  if (STORE || CLUB || KFC || RL || LN) {
     // 玻璃幕面，不做木格窗光斑
   } else if (TOWER) {
     addPatch(4.4, 4.4, -2.05 + 3.2, 1.24, -0.2, 0.1, 0.18);
@@ -11999,7 +12927,7 @@ function buildRlAll() {
     smokes.push(new Smoke(-3.10, 2.20, 6.10, 0.70, 5));
   } else if (JD) {
     smokes.push(new Smoke(DHCX + 0.30, DH_RG + 0.92, DW1 - 0.62, 1.15, 7));
-  } else if (!TOWER && !STORE && !CLUB && !WRH && !CYB && !KFC && !RL) {
+  } else if (!TOWER && !STORE && !CLUB && !WRH && !CYB && !KFC && !RL && !LN) {
     smokes.push(new Smoke(-1.62, FL + 0.88, 0.73, 1.0, 6));
     smokes.push(new Smoke(-3.55, FL + 0.66, -2.3, 1.2, 7));
     smokes.push(new Smoke(2.3, F2 + 0.8, -0.5, 0.9, 5));

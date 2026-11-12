@@ -831,6 +831,86 @@
          孤舟在近景偏左，右侧大片留白。theta=0 会变成从 +x 侧看，
          横贯的群山会被拧成右侧一条斜带 —— 别再改回去。 */
       cam: { theta: 1.50, phi: 1.32, dist: 70.0, target: [0.0, 3.0, -2.0] }
+    },
+
+    /* ---------------------------------------------------------
+       千灯 · 上元灯会（第 13 套）
+       与寒江雪相反：极闹 / 满铺 / 万点暖光。暮色远山 + 落日在天，
+       临水灯街在中，寒河与河灯在下，石拱桥斜跨、人潮只作单色剪影。
+       三类 GPU 粒子：花灯辉光呼吸 / 河灯顺流 / 孔明灯升空。
+       --------------------------------------------------------- */
+    lantern: {
+      id: 'lantern',
+      title: '千灯 · 上元灯会',
+      lantern: true,
+      emis: 1.15,
+      lampK: 1.0,
+      /* 暮色四段：中心暖橙落日，外缘靛蓝夜幕 */
+      sky: ['#ffd9a0', '#e8a274', '#8a637e', '#2b2b4c'],
+      vig: 'rgba(28,20,42,0.38)',
+      distMax: 220,
+      targetR: 90,
+      shadowSpan: 52,
+      shadowFar: 200,
+      camFar: 700,
+      fog: { color: 0x6a5064, near: 42.0, far: 185.0 },
+      lnRiverN: 190,
+      lnSkyN: 108,
+      lnWater: {
+        deep: [0.105, 0.118, 0.215],
+        shal: [0.190, 0.190, 0.275],
+        glow: [1.000, 0.610, 0.270],
+        fog:  [0.290, 0.250, 0.330]
+      },
+      palette: {
+        /* 漆盘底座与岸台：暗赭而不是纯黑，别出现托盘黑框 */
+        lnBase: 0x5a4a4e, lnBaseD: 0x453a52, lnBaseL: 0x6b5458,
+        lnQuay: 0x6a5850, lnQuayD: 0x453b3c,
+        lnPave: 0x8a7566, lnPaveD: 0x766254,
+        lnStone: 0x8d7d72, lnStoneD: 0x574c48, lnStoneL: 0xa39383,
+        /* 远山：近深远淡，靛紫剪影 */
+        lnMtn1: 0x423c56, lnMtn2: 0x574c66, lnMtn3: 0x6f5d74,
+        /* 临水楼阁 */
+        lnWall: 0xb59a83, lnWallD: 0x967c6c,
+        lnWood: 0x7a4a34, lnWoodD: 0x552f24, lnWoodDeep: 0x3d241e,
+        lnPillar: 0x8c3a2c, lnRail: 0x7c4a32, lnDoor: 0x38251f,
+        lnTile: 0x39404f, lnTileD: 0x272c39, lnTileL: 0x4e5566,
+        /* 灯 */
+        lnLanternD: 0x7a2a1c, lnTassel: 0xd8a03c, lnCord: 0x3a2a26,
+        /* 牌楼 / 桥 / 人 / 树 / 船 */
+        lnGate: 0x9b3a2c, lnGateD: 0x6d2a20,
+        lnBridge: 0x8b7d70, lnBridgeD: 0x5f564f,
+        lnFigure: 0x413343, lnFigureD: 0x5b4552,
+        lnTree: 0x3b4438, lnTreeD: 0x2f3830, lnBark: 0x4a3830,
+        lnBoat: 0x6a4433, lnBoatD: 0x452c24,
+        /* 灯市棚布：暖红 / 赭橙 / 米白，只此三色，第四色整条街就散了 */
+        lnStall1: 0xa8442e, lnStall2: 0xc47a3a, lnStall3: 0xd8b78a
+      },
+      emit: {
+        /* 灯会的辨识度全部来自自发光：三色灯 + 两色窗，漏一个就是死黑 */
+        lnLantern:  { c: 0xe8572c, e: 0xa83a12 },
+        lnLanternY: { c: 0xffc257, e: 0xb06a18 },
+        lnLanternW: { c: 0xffe6b4, e: 0xc08a48 },
+        lnLanternD: { c: 0x7a2a1c, e: 0x1e0804 },
+        lnWin:      { c: 0xffb45e, e: 0x8c4a16 },
+        lnWinW:     { c: 0xffd08a, e: 0xa05e20 },
+        lnTassel:   { c: 0xd8a03c, e: 0x3a2008 },
+        /* 灯市棚布要透光，否则暮色里是一排暗瓦片 */
+        lnStall1:   { c: 0xa8442e, e: 0x3a1008 },
+        lnStall2:   { c: 0xc47a3a, e: 0x3a2008 },
+        lnStall3:   { c: 0xd8b78a, e: 0x3a2810 }
+      },
+      light: {
+        /* 黄昏强光比：主光从落日方向低角度逆打，补光给冷紫，别把暗部抬平 */
+        sun:  { color: 0xffb070, i: 1.18, pos: [-22.0, 18.0, -12.0] },
+        fill: { color: 0x7a86b8, i: 0.55, pos: [18.0, 12.0, 20.0] },
+        hemi: { sky: 0x8f8fae, ground: 0x6b4a40, i: 0.95 },
+        amb:  { color: 0x8a7a90, i: 0.30 }
+      },
+      veg: { willows: [], bamboo: [], pots: [] },
+      /* theta≈1.50 正对 -z 的灯街与远山；phi 1.26 近水平，
+         让天—街—河三段都进画框。theta=0 会把横贯的街拧成右侧斜带。 */
+      cam: { theta: 1.50, phi: 1.24, dist: 62.0, target: [0.0, 4.8, -1.0] }
     }
 
   };
