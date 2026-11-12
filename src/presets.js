@@ -752,6 +752,76 @@
       },
       veg: { willows: [], bamboo: [], pots: [] },
       cam: { theta: 0.62, phi: 0.98, dist: 32.0, target: [0.0, 1.70, 0.60] }
+    },
+
+    /* ---------------------------------------------------------
+       烟雨 · 湖亭独钓（rainlake 形制）
+       水盘 + 三层远山 + 六角攒尖亭 + 一叶孤舟蓑笠翁 + 斜雨
+       阴雨的关键不是把灯调暗，是「压掉饱和 + 分层起雾 + 留白」
+       --------------------------------------------------------- */
+    rainlake: {
+      id: 'rainlake',
+      title: '烟雨 · 湖亭独钓',
+      rainlake: true,
+      emis: 0.92,
+      lampK: 0.85,
+      sky: ['#f2f6f5', '#e2eaea', '#c6d4d4', '#a8bcbe'],
+      vig: 'rgba(38,56,60,0.30)',
+      distMax: 100,
+      targetR: 24,
+      shadowSpan: 20,
+      shadowFar: 110,
+      camFar: 500,
+      fog: { color: 0xb5c6c7, near: 24.0, far: 95.0 },
+      rlRainN: 1300,
+      rlRainOp: 0.30,
+      rlWater: {
+        deep: [0.255, 0.335, 0.345],
+        shal: [0.385, 0.465, 0.465],
+        hi: [0.680, 0.745, 0.738],
+        fog: [0.690, 0.755, 0.755]
+      },
+      palette: {
+        /* 水盘底座 */
+        rlBase: 0x6f7d7c, rlBaseD: 0x4c5a5a, rlBaseL: 0x8b9896,
+        /* 远山三层：越远越淡，雾再吃掉一层 */
+        rlMtn1: 0xa8bcbc, rlMtn2: 0x8aa2a3, rlMtn3: 0x6b8586,
+        rlMtnL: 0xb9cccc, rlPine: 0x4a6660,
+        /* 岸土 / 石板 / 山石 */
+        rlBank: 0x8a9084, rlBankD: 0x5d6862,
+        rlPave: 0xa9b1aa, rlPaveD: 0x8e9992, rlPaveW: 0xc3cdc6,
+        rlStone: 0x929c98, rlStoneD: 0x6c7874, rlStoneL: 0x98a49f,
+        /* 亭：暗朱柱 + 青灰瓦，饱和度压到最低 */
+        rlWood: 0x6b5642, rlWoodD: 0x4a3c30, rlWoodL: 0x8c7458,
+        rlPillar: 0x7b4a3c, rlTile: 0x53666b, rlTileD: 0x3c4c51,
+        rlTileL: 0x6e8388, rlBrass: 0xa08b58,
+        /* 舟与蓑笠翁 */
+        rlBoat: 0x9c7950, rlBoatD: 0x53402e, rlBoatL: 0x3d3024,
+        rlStraw: 0xd0bd8d, rlStrawD: 0x6d5d3c,
+        rlCanopy: 0x4d5a58, rlCanopyR: 0xb9c6bd,
+        rlSkin: 0xd8b492, rlCloth: 0x4e5a5c,
+        rlRod: 0x9a9968, rlBasket: 0xa4854e,
+        /* 草木：全场暖色只留给荷花与灯笼 */
+        rlLeaf: 0x6f8a5e, rlLeafD: 0x5b7650, rlWillowW: 0x769265, rlBark: 0x615345,
+        rlReed: 0x7f9266, rlReedD: 0xa8a071,
+        rlPad: 0x5d8068, rlPadD: 0x7f9c7e,
+        rlBloom: 0xd9a6ad, rlBloomD: 0xe8d09a,
+        rlLamp: 0xffd9a2, rlSail: 0xd7e0dc
+      },
+      emit: {
+        /* 阴雨里自发光只用来「防死黑」，不是提亮 */
+        rlLamp:   { c: 0xffd9a2, e: 0x6a4520 },
+        rlSail:   { c: 0xd7e0dc, e: 0x20282a },
+        rlPaveW:  { c: 0xc3cdc6, e: 0x151c1c }
+      },
+      light: {
+        sun:  { color: 0xe4eeee, i: 0.95, pos: [16.0, 22.0, 15.0] },
+        fill: { color: 0x9dbcc4, i: 0.55, pos: [-15, 11, -13] },
+        hemi: { sky: 0xd3e0e0, ground: 0x6b7a76, i: 1.15 },
+        amb:  { color: 0xa9bcbd, i: 0.30 }
+      },
+      veg: { willows: [], bamboo: [], pots: [] },
+      cam: { theta: 0.76, phi: 1.10, dist: 46.0, target: [0.0, 1.20, -1.00] }
     }
 
   };
