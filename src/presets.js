@@ -977,6 +977,113 @@
       },
       veg: { willows: [], bamboo: [], pots: [] },
       cam: { theta: 0.80, phi: 1.11, dist: 28.0, target: [0.4, 3.90, -0.3] }
+    },
+    /* ---------------------------------------------------------
+       城市剖面（第 15 套）
+       一块被竖直切开的地籍块：地下土层层理 + 地铁 / 街道 / 六层楼剖面。
+       主角是那两道切面 —— 一座城市在同一秒的六种生活并排摊开。
+       冷灰混凝土 + 每层不同的室内色温，下午侧光把切面照亮。
+       --------------------------------------------------------- */
+    section: {
+      id: 'section',
+      title: '城市剖面',
+      section: true,
+      emis: 1.0,
+      lampK: 1.0,
+      sky: ['#e6eff7', '#cfe0ee', '#b0c8dd', '#94b0c6'],
+      vig: 'rgba(28,38,48,0.20)',
+      distMax: 150,
+      targetR: 46,
+      shadowSpan: 42,
+      shadowFar: 150,
+      camFar: 700,
+      fog: { color: 0xcfd8dc, near: 72.0, far: 230.0 },
+      palette: {
+        /* 地面与土：路面的冷灰，土的四层由暖到冷 */
+        scAsphalt: 0x4c5057, scAsphaltD: 0x3d4147,
+        scWalk: 0x9d9a92, scCurb: 0xb8b5ab,
+        scPaving: 0xa8a49a, scPavingD: 0x8e8a80,
+        scBase: 0x74766f,
+        scSoil1: 0x7a6247, scSoil2: 0x6a5540, scSoil3: 0x5a4838, scRock: 0x555b60,
+        scStone: 0x8b8d88, scStoneD: 0x6f726e, scStoneP: 0xb9b9b0, scStoneW: 0xc0beb2,
+        /* 管线三色：水蓝 / 气黄 / 电灰 */
+        scPipeA: 0x3f6f8c, scPipeB: 0xc9a13b, scPipeC: 0x7d838a,
+        /* 标线 */
+        scPaintW: 0xf2f0e8, scPaintR: 0xc4473c, scPaintY: 0xe3b93c,
+        /* 隧道与列车 */
+        scBallast: 0x6e6a63, scSleeper: 0x6b5b4a,
+        scRail: 0xb9bcc0, scRailD: 0x6d7176,
+        scTrain: 0xdfe3e6, scTrainD: 0x8f979e, scTrainStr: 0x2f6fa8,
+        scPlatform: 0x9a9c98, scTunnelDark: 0x14181c,
+        /* 混凝土：整场主色，要冷、要脏 */
+        scCon: 0xb9b7ae, scConD: 0x9b9a92, scConL: 0xcdcbc1, scCut: 0x8f8f86,
+        scConW: 0xdcdad0,
+        scCeil: 0xe6e4da, scSkirt: 0x7c7b74,
+        /* 金属与木 */
+        scMetal: 0x8d939a, scMetalD: 0x5f666d, scMetalL: 0xb9bec3,
+        scWood: 0x9a7148, scWoodD: 0x6d4f33, scWoodL: 0xb98d5f,
+        scBark: 0x6b5540, scBarkD: 0x4d3d2c,
+        scLeaf1: 0x6f9b52, scLeaf2: 0x527a3d, scLeaf3: 0x8cb96a,
+        /* 屋顶设备 */
+        scTank: 0x9fa8ad, scTankD: 0x7d868c,
+        scElev: 0xb8452f, scElevD: 0x8d3324,
+        /* 每层地面：便利店的浅灰砖、办公的米色、健身的深胶、住宅的木 */
+        scFl0: 0xa8a196, scFl1: 0xa8a191, scFl2: 0x777d78,
+        scFl3: 0xb08a5c, scFl4: 0xa8815a, scFl5: 0x8f8578,
+        /* 货架与商品 */
+        scShelf: 0xb6b3a8, scShelfD: 0x8e8b81,
+        scGoodsA: 0xd8552f, scGoodsB: 0x2f7fb8, scGoodsC: 0xe0a92e,
+        scFridge: 0xcfd6d8, scGlass: 0x8fb6c4, scGlassW: 0xfff3d4,
+        scCounter: 0xa88a5f, scCounterD: 0x7d6444,
+        scStool: 0x7a4a3a, scRug: 0x8f6a52, scRug2: 0x6d7f8a,
+        /* 办公 */
+        scDesk: 0xc0b49c, scChair: 0x4a5058,
+        scBoard: 0xf0efe6, scBoardD: 0x8a8b84,
+        scPot: 0xb06a48, scLampShade: 0xf0e2b8,
+        /* 健身 */
+        scGym: 0x3f444b, scGymD: 0x2b3036, scMirror: 0xbfd6dc,
+        scMatG: 0x3d5a52, scBag: 0x8a3b32,
+        /* 客厅与卧室 */
+        scSofa: 0x6d7f76, scSofaD: 0x55665e, scCushion: 0xd8c28a,
+        scBookA: 0xb04a3a, scBookB: 0x3f6f8a, scBookC: 0xd8c06a,
+        scBedBase: 0x8a6a4a, scBed: 0xe6e0d0, scQuilt: 0x7f93a8,
+        scPillow: 0xf2ece0, scWardrobe: 0x9a7a56, scWardrobeD: 0x775c40,
+        /* 工作室 */
+        scPaper: 0xe8e4d4, scModelBase: 0xb0aa98, scModel: 0xd8d2c0,
+        scCanvas: 0xf0ead8,
+        /* 花店 */
+        scFlA: 0xe07a8a, scFlB: 0xe8c04a, scFlC: 0xb07ac8, scFlD: 0xf0eee0,
+        scBucket: 0x7d848a, scSignA: 0x2f6b52, scSignB: 0x2f5d8a,
+        scShed: 0x6f7a72, scShedD: 0x535d57, scCarton: 0xb08e62,
+        scTire: 0x2b2b2e, scBrickW: 0xc8c3b4,
+        scCarA: 0xc9503e, scCarB: 0xdfe2e4, scCarC: 0x2f4f6b, scTail: 0xc0392b,
+        scLocker: 0xd8c86a, scLockerD: 0x9a8f4a, scCabinet: 0xdad3c2,
+        scArtF: 0x6d5a44, scArt1: 0xcf7a4a, scArt2: 0x4a7f9a, scArt3: 0xc8b05a,
+        /* 一街三色：主楼冷灰、左楼旧砖、右店米白 */
+        scBrickW2: 0xa8705c, scCream: 0xe0d8c4,
+        scMenuBox: 0x3a3f46, scMenuLine: 0x7a6a52,
+        scFridgeD: 0xb9c1c3, scRope: 0x8a8378,
+        scClothA: 0xe6e0d0, scClothB: 0xa8c0d8, scClothC: 0xd8a8b0,
+        /* 人物 */
+        scHair: 0x2f2a26, scSkin1: 0xe8bd9a, scSkin2: 0xc98f66,
+        scShirtA: 0x2f5d8a, scShirtB: 0x8a3f4f, scShirtC: 0x4a6b52,
+        scShirtD: 0xb08a4a, scClothB: 0x3b4048
+      },
+      emit: {
+        scNeonW:   { c: 0xfff8ea, e: 0xfff2d6 },
+        scNeonC:   { c: 0xeaf6ff, e: 0xbfe6ff },
+        scTrainWin:{ c: 0xfff0cc, e: 0xffe6b0 },
+        scGlassW:  { c: 0xfffaf0, e: 0xfff3d4 }
+      },
+      light: {
+        /* 下午的斜光从左后上方来，正好把朝 +z 的切面照亮 */
+        sun:  { color: 0xffe6bc, i: 2.90, pos: [-19.0, 25.0, 21.0] },
+        fill: { color: 0x9fbdd6, i: 0.44, pos: [14.0, 9.0, 10.0] },
+        hemi: { sky: 0xd8e6f2, ground: 0x9a8f7a, i: 0.86 },
+        amb:  { color: 0x9aa6b0, i: 0.22 }
+      },
+      veg: { willows: [], bamboo: [], pots: [] },
+      cam: { theta: 1.20, phi: 1.245, dist: 51.0, target: [0.0, 7.45, -0.40] }
     }
   };
 });

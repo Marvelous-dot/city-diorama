@@ -13535,12 +13535,1171 @@ function buildRwAll() {
   }
 }
 
+/* ============================================================
+   城市剖面（section / SEC）—— 第 15 套形制
+   一块被竖直切开的地籍块。三个深度层次：
+     前缘 z = SC_ZH（4.40）   地下土层层理 + 地铁隧道（切面正对相机）
+     中景 z = 0.40            街道路面
+     后景 z = 0.40            6 层混合用途楼的室内剖面
+   主角是那两道切面：它把一座城市在同一秒的六种生活并排摊开。
+   ============================================================ */
+const SEC = !!PS.section;
+
+const SC_X0 = -9.6, SC_X1 = 9.6;   // 地块左右
+const SC_Z0 = -7.4;                // 后缘
+const SC_ZH = 4.40;                // 前缘 = 剖切面
+const SC_GY = 0.14;                // 室外地面
+const SC_BT = -5.85;               // 台底
+
+const S_W = 4.55;                  // 主楼半宽
+const S_ZB = -6.95;                // 后墙外面
+const S_ZF = 0.40;                 // 前切面
+const S_T = 0.34;                  // 墙厚
+const S_FL = 3.20;                 // 层高
+const S_SL = 0.26;                 // 楼板厚
+const S_N = 6;                     // 层数
+const S_TOP = SC_GY + S_N * S_FL;  // 19.34
+
+const SH_X0 = 5.35, SH_X1 = 9.20;  // 右侧三店小楼
+const SH_Z0 = -5.80, SH_Z1 = 0.30;
+const SH_FL = 3.10, SH_N = 3;
+
+/* 地铁：沿 x 贯穿，近侧壁刚好落在切面上，切面里能直接看进隧道 */
+const T_ZF = SC_ZH;                // 近壁 = 切面
+const T_ZB = -1.45;                // 远壁
+const T_FL = -4.32;                // 轨面
+const T_TY = -1.58;                // 顶板底
+
+/* 确定性伪随机 */
+function scR(seed) {
+  const x = Math.sin(seed * 113.7 + 271.3) * 43758.5453;
+  return x - Math.floor(x);
+}
+
+/* 描边压成冷灰，别用民居的纯黑 */
+if (SEC) OUTLINE.uniforms.uColor.value.set(0x3a3f46);
+
+/* 任意多边形棱柱（(x,z) 折线 + 上下高度） */
+function scSlab(b, key, pts, y0, y1) {
+  const sh = new T.Shape();
+  sh.moveTo(pts[0][0], -pts[0][1]);
+  for (let i = 1; i < pts.length; i++) sh.lineTo(pts[i][0], -pts[i][1]);
+  sh.closePath();
+  const g = new T.ExtrudeGeometry(sh, {
+    depth: Math.max(0.002, y1 - y0), bevelEnabled: false, curveSegments: 1, steps: 1
+  });
+  g.rotateX(-Math.PI / 2);
+  g.translate(0, y0, 0);
+  b.add(key, g);
+  return g;
+}
+
+/* 矩形棱柱：按「两个角 + 两个高度」给 */
+function scBlock(b, key, x0, x1, z0, z1, y0, y1) {
+  return scSlab(b, key, [[x0, z0], [x1, z0], [x1, z1], [x0, z1]], y0, y1);
+}
+
+/* 一段台阶：整个梯段一次挤出，绝不一级一个盒子（不然满梯子砖缝） */
+function scSteps(b, key, x0, x1, zFront, y0, n, run, rise) {
+  const sh = new T.Shape();
+  sh.moveTo(zFront, y0);
+  let z = zFront, y = y0;
+  for (let i = 0; i < n; i++) {
+    z -= run;
+    sh.lineTo(z, y);
+    y += rise;
+    sh.lineTo(z, y);
+  }
+  sh.lineTo(z, y0);
+  sh.closePath();
+  const g = new T.ExtrudeGeometry(sh, {
+    depth: x1 - x0, bevelEnabled: false, curveSegments: 1, steps: 1
+  });
+  g.rotateY(-Math.PI * 0.5);
+  g.translate(x1, 0, 0);
+  b.add(key, g);
+  return [z, y];
+}
+
+/* ------------------------------------------------------------ 地下土方 */
+/* 土方绕开隧道：隧道那一段只留远侧的土。
+   ★ 整块挤出，绝不用盒子拼 —— 盒子接缝会漏出一圈描边，剖面像砖墙。 */
+function scEarth(b) {
+  const ALL = [[SC_X0, SC_Z0], [SC_X1, SC_Z0], [SC_X1, SC_ZH], [SC_X0, SC_ZH]];
+  const BACK = [[SC_X0, SC_Z0], [SC_X1, SC_Z0], [SC_X1, T_ZB], [SC_X0, T_ZB]];
+
+  /* 路面结构层 */
+  scBlock(b, 'scAsphalt', SC_X0, SC_X1, SC_Z0, SC_ZH, SC_GY - 0.20, SC_GY);
+  scBlock(b, 'scBase', SC_X0, SC_X1, SC_Z0, SC_ZH, SC_GY - 0.50, SC_GY - 0.20);
+
+  /* 隧道顶板以上：整块填土 */
+  scSlab(b, 'scSoil1', ALL, T_TY, SC_GY - 0.50);
+  /* 隧道高度范围：只留远侧（z < T_ZB）那一截 */
+  scSlab(b, 'scSoil2', BACK, T_FL, T_TY);
+  /* 隧道地板以下 */
+  scSlab(b, 'scSoil3', ALL, -4.95, T_FL);
+  scSlab(b, 'scRock', ALL, SC_BT, -4.95);
+
+  /* 切面上的石子：一层层排，深浅不一 */
+  for (let i = 0; i < 132; i++) {
+    const y = SC_GY - 0.58 - scR(i * 3.1 + 1) * 3.95;
+    if (y < T_TY && y > T_FL) continue;                 // 让开隧道
+    const x = SC_X0 + 0.32 + scR(i * 5.3 + 2) * (SC_X1 - SC_X0 - 0.64);
+    const r = 0.042 + scR(i * 7.7) * 0.105;
+    b.box(scR(i * 9.1) < 0.14 ? 'scStoneP' : (i % 3 ? 'scStone' : 'scStoneD'),
+      r * 1.9, r * 1.2, 0.05, x, y, SC_ZH - 0.008,
+      0, 0, scR(i * 11.3) * 3.14);
+  }
+
+  /* 三根横穿的管线：水 / 燃气 / 电 */
+  const runs = [
+    [-0.70, 0.082, 'scPipeA'], [-0.96, 0.066, 'scPipeB'], [-1.20, 0.050, 'scPipeC']
+  ];
+  for (let i = 0; i < runs.length; i++) {
+    const q = runs[i];
+    /* 管子沿 x 走、贴着切面：剖面里看到的是半根管子鼓出来，正是一根被切开的管 */
+    const pz = SC_ZH - 0.035;
+    b.to(q[2], q[1], SC_X0, q[0], pz, SC_X1, q[0], pz, 8);
+    for (let k = 0; k < 5; k++) {
+      b.cyl(q[2], q[1] * 1.45, q[1] * 1.45, 0.10, 8,
+        SC_X0 + 1.7 + k * 3.5, q[0], pz, 0, 0, Math.PI * 0.5);
+    }
+  }
+  /* 从楼里下来的排水立管，一路穿到隧道顶板上方 */
+  b.to('scPipeC', 0.070, 3.95, SC_GY - 0.40, -6.20, 3.95, T_TY + 0.10, -6.20, 8);
+
+  /* 台底混凝土基座 */
+  scSlab(b, 'scBase', [[SC_X0 - 0.24, SC_Z0 - 0.24], [SC_X1 + 0.24, SC_Z0 - 0.24],
+    [SC_X1 + 0.24, SC_ZH + 0.24], [SC_X0 - 0.24, SC_ZH + 0.24]], SC_BT - 0.30, SC_BT);
+
+  /* 左端立一根水准标尺，坐在土里，不要伸出台座 —— 伸出去了就像一根插错位置的杆子 */
+  b.box('scMetalD', 0.06, 4.10, 0.06, SC_X0 + 0.52, SC_BT + 2.30, SC_ZH + 0.06);
+  for (let i = 0; i < 4; i++) {
+    b.box(i % 2 ? 'scPaintW' : 'scPaintR', 0.16, 1.00, 0.02,
+      SC_X0 + 0.52, SC_BT + 0.65 + i * 1.02, SC_ZH + 0.09);
+  }
+}
+
+/* ------------------------------------------------------------ 地铁 */
+function scTunnel(b) {
+  const X0 = SC_X0, X1 = SC_X1;
+
+  /* 底板 / 顶板 / 远壁：三块板围出一个盒子，近侧就是切面 */
+  scBlock(b, 'scConD', X0, X1, T_ZB - 0.28, T_ZF, T_FL - 0.26, T_FL);
+  scBlock(b, 'scConD', X0, X1, T_ZB - 0.28, T_ZF, T_TY, T_TY + 0.26);
+  scBlock(b, 'scCon', X0, X1, T_ZB - 0.28, T_ZB, T_FL - 0.26, T_TY + 0.26);
+
+  /* 远壁上的电缆桥架与一排检修灯 */
+  for (let i = 0; i < 2; i++) {
+    b.box('scMetalD', X1 - X0 - 0.1, 0.10, 0.16, 0, -2.10 - i * 0.46, T_ZB + 0.06);
+  }
+  for (let i = 0; i < 7; i++) {
+    const x = X0 + 1.2 + i * 2.55;
+    b.box('scNeonC', 0.42, 0.10, 0.10, x, T_TY - 0.10, T_ZB + 0.22);
+  }
+
+  /* 顶板下的两列吊灯：靠切面这一列最亮，给隧道内部一点纵深 */
+  for (let i = 0; i < 6; i++) {
+    const x = X0 + 1.5 + i * 2.9;
+    b.box('scMetalD', 0.06, 0.16, 0.06, x, T_TY - 0.16, 2.55);
+    b.box('scNeonW', 0.90, 0.06, 0.24, x, T_TY - 0.26, 2.55);
+  }
+
+  /* 双轨：枕木 + 钢轨 + 道床 */
+  const TR = [2.55, 0.95];
+  for (let t = 0; t < TR.length; t++) {
+    const tz = TR[t];
+    scBlock(b, 'scBallast', X0, X1, tz - 0.82, tz + 0.82, T_FL, T_FL + 0.10);
+    for (let i = 0; i < 26; i++) {
+      const x = X0 + 0.35 + i * 0.74;
+      b.box('scSleeper', 0.24, 0.07, 1.42, x, T_FL + 0.13, tz);
+    }
+    b.box('scRail', X1 - X0, 0.11, 0.09, 0, T_FL + 0.21, tz - 0.56);
+    b.box('scRail', X1 - X0, 0.11, 0.09, 0, T_FL + 0.21, tz + 0.56);
+    b.box('scRailD', X1 - X0, 0.05, 0.16, 0, T_FL + 0.10, tz - 0.56);
+    b.box('scRailD', X1 - X0, 0.05, 0.16, 0, T_FL + 0.10, tz + 0.56);
+    /* 第三轨 */
+    b.box('scRail', X1 - X0, 0.07, 0.07, 0, T_FL + 0.36, tz - 0.74);
+  }
+
+  /* 一列地铁停在远轨上：正面看是侧面长条，窗里透暖光 */
+  const cx = -0.4, cl = 7.4;
+  b.box('scTrain', cl, 1.62, 2.42, cx, T_FL + 1.02, 0.95);
+  b.box('scTrainD', cl, 0.24, 2.46, cx, T_FL + 0.32, 0.95);
+  b.box('scTrainD', cl - 0.3, 0.10, 2.30, cx, T_FL + 1.86, 0.95);
+  /* 车窗：两排，靠切面这一侧最清楚 */
+  for (let i = 0; i < 6; i++) {
+    const x = cx - 2.55 + i * 1.02;
+    b.box('scTrainWin', 0.72, 0.62, 0.06, x, T_FL + 1.28, 0.95 - 1.23);
+    b.box('scTrainWin', 0.72, 0.62, 0.06, x, T_FL + 1.28, 0.95 + 1.23);
+    b.box('scTrainWin', 0.06, 0.62, 0.86, x + 0.38, T_FL + 1.28, 0.95);
+  }
+  /* 车门 */
+  b.box('scTrainD', 0.10, 1.46, 0.86, cx + 1.62, T_FL + 1.00, 0.95 - 1.21);
+  b.box('scTrainD', 0.10, 1.46, 0.86, cx + 1.62, T_FL + 1.00, 0.95 + 1.21);
+  /* 车头灯与侧面腰线 */
+  b.box('scNeonW', 0.10, 0.26, 0.30, cx - cl * 0.5, T_FL + 0.80, 0.95 - 0.86);
+  b.box('scNeonW', 0.10, 0.26, 0.30, cx - cl * 0.5, T_FL + 0.80, 0.95 + 0.86);
+  b.box('scTrainStr', cl, 0.12, 2.44, cx, T_FL + 1.52, 0.95);
+  /* 转向架 */
+  for (let i = 0; i < 2; i++) {
+    b.box('scMetalD', 1.10, 0.34, 1.70, cx - 2.5 + i * 5.0, T_FL + 0.24, 0.95);
+  }
+
+  /* 站台：远壁一侧贴一条站台边，带黄线 */
+  scBlock(b, 'scPlatform', X0, X1, T_ZB + 0.02, T_ZB + 0.62, T_FL + 0.06, T_FL + 0.42);
+  b.box('scPaintY', X1 - X0, 0.03, 0.14, 0, T_FL + 0.44, T_ZB + 0.52);
+
+  /* 隧道口两端的暗：让隧道看起来是通的，不是一截盒子 */
+  for (let i = 0; i < 2; i++) {
+    b.box('scTunnelDark', 0.5, T_TY - T_FL - 0.2, T_ZF - T_ZB - 0.1,
+      i ? X1 - 0.25 : X0 + 0.25, (T_TY + T_FL) * 0.5, (T_ZF + T_ZB) * 0.5);
+  }
+}
+
+/* ------------------------------------------------------------ 街道 */
+function scStreet(b) {
+  /* 人行道：沿楼前一条，比车行道高 0.14 */
+  scBlock(b, 'scWalk', SC_X0, SC_X1, S_ZF, 1.55, SC_GY, SC_GY + 0.14);
+  b.box('scCurb', SC_X1 - SC_X0, 0.16, 0.10, 0, SC_GY + 0.06, 1.55);
+
+  /* 车行道：两条车道 + 中间虚线 */
+  scBlock(b, 'scAsphalt', SC_X0, SC_X1, 1.55, SC_ZH, SC_GY - 0.02, SC_GY);
+  for (let i = 0; i < 9; i++) {
+    b.box('scPaintW', 0.70, 0.02, 0.10, SC_X0 + 1.0 + i * 2.15, SC_GY + 0.012, 2.95);
+  }
+
+  /* 斑马线：一块灰沥青最难读的就是「这是条路」，几道白条就够 */
+  for (let i = 0; i < 7; i++) {
+    b.box('scPaintW', 0.44, 0.02, 2.40, -8.55 + i * 0.78, SC_GY + 0.012, 2.95);
+  }
+  /* 停止线 */
+  b.box('scPaintW', 5.20, 0.02, 0.14, -4.90, SC_GY + 0.012, 1.85);
+
+  /* 井盖、雨水箅子、路面裂缝 */
+  for (let i = 0; i < 3; i++) {
+    b.cyl('scMetalD', 0.32, 0.32, 0.03, 12, -5.4 + i * 6.0, SC_GY + 0.008, 2.05);
+  }
+  b.box('scMetalD', 0.86, 0.03, 0.40, 3.05, SC_GY + 0.008, 1.72);
+  for (let i = 0; i < 4; i++) {
+    b.box('scAsphaltD', 1.30 + scR(i * 3.1) * 1.6, 0.012, 0.05,
+      -6.0 + i * 3.4, SC_GY + 0.006, 2.3 + scR(i * 5.7) * 1.2, 0, scR(i * 7.3) * 0.5, 0);
+  }
+
+  /* 人行道上：一棵行道树、一盏路灯、一个公交站牌、一张长椅、两辆自行车 */
+  scTree(b, -3.30, 0.95, 2.05, 1.0);
+  scTree(b, 6.15, 0.95, 2.30, 0.86);
+
+  /* 路灯：灯杆在楼前，灯头挑出来压在车行道上 */
+  b.cyl('scMetalD', 0.055, 0.075, 4.30, 8, 4.95, SC_GY + 2.15, 1.05);
+  b.to('scMetalD', 0.052, 4.95, SC_GY + 4.28, 1.05, 4.95, SC_GY + 4.46, 2.35, 6);
+  b.box('scMetalD', 0.20, 0.14, 0.62, 4.95, SC_GY + 4.40, 2.45);
+  b.box('scNeonW', 0.16, 0.05, 0.46, 4.95, SC_GY + 4.32, 2.45);
+
+  /* 公交站牌 */
+  b.cyl('scMetalD', 0.045, 0.045, 2.55, 8, -6.85, SC_GY + 1.42, 1.05);
+  b.box('scSignB', 0.72, 0.44, 0.05, -6.85, SC_GY + 2.62, 1.05);
+  b.box('scMetalD', 0.86, 0.06, 0.06, -6.85, SC_GY + 2.86, 1.05);
+
+  /* 长椅（朝街） */
+  const bx = -8.20, bz = 1.10;
+  for (let i = 0; i < 2; i++) {
+    b.box('scMetalD', 0.08, 0.42, 0.42, bx + (i ? 0.86 : -0.86), SC_GY + 0.35, bz);
+  }
+  for (let i = 0; i < 3; i++) {
+    b.box('scWood', 2.10, 0.07, 0.13, bx, SC_GY + 0.58, bz - 0.16 + i * 0.16);
+  }
+  for (let i = 0; i < 2; i++) {
+    b.box('scWood', 2.10, 0.13, 0.06, bx, SC_GY + 0.82 + i * 0.20, bz + 0.30);
+  }
+
+  /* 自行车：两个轮 + 车架，靠在树边 */
+  for (let i = 0; i < 2; i++) {
+    const z = 1.15 + i * 0.45;
+    b.torus('scTire', 0.30, 0.035, -1.95 + i * 0.1, SC_GY + 0.44, z, 0, 0, 0);
+    b.torus('scTire', 0.30, 0.035, -1.05 + i * 0.1, SC_GY + 0.44, z, 0, 0, 0);
+    b.to('scMetalL', 0.028, -1.95, SC_GY + 0.44, z, -1.55, SC_GY + 0.86, z, 5);
+    b.to('scMetalL', 0.028, -1.55, SC_GY + 0.86, z, -1.05, SC_GY + 0.44, z, 5);
+    b.to('scMetalL', 0.028, -1.62, SC_GY + 0.44, z, -1.48, SC_GY + 0.90, z, 5);
+    b.box('scMetalL', 0.30, 0.03, 0.03, -1.52, SC_GY + 0.93, z);
+  }
+
+  /* 街上停三辆车：空的街道一眼就是模型 */
+  const cars = [
+    [-6.30, 2.45, 0, 'scCarA'], [1.55, 3.55, Math.PI, 'scCarB'],
+    [6.55, 3.55, 0, 'scCarC']
+  ];
+  for (let i = 0; i < cars.length; i++) {
+    const q = cars[i];
+    const cx = q[0], cz = q[1], ry = q[2];
+    const c = Math.cos(ry), sn = Math.sin(ry);
+    const P = function (lx, lz) { return [cx + lx * c + lz * sn, cz - lx * sn + lz * c]; };
+    b.box(q[3], 3.60, 0.62, 1.58, cx, SC_GY + 0.52, cz, 0, ry, 0);
+    b.box(q[3], 2.10, 0.46, 1.50, cx, SC_GY + 0.98, cz, 0, ry, 0);
+    b.box('scGlass', 1.94, 0.40, 1.40, cx, SC_GY + 1.02, cz, 0, ry, 0);
+    b.box('scMetalD', 2.16, 0.06, 1.54, cx, SC_GY + 1.24, cz, 0, ry, 0);
+    b.box('scNeonW', 0.10, 0.16, 0.34, P(1.80, -0.52)[0], SC_GY + 0.62, P(1.80, -0.52)[1], 0, ry, 0);
+    b.box('scNeonW', 0.10, 0.16, 0.34, P(1.80, 0.52)[0], SC_GY + 0.62, P(1.80, 0.52)[1], 0, ry, 0);
+    b.box('scTail', 0.08, 0.14, 0.30, P(-1.80, -0.54)[0], SC_GY + 0.66, P(-1.80, -0.54)[1], 0, ry, 0);
+    b.box('scTail', 0.08, 0.14, 0.30, P(-1.80, 0.54)[0], SC_GY + 0.66, P(-1.80, 0.54)[1], 0, ry, 0);
+    for (let j = 0; j < 4; j++) {
+      const lx = j < 2 ? 1.16 : -1.16, lz = (j % 2) ? 0.74 : -0.74;
+      const pp = P(lx, lz);
+      b.cyl('scTire', 0.28, 0.28, 0.20, 10, pp[0], SC_GY + 0.28, pp[1], 0, ry, Math.PI * 0.5);
+    }
+  }
+
+  /* 街上的人：人行道上散步的、等车的、正过马路的 */
+  scPed(b, -2.05, SC_GY + 0.14, 1.05, 1.55, 'scShirtB', 'scSkin1');
+  scPed(b, -1.35, SC_GY + 0.14, 1.18, 1.25, 'scShirtD', 'scSkin2');
+  scPed(b, -6.75, SC_GY + 0.14, 1.02, 0.30, 'scShirtC', 'scSkin1');
+  scPed(b, 7.35, SC_GY + 0.14, 1.05, 4.10, 'scShirtA', 'scSkin2');
+  scPed(b, -5.05, SC_GY, 2.55, 3.05, 'scShirtD', 'scSkin1');
+  scPed(b, 2.75, SC_GY + 0.14, 0.95, 2.60, 'scShirtC', 'scSkin2');
+
+  /* 路边的垃圾桶 */
+  b.cyl('scMetalD', 0.20, 0.17, 0.72, 10, -3.05, SC_GY + 0.50, 0.90);
+  b.cyl('scMetalD', 0.23, 0.23, 0.06, 10, -3.05, SC_GY + 0.88, 0.90);
+}
+
+/* ------------------------------------------------------------ 树 */
+function scTree(b, x, z, h, s) {
+  const y0 = SC_GY + (z > 1.5 ? 0 : 0.10);
+  b.to('scBark', 0.11 * s, x, y0, z, x + 0.06, y0 + h * 0.62, z - 0.04, 7);
+  for (let i = 0; i < 3; i++) {
+    const a = 0.6 + i * 2.0;
+    b.to('scBarkD', 0.06 * s,
+      x + 0.05, y0 + h * 0.55, z - 0.03,
+      x + Math.cos(a) * 0.55 * s, y0 + h * 0.86, z + Math.sin(a) * 0.55 * s, 5);
+  }
+  const cy = y0 + h * 0.92;
+  for (let i = 0; i < 5; i++) {
+    const a = i * 1.27 + 0.4;
+    const r = (0.52 + scR(i * 3.7 + x) * 0.26) * s;
+    b.sph(i % 2 ? 'scLeaf1' : 'scLeaf2', r,
+      x + Math.cos(a) * 0.52 * s, cy + (scR(i * 5.3) - 0.4) * 0.42 * s,
+      z + Math.sin(a) * 0.52 * s, 1.15, 0.86, 1.05);
+  }
+}
+
+/* ------------------------------------------------------------ 主楼外壳 */
+function scShell(b) {
+  const ZB = S_ZB, ZF = S_ZF;
+  const XL = -S_W, XR = S_W;
+
+  /* 后墙：留一排窗洞（不真切洞，用内凹的窗框 + 深色玻璃块） */
+  scBlock(b, 'scCon', XL, XR, ZB, ZB + S_T, SC_GY - 0.30, S_TOP);
+
+  /* 左右侧墙 */
+  scBlock(b, 'scCon', XL, XL + S_T, ZB + S_T, ZF, SC_GY - 0.30, S_TOP);
+  scBlock(b, 'scCon', XR - S_T, XR, ZB + S_T, ZF, SC_GY - 0.30, S_TOP);
+
+  /* 楼板 + 前切面 */
+  for (let k = 0; k <= S_N; k++) {
+    const y = SC_GY + k * S_FL;
+    scBlock(b, 'scConD', XL, XR, ZB + S_T, ZF, y - S_SL, y);
+    /* 切面：楼板端头一条略深的断面，加几颗露出来的骨料 */
+    b.box('scCut', XR - XL, S_SL * 0.94, 0.05, 0, y - S_SL * 0.5, ZF + 0.02);
+    for (let i = 0; i < 9; i++) {
+      b.box('scStoneP', 0.05 + scR(k * 7.1 + i) * 0.07, 0.04, 0.03,
+        -S_W + 0.5 + scR(k * 3.3 + i * 2.7) * (S_W * 2 - 1.0),
+        y - S_SL * (0.25 + scR(k * 5.9 + i) * 0.5), ZF + 0.045);
+    }
+    /* 侧墙的断面也压一条 */
+    b.box('scCut', 0.05, S_SL * 0.94, ZF - ZB, XL + S_T + 0.02, y - S_SL * 0.5, (ZF + ZB) * 0.5);
+    b.box('scCut', 0.05, S_SL * 0.94, ZF - ZB, XR - S_T - 0.02, y - S_SL * 0.5, (ZF + ZB) * 0.5);
+  }
+
+  /* 屋顶：女儿墙 + 设备 + 楼梯出屋面 */
+  scBlock(b, 'scCon', XL, XR, ZB + S_T, ZF, S_TOP, S_TOP + 0.16);
+  for (let i = 0; i < 2; i++) {
+    const z = ZB + 0.4 + i * (ZF - ZB - 0.8);
+    b.box('scConL', XR - XL - 0.4, 0.52, 0.24, 0, S_TOP + 0.42, z);
+  }
+  b.box('scConL', 0.24, 0.52, 0.30, XL + 0.14, S_TOP + 0.42, (ZF + ZB) * 0.5);
+  b.box('scConL', 0.24, 0.52, 0.30, XR - 0.14, S_TOP + 0.42, (ZF + ZB) * 0.5);
+  /* 楼梯出屋面小房 */
+  b.box('scConD', 1.70, 1.35, 1.90, -2.75, S_TOP + 0.70, ZB + 1.6);
+  b.box('scCon', 1.90, 0.16, 2.10, -2.75, S_TOP + 1.44, ZB + 1.6);
+  /* 空调外机与水箱 */
+  b.box('scMetal', 1.10, 0.62, 0.86, 2.35, S_TOP + 0.48, ZB + 1.5);
+  b.box('scMetalD', 0.90, 0.08, 0.70, 2.35, S_TOP + 0.82, ZB + 1.5);
+  b.cyl('scTank', 0.72, 0.72, 0.90, 12, 2.30, S_TOP + 1.30, ZB + 3.1);
+  b.cyl('scTankD', 0.76, 0.76, 0.10, 12, 2.30, S_TOP + 1.78, ZB + 3.1);
+  for (let i = 0; i < 4; i++) {
+    const a = i * 1.57 + 0.6;
+    b.to('scMetalD', 0.045, 2.30 + Math.cos(a) * 0.42, S_TOP + 0.16,
+      ZB + 3.1 + Math.sin(a) * 0.42, 2.30 + Math.cos(a) * 0.42, S_TOP + 0.86,
+      ZB + 3.1 + Math.sin(a) * 0.42, 5);
+  }
+}
+
+/* ------------------------------------------------------------ 外立面 */
+/* ★ 侧墙如果不开窗，从外面看就是一块两百像素见方的水泥板。
+   窗做「贴在墙面上的凹窗」：深色玻璃 + 四道浅色窗框 + 一块窗台，
+   比真切洞便宜得多，远看一样是窗。 */
+function scFacade(b, x, dir) {
+  const ZB = S_ZB + S_T, ZF = S_ZF;
+  for (let k = 0; k < S_N; k++) {
+    const y = SC_GY + k * S_FL + 1.62;
+    for (let i = 0; i < 3; i++) {
+      const z = ZB + 1.15 + i * 1.95;
+      const fx = x + dir * 0.012;
+      b.box('scGlass', 0.04, 1.52, 1.30, fx, y, z);
+      b.box('scConL', 0.06, 0.10, 1.46, fx + dir * 0.012, y + 0.80, z);
+      b.box('scConL', 0.06, 0.10, 1.46, fx + dir * 0.012, y - 0.80, z);
+      b.box('scConL', 0.06, 1.70, 0.09, fx + dir * 0.012, y, z - 0.68);
+      b.box('scConL', 0.06, 1.70, 0.09, fx + dir * 0.012, y, z + 0.68);
+      b.box('scConW', 0.14, 0.08, 1.52, x + dir * 0.05, y - 0.86, z);
+    }
+    /* 楼层之间一道分隔线，立面才有层数 */
+    b.box('scConL', 0.04, 0.07, ZF - ZB, x + dir * 0.012,
+      SC_GY + k * S_FL + 0.10, (ZF + ZB) * 0.5);
+  }
+  /* 立面上的空调外机与落水管 */
+  for (let i = 0; i < 3; i++) {
+    const y = SC_GY + (0.6 + i * 2) * S_FL + 0.95;
+    b.box('scMetal', 0.42, 0.54, 0.76, x + dir * 0.24, y, ZB + 4.55);
+    b.box('scMetalD', 0.06, 0.44, 0.64, x + dir * 0.44, y, ZB + 4.55);
+  }
+  b.cyl('scMetalD', 0.06, 0.06, S_TOP - SC_GY, 7,
+    x + dir * 0.12, (S_TOP + SC_GY) * 0.5, ZB + 0.42);
+}
+
+/* ------------------------------------------------------------ 电梯井与楼梯 */
+function scCore(b) {
+  const EX0 = 2.55, EX1 = 3.95, EZ0 = -2.35, EZ1 = -1.05;
+
+  /* 井道：只砌三面，切面那面敞开，能看到轿厢 */
+  scBlock(b, 'scConL', EX0, EX1, EZ0, EZ0 + 0.16, SC_GY, S_TOP);
+  scBlock(b, 'scConL', EX0, EX0 + 0.14, EZ0, EZ1, SC_GY, S_TOP);
+  scBlock(b, 'scConL', EX1 - 0.14, EX1, EZ0, EZ1, SC_GY, S_TOP);
+
+  /* 轿厢停在第 3 层：红色厢体 + 内灯 + 楼层显示 */
+  const cy = SC_GY + 2 * S_FL + 0.10;
+  b.box('scElev', 1.24, 2.30, 1.16, (EX0 + EX1) * 0.5, cy + 1.15, (EZ0 + EZ1) * 0.5);
+  b.box('scElevD', 1.24, 0.16, 1.16, (EX0 + EX1) * 0.5, cy + 0.08, (EZ0 + EZ1) * 0.5);
+  b.box('scElevD', 1.10, 2.10, 0.05, (EX0 + EX1) * 0.5, cy + 1.15, EZ1 - 0.04);
+  b.box('scNeonW', 0.80, 0.05, 0.05, (EX0 + EX1) * 0.5, cy + 2.22, EZ1 - 0.02);
+  b.box('scNeonC', 0.34, 0.16, 0.04, (EX0 + EX1) * 0.5, cy + 2.42, EZ1 - 0.02);
+
+  /* 井道钢缆 */
+  for (let i = 0; i < 3; i++) {
+    b.box('scMetalD', 0.02, S_TOP - cy - 2.4, 0.02,
+      (EX0 + EX1) * 0.5 - 0.30 + i * 0.30, (S_TOP + cy + 2.4) * 0.5, (EZ0 + EZ1) * 0.5);
+  }
+
+  /* 楼梯：贴着左墙，每层两跑 + 一个平台 */
+  for (let k = 0; k < S_N; k++) {
+    const y = SC_GY + k * S_FL;
+    const r1 = scSteps(b, 'scConD', -S_W + S_T + 0.10, -S_W + S_T + 1.32,
+      0.05, y + 0.06, 7, 0.20, 0.232);
+    /* 平台 */
+    scBlock(b, 'scConD', -S_W + S_T + 0.10, -S_W + S_T + 1.32,
+      r1[0] - 0.90, r1[0], y + r1[1] - 0.06, y + r1[1]);
+    /* 第二跑朝回走 */
+    const sh2 = new T.Shape();
+    sh2.moveTo(r1[0] - 0.90, y + r1[1] - 0.06);
+    let z2 = r1[0] - 0.90, y2 = y + r1[1] - 0.06;
+    for (let i = 0; i < 7; i++) {
+      z2 -= 0.20;
+      sh2.lineTo(z2, y2);
+      y2 += 0.232;
+      sh2.lineTo(z2, y2);
+    }
+    sh2.lineTo(z2, y + r1[1] - 0.06);
+    sh2.closePath();
+    const g2 = new T.ExtrudeGeometry(sh2, {
+      depth: 1.22, bevelEnabled: false, curveSegments: 1, steps: 1
+    });
+    g2.rotateY(-Math.PI * 0.5);
+    g2.translate(-S_W + S_T + 1.32, 0, 0);
+    b.add('scConD', g2);
+
+    /* 扶手：一道斜线，够读就行 */
+    b.to('scMetalD', 0.026, -S_W + S_T + 1.26, y + 0.96, 0.05,
+      -S_W + S_T + 1.26, y + 2.62, r1[0] + 0.10, 5);
+    b.to('scMetalD', 0.026, -S_W + S_T + 1.26, y + 2.62, r1[0] - 0.10,
+      -S_W + S_T + 1.26, y + 3.84, r1[0] - 0.95, 5);
+  }
+}
+
+/* ------------------------------------------------------------ 人物 */
+function scPed(b, x, y, z, ry, key, skin, pose) {
+  const c = Math.cos(ry), s = Math.sin(ry);
+  const P = function (lx, lz) { return [x + lx * c + lz * s, z - lx * s + lz * c]; };
+  const H = pose === 'sit' ? 0.86 : 1.0;
+  b.cyl(key, 0.115, 0.155, 0.44 * H, 7, x, y + (pose === 'sit' ? 0.56 : 1.24), z);
+  b.sph(key, 0.145, x, y + (pose === 'sit' ? 0.80 : 1.50), z, 1, 0.72, 0.86);
+  b.sph(skin, 0.093, x, y + (pose === 'sit' ? 0.93 : 1.62), z, 1, 1.10, 1);
+  b.sph('scHair', 0.096, x, y + (pose === 'sit' ? 0.99 : 1.68), z - 0.02, 1, 0.60, 1);
+  b.box('scHair', 0.06, 0.07, 0.06, x, y + (pose === 'sit' ? 0.86 : 1.55), z);
+  if (pose === 'sit') {
+    let p = P(-0.055, 0.20);
+    b.cyl('scClothB', 0.048, 0.048, 0.42, 6, p[0], y + 0.56, p[1], 0, 0, Math.PI * 0.5);
+    p = P(0.055, 0.20);
+    b.cyl('scClothB', 0.048, 0.048, 0.42, 6, p[0], y + 0.56, p[1], 0, 0, Math.PI * 0.5);
+    p = P(-0.055, 0.42);
+    b.cyl('scHair', 0.044, 0.044, 0.46, 6, p[0], y + 0.24, p[1]);
+    p = P(0.055, 0.42);
+    b.cyl('scHair', 0.044, 0.044, 0.46, 6, p[0], y + 0.24, p[1]);
+  } else {
+    for (let i = 0; i < 2; i++) {
+      const p = P(i ? 0.075 : -0.075, 0);
+      b.to('scClothB', 0.05, p[0], y + 0.86, p[1],
+        p[0] + (i ? 0.02 : -0.02), y + 0.04, p[1] + 0.06, 5);
+      const q = P(i ? 0.135 : -0.135, 0.02);
+      b.to(key, 0.042, q[0], y + 1.44, q[1], q[0], y + 0.92, q[1] + 0.05, 5);
+    }
+  }
+}
+
+/* ------------------------------------------------------------ 室内：每层一种生活 */
+function scFloor(b, k) {
+  const y0 = SC_GY + k * S_FL + 0.02;
+  const ZB = S_ZB + S_T, ZF = S_ZF;
+  const XL = -S_W + S_T, XR = S_W - S_T;
+
+  /* 地面材质每层不同；靠切面一条踢脚线，边界才清 */
+  scBlock(b, 'scFl' + k, XL, XR, ZB, ZF, y0 - 0.03, y0);
+  b.box('scSkirt', XR - XL, 0.10, 0.035, 0, y0 + 0.05, ZF - 0.02);
+
+  /* 顶棚：暗色顶面 + 一排筒灯（靠切面那排照出来） */
+  b.box('scCeil', XR - XL, 0.04, ZF - ZB, 0, y0 + S_FL - S_SL - 0.06, (ZB + ZF) * 0.5);
+  for (let i = 0; i < 3; i++) {
+    b.box('scNeonW', 0.30, 0.05, 0.30, XL + 1.4 + i * 2.8,
+      y0 + S_FL - S_SL - 0.10, ZF - 1.5);
+  }
+
+  /* 后墙踢脚 */
+  b.box('scSkirt', XR - XL, 0.16, 0.03, 0, y0 + 0.08, ZB + 0.02);
+
+  /* 墙上的画：一堵空墙挂两幅画，室内立刻有「住过人」的味道 */
+  const art = ['scArt1', 'scArt2', 'scArt3'];
+  const aw = 0.62 + scR(k * 3.3) * 0.34;
+  b.box('scArtF', aw + 0.10, 0.50 + scR(k * 5.7) * 0.22, 0.04,
+    -S_W + 1.30 + scR(k * 7.1) * 1.20, y0 + 1.84, ZB + 0.05);
+  b.box(art[k % 3], aw, 0.42 + scR(k * 5.7) * 0.20, 0.03,
+    -S_W + 1.30 + scR(k * 7.1) * 1.20, y0 + 1.84, ZB + 0.075);
+  b.box('scArtF', 0.44, 0.62, 0.04, S_W - 1.55, y0 + 1.72, ZB + 0.05);
+  b.box(art[(k + 1) % 3], 0.36, 0.54, 0.03, S_W - 1.55, y0 + 1.72, ZB + 0.075);
+
+  if (k === 0) {
+    /* ---- 一层：便利店 + 咖啡吧 ---- */
+    /* 岛式货架：立在店中间。贴后墙摆，上面那块楼板会把上半截整片切掉 */
+    for (let i = 0; i < 3; i++) {
+      const x = -3.45 + i * 1.42;
+      b.box('scShelf', 1.16, 1.62, 0.44, x, y0 + 0.83, -3.05);
+      for (let r = 0; r < 4; r++) {
+        b.box('scShelfD', 1.12, 0.05, 0.50, x, y0 + 0.26 + r * 0.40, -3.05);
+        for (let c = 0; c < 4; c++) {
+          b.box(['scGoodsA', 'scGoodsB', 'scGoodsC'][(r + c + i) % 3],
+            0.20, 0.22, 0.32, x - 0.42 + c * 0.28,
+            y0 + 0.39 + r * 0.40, -3.05);
+        }
+      }
+    }
+    /* 冷柜 */
+    b.box('scFridge', 1.10, 1.94, 0.58, 2.95, y0 + 0.98, -3.55, 0, Math.PI * 0.5, 0);
+    b.box('scGlass', 0.04, 1.76, 1.00, 2.65, y0 + 1.00, -3.55);
+    for (let i = 0; i < 3; i++) {
+      b.box('scNeonC', 0.05, 0.04, 0.98, 2.64, y0 + 0.28 + i * 0.58, -3.55);
+    }
+    /* 收银台 */
+    b.box('scCounter', 2.30, 0.98, 0.72, -1.20, y0 + 0.49, -1.05);
+    b.box('scCounterD', 2.34, 0.10, 0.78, -1.20, y0 + 0.98, -1.05);
+    b.box('scMetal', 0.42, 0.30, 0.34, -1.95, y0 + 1.14, -1.05);
+    b.box('scNeonC', 0.34, 0.16, 0.03, -1.95, y0 + 1.26, -0.86);
+    /* 咖啡吧：吧台 + 两台机器 + 高脚凳 */
+    b.box('scCounter', 2.10, 1.06, 0.68, 2.55, y0 + 0.53, -2.15);
+    b.box('scMetal', 0.52, 0.56, 0.44, 2.10, y0 + 1.34, -2.15);
+    b.box('scMetalD', 0.46, 0.34, 0.38, 2.92, y0 + 1.22, -2.15);
+    for (let i = 0; i < 3; i++) {
+      const x = 1.90 + i * 0.66;
+      b.cyl('scMetalD', 0.035, 0.035, 0.62, 6, x, y0 + 0.31, -1.55);
+      b.sph('scStool', 0.16, x, y0 + 0.66, -1.55, 1, 0.42, 1);
+    }
+    /* 门头的菜单灯箱：一层原来太暗，一块自发光板就够把它点亮 */
+    b.box('scMenuBox', 1.42, 0.60, 0.07, -1.95, y0 + 2.46, -0.72);
+    b.box('scNeonW', 1.32, 0.50, 0.03, -1.95, y0 + 2.46, -0.68);
+    for (let i = 0; i < 3; i++) {
+      b.box('scMenuLine', 0.96, 0.05, 0.02, -1.95, y0 + 2.60 - i * 0.15, -0.66);
+    }
+    /* 门口地垫与两人 */
+    b.box('scRug', 1.90, 0.02, 1.10, 0.55, y0 + 0.015, -3.95);
+    scPed(b, -0.55, y0, -1.95, 2.9, 'scShirtA', 'scSkin1');
+    scPed(b, 0.10, y0, -1.70, 3.5, 'scShirtB', 'scSkin2');
+    scPed(b, -1.35, y0, -0.72, 0.1, 'scShirtC', 'scSkin1', 'sit');
+  } else if (k === 1) {
+    /* ---- 二层：联合办公 ---- */
+    for (let i = 0; i < 2; i++) {
+      const z = -3.55 + i * 2.05;
+      b.box('scDesk', 5.60, 0.08, 1.05, -0.55, y0 + 0.74, z);
+      for (let j = 0; j < 2; j++) {
+        const lx = j ? 2.05 : -3.15;
+        b.box('scMetalD', 0.10, 0.72, 0.90, -0.55 + lx * 0.5 + (j ? 0 : 0), y0 + 0.36, z);
+      }
+      for (let m = 0; m < 4; m++) {
+        const x = -3.05 + m * 1.60;
+        b.box('scMetalD', 0.06, 0.34, 0.30, x, y0 + 1.06, z - 0.22);
+        b.box('scNeonC', 0.52, 0.30, 0.02, x, y0 + 1.06, z - 0.375);
+        b.box('scMetalD', 0.24, 0.02, 0.16, x, y0 + 0.86, z - 0.16);
+        /* 椅子 */
+        b.box('scChair', 0.42, 0.07, 0.42, x, y0 + 0.45, z + 0.62);
+        b.box('scChair', 0.42, 0.44, 0.07, x, y0 + 0.66, z + 0.82);
+        b.to('scMetalD', 0.022, x, y0 + 0.44, z + 0.62, x, y0 + 0.02, z + 0.68, 5);
+      }
+    }
+    /* 白板 + 会议区 */
+    b.box('scBoard', 0.10, 1.30, 2.20, -3.85, y0 + 2.00, -5.30);
+    b.box('scBoardD', 0.13, 1.36, 2.26, -3.87, y0 + 2.00, -5.30);
+    b.box('scDesk', 1.90, 0.07, 0.90, 0.55, y0 + 0.74, -5.55);
+    /* 绿植与一盏落地灯 */
+    b.cyl('scPot', 0.24, 0.20, 0.42, 8, 3.35, y0 + 0.21, -5.55);
+    for (let i = 0; i < 4; i++) {
+      const a = i * 1.6;
+      b.sph(i % 2 ? 'scLeaf1' : 'scLeaf2', 0.30,
+        3.35 + Math.cos(a) * 0.20, y0 + 0.62 + i * 0.12, -5.55 + Math.sin(a) * 0.20,
+        1.1, 0.8, 1.05);
+    }
+    b.cyl('scMetalD', 0.035, 0.035, 1.55, 6, 3.55, y0 + 0.78, -1.35);
+    b.cyl('scLampShade', 0.26, 0.16, 0.26, 10, 3.55, y0 + 1.62, -1.35);
+    scPed(b, -1.30, y0, -1.75, 3.1, 'scShirtD', 'scSkin2');
+    scPed(b, 1.05, y0, -1.10, 3.4, 'scShirtA', 'scSkin1', 'sit');
+  } else if (k === 2) {
+    /* ---- 三层：健身房 ---- */
+    for (let i = 0; i < 3; i++) {
+      const x = -3.15 + i * 1.85;
+      b.box('scGym', 0.78, 0.22, 1.90, x, y0 + 0.42, -3.35);
+      b.box('scGymD', 0.66, 0.10, 1.30, x, y0 + 0.56, -3.35);
+      b.to('scMetalD', 0.035, x, y0 + 0.50, -4.02, x, y0 + 1.42, -3.70, 5);
+      b.box('scMetalD', 0.50, 0.06, 0.06, x, y0 + 1.42, -3.70);
+      b.box('scNeonC', 0.34, 0.20, 0.03, x, y0 + 1.24, -3.60);
+    }
+    /* 哑铃架 */
+    b.box('scMetalD', 2.10, 0.14, 0.62, -1.55, y0 + 0.62, -2.15);
+    for (let i = 0; i < 5; i++) {
+      b.cyl('scMetal', 0.10, 0.10, 0.34, 8, -2.35 + i * 0.40, y0 + 0.78, -2.15,
+        0, 0, Math.PI * 0.5);
+    }
+    /* 镜墙 + 训练区地胶 */
+    b.box('scMirror', 3.60, 2.10, 0.05, 2.20, y0 + 1.35, -6.45);
+    b.box('scMatG', 3.10, 0.02, 2.10, 2.20, y0 + 0.015, -4.75);
+    /* 沙袋 */
+    b.cyl('scMetalD', 0.05, 0.05, 0.70, 6, 3.65, y0 + 2.55, -3.60);
+    b.cyl('scBag', 0.26, 0.26, 1.10, 10, 3.65, y0 + 1.65, -3.60);
+    scPed(b, -1.20, y0, -4.95, 3.1, 'scShirtB', 'scSkin2');
+    scPed(b, 2.30, y0, -3.40, 1.2, 'scShirtA', 'scSkin1');
+  } else if (k === 3) {
+    /* ---- 四层：客厅 ---- */
+    b.box('scRug', 3.60, 0.02, 2.70, -0.55, y0 + 0.015, -3.15);
+    /* 沙发（背朝后墙，面朝切面） */
+    b.box('scSofa', 2.60, 0.44, 0.92, -0.85, y0 + 0.24, -4.55);
+    b.box('scSofa', 2.60, 0.52, 0.24, -0.85, y0 + 0.62, -4.96);
+    b.box('scSofaD', 0.26, 0.46, 0.92, -2.28, y0 + 0.34, -4.55);
+    b.box('scSofaD', 0.26, 0.46, 0.92, 0.58, y0 + 0.34, -4.55);
+    for (let i = 0; i < 2; i++) {
+      b.box('scCushion', 0.56, 0.34, 0.20, -1.55 + i * 1.40, y0 + 0.52, -4.62, 0, 0.12, 0);
+    }
+    /* 茶几 + 书本 */
+    b.box('scWood', 1.50, 0.36, 0.80, -0.85, y0 + 0.20, -3.15);
+    b.box('scWoodL', 1.56, 0.07, 0.86, -0.85, y0 + 0.40, -3.15);
+    b.box('scBookA', 0.30, 0.05, 0.24, -1.15, y0 + 0.45, -3.20, 0, 0.3, 0);
+    b.cyl('scPot', 0.10, 0.08, 0.16, 8, -0.35, y0 + 0.50, -3.05);
+    /* 电视 + 电视柜（贴后墙） */
+    b.box('scWood', 2.20, 0.40, 0.46, 1.05, y0 + 0.20, -6.15);
+    b.box('scGlass', 2.00, 1.10, 0.06, 1.05, y0 + 1.30, -6.30);
+    b.box('scMetalD', 1.60, 0.10, 0.10, 1.05, y0 + 0.78, -6.22);
+    /* 落地灯 + 书架 */
+    b.cyl('scMetalD', 0.035, 0.035, 1.62, 6, -3.05, y0 + 0.82, -5.60);
+    b.cyl('scLampShade', 0.30, 0.18, 0.30, 10, -3.05, y0 + 1.72, -5.60);
+    b.box('scShelf', 1.30, 1.90, 0.36, 3.55, y0 + 0.96, -5.70);
+    for (let r = 0; r < 3; r++) {
+      b.box('scShelfD', 1.26, 0.05, 0.40, 3.55, y0 + 0.42 + r * 0.52, -5.70);
+      for (let c = 0; c < 5; c++) {
+        b.box(['scBookA', 'scBookB', 'scBookC'][(r + c) % 3],
+          0.09, 0.28, 0.28, 3.12 + c * 0.20, y0 + 0.62 + r * 0.52, -5.70);
+      }
+    }
+    scPed(b, -2.05, y0, -4.45, 0.2, 'scShirtC', 'scSkin1', 'sit');
+    scPed(b, 1.35, y0, -3.35, 4.2, 'scShirtD', 'scSkin2');
+  } else if (k === 4) {
+    /* ---- 五层：卧室 + 书桌 ---- */
+    /* 床：床头靠左墙 */
+    b.box('scBedBase', 2.05, 0.42, 1.62, -2.35, y0 + 0.21, -4.55);
+    b.box('scBed', 2.05, 0.26, 1.58, -2.35, y0 + 0.52, -4.55);
+    b.box('scQuilt', 1.42, 0.22, 1.62, -2.10, y0 + 0.70, -4.55, 0, 0, -0.03);
+    b.box('scPillow', 0.46, 0.18, 1.10, -3.05, y0 + 0.76, -4.55);
+    b.box('scWoodD', 0.14, 1.10, 1.72, -3.42, y0 + 0.55, -4.55);
+    /* 床头柜 + 台灯 */
+    b.box('scWood', 0.48, 0.46, 0.44, -3.20, y0 + 0.23, -3.30);
+    b.cyl('scMetalD', 0.028, 0.028, 0.34, 6, -3.20, y0 + 0.62, -3.30);
+    b.cyl('scLampShade', 0.17, 0.12, 0.22, 10, -3.20, y0 + 0.84, -3.30);
+    /* 衣柜 */
+    b.box('scWardrobe', 0.62, 2.10, 1.85, -3.86, y0 + 1.06, -5.55);
+    b.box('scWardrobeD', 0.05, 2.06, 0.04, -3.54, y0 + 1.06, -5.55);
+    for (let i = 0; i < 2; i++) {
+      b.cyl('scMetalL', 0.022, 0.022, 0.44, 6, -3.52, y0 + 1.06, -5.75 + i * 0.42);
+    }
+    /* 书桌朝切面 */
+    b.box('scDesk', 1.90, 0.07, 0.70, 1.35, y0 + 0.74, -1.60);
+    for (let i = 0; i < 2; i++) {
+      b.box('scMetalD', 0.07, 0.72, 0.62, 0.48 + i * 1.74, y0 + 0.36, -1.60);
+    }
+    b.box('scNeonC', 0.56, 0.34, 0.03, 1.35, y0 + 1.08, -1.90);
+    b.box('scChair', 0.44, 0.07, 0.44, 1.35, y0 + 0.46, -1.02);
+    b.box('scChair', 0.44, 0.46, 0.07, 1.35, y0 + 0.68, -0.82);
+    b.cyl('scPot', 0.11, 0.09, 0.18, 8, 2.55, y0 + 0.85, -1.85);
+    for (let i = 0; i < 3; i++) {
+      b.sph(i % 2 ? 'scLeaf1' : 'scLeaf2', 0.16,
+        2.55 + (i - 1) * 0.12, y0 + 1.02 + i * 0.06, -1.85, 1.1, 0.8, 1);
+    }
+    b.box('scRug2', 2.20, 0.02, 1.50, 1.35, y0 + 0.015, -2.65);
+    scPed(b, 1.55, y0, -2.55, 3.3, 'scShirtA', 'scSkin2');
+    scPed(b, -2.30, y0, -4.40, 1.6, 'scShirtD', 'scSkin1', 'sit');
+  } else {
+    /* ---- 六层：工作室 + 屋顶花园 ---- */
+    /* 大工作台 */
+    b.box('scDesk', 3.30, 0.08, 1.20, -1.10, y0 + 0.80, -3.40);
+    for (let i = 0; i < 3; i++) {
+      b.box('scMetalD', 0.08, 0.78, 1.10, -2.60 + i * 1.50, y0 + 0.40, -3.40);
+    }
+    /* 台面上的东西：卷起的图纸、模型、显示器 */
+    for (let i = 0; i < 3; i++) {
+      b.cyl('scPaper', 0.07, 0.07, 0.90, 8, -2.10 + i * 0.55, y0 + 0.90, -3.15,
+        0, 0, Math.PI * 0.5);
+    }
+    b.box('scMetalD', 0.06, 0.34, 0.30, 0.95, y0 + 1.12, -3.55);
+    b.box('scNeonC', 0.54, 0.30, 0.02, 0.95, y0 + 1.12, -3.71);
+    b.box('scModelBase', 0.90, 0.10, 0.90, -0.95, y0 + 0.90, -3.05);
+    for (let i = 0; i < 3; i++) {
+      b.box('scModel', 0.24, 0.30 + i * 0.10, 0.24,
+        -1.20 + i * 0.28, y0 + 1.05 + i * 0.05, -3.05);
+    }
+    /* 画架 */
+    b.to('scWood', 0.032, 2.15, y0 + 0.02, -2.30, 2.32, y0 + 1.55, -2.42, 5);
+    b.to('scWood', 0.032, 2.62, y0 + 0.02, -2.30, 2.45, y0 + 1.55, -2.42, 5);
+    b.to('scWood', 0.030, 2.38, y0 + 0.02, -2.05, 2.38, y0 + 1.50, -2.40, 5);
+    b.box('scCanvas', 0.86, 1.06, 0.05, 2.38, y0 + 1.28, -2.46, 0, 0, -0.04);
+    /* 书架 + 植物 */
+    b.box('scShelf', 1.10, 1.80, 0.34, 3.55, y0 + 0.92, -5.80);
+    for (let r = 0; r < 3; r++) {
+      b.box('scShelfD', 1.06, 0.05, 0.38, 3.55, y0 + 0.42 + r * 0.50, -5.80);
+      for (let c = 0; c < 4; c++) {
+        b.box(['scBookA', 'scBookB', 'scBookC'][(r + c + 1) % 3],
+          0.12, 0.26, 0.26, 3.18 + c * 0.24, y0 + 0.60 + r * 0.50, -5.80);
+      }
+    }
+    for (let i = 0; i < 3; i++) {
+      b.cyl('scPot', 0.16, 0.13, 0.28, 8, -3.40 + i * 0.62, y0 + 0.14, -1.30);
+      for (let j = 0; j < 3; j++) {
+        b.sph(j % 2 ? 'scLeaf1' : 'scLeaf2', 0.24,
+          -3.40 + i * 0.62 + (j - 1) * 0.10, y0 + 0.48 + j * 0.10, -1.30,
+          1.1, 0.85, 1.05);
+      }
+    }
+    /* 天窗：屋面上开两个洞，切成可见的玻璃框 */
+    b.box('scGlassW', 1.40, 0.06, 1.60, -1.60, y0 + S_FL - S_SL + 0.05, -4.20);
+    b.box('scGlassW', 1.40, 0.06, 1.60, 2.10, y0 + S_FL - S_SL + 0.05, -4.20);
+    scPed(b, -1.95, y0, -2.55, 0.4, 'scShirtB', 'scSkin2');
+    scPed(b, 2.60, y0, -2.90, 2.7, 'scShirtC', 'scSkin1');
+  }
+}
+
+/* ------------------------------------------------------------ 右侧三层小楼 */
+function scShop(b) {
+  const X0 = SH_X0, X1 = SH_X1, Z0 = SH_Z0, Z1 = SH_Z1;
+  const TOP = SC_GY + SH_N * SH_FL;
+
+  /* 背墙与两侧墙 */
+  scBlock(b, 'scCream', X0, X1, Z0, Z0 + 0.30, SC_GY - 0.30, TOP);
+  scBlock(b, 'scCream', X0, X0 + 0.28, Z0, Z1, SC_GY - 0.30, TOP);
+  scBlock(b, 'scCream', X1 - 0.28, X1, Z0, Z1, SC_GY - 0.30, TOP);
+
+  /* 楼板 + 切面 */
+  for (let k = 0; k <= SH_N; k++) {
+    const y = SC_GY + k * SH_FL;
+    scBlock(b, 'scConD', X0, X1, Z0 + 0.30, Z1, y - 0.22, y);
+    b.box('scCut', X1 - X0, 0.20, 0.04, (X0 + X1) * 0.5, y - 0.11, Z1 + 0.02);
+  }
+
+  /* 屋顶：女儿墙 + 花箱 */
+  b.box('scCream', X1 - X0, 0.40, 0.20, (X0 + X1) * 0.5, TOP + 0.20, Z1 - 0.10);
+  b.box('scBrickW', X1 - X0, 0.46, 0.24, (X0 + X1) * 0.5, TOP + 0.23, Z0 + 0.42);
+  for (let i = 0; i < 3; i++) {
+    b.box('scPot', 0.62, 0.34, 0.34, X0 + 0.75 + i * 1.25, TOP + 0.17, Z1 - 0.62);
+    for (let j = 0; j < 3; j++) {
+      b.sph(j % 2 ? 'scLeaf1' : 'scLeaf3', 0.20,
+        X0 + 0.75 + i * 1.25 + (j - 1) * 0.16, TOP + 0.48, Z1 - 0.62, 1.05, 0.9, 1);
+    }
+  }
+
+  /* 一层：花店（台面全部靠切面摆，不然全藏在板底下） */
+  let y0 = SC_GY + 0.02;
+  scBlock(b, 'scFl0', X0 + 0.28, X1 - 0.28, Z0 + 0.30, Z1, y0 - 0.03, y0);
+  for (let i = 0; i < 3; i++) {
+    const x = X0 + 0.85 + i * 1.12;
+    b.box('scMetalD', 0.86, 0.10, 0.62, x, y0 + 0.56, -1.85);
+    b.box('scMetalD', 0.86, 0.62, 0.10, x, y0 + 0.86, -2.14);
+    for (let j = 0; j < 5; j++) {
+      b.cyl('scLeaf3', 0.035, 0.030, 0.34, 5,
+        x - 0.30 + j * 0.15, y0 + 0.78, -1.85 + (j % 2) * 0.12);
+      b.sph(['scFlA', 'scFlB', 'scFlC', 'scFlD'][j % 4], 0.10,
+        x - 0.30 + j * 0.15, y0 + 0.96, -1.85 + (j % 2) * 0.12, 1, 0.7, 1);
+    }
+  }
+  b.box('scCounter', 1.40, 0.94, 0.62, X1 - 1.35, y0 + 0.47, -1.45);
+  b.box('scWoodD', 0.60, 0.34, 0.30, X1 - 1.35, y0 + 1.06, -1.45);
+  b.box('scNeonC', 0.44, 0.22, 0.03, X1 - 1.35, y0 + 1.28, -1.16);
+  /* 门口外摆：三个花桶，摆在切面外面的人行道上 */
+  for (let i = 0; i < 3; i++) {
+    const x = X0 + 0.55 + i * 0.72;
+    b.cyl('scBucket', 0.16, 0.13, 0.36, 8, x, SC_GY + 0.32, Z1 + 0.42);
+    for (let j = 0; j < 4; j++) {
+      const a = j * 1.6;
+      b.cyl('scLeaf3', 0.02, 0.02, 0.40, 4,
+        x + Math.cos(a) * 0.06, SC_GY + 0.70, Z1 + 0.42 + Math.sin(a) * 0.06);
+      b.sph(['scFlA', 'scFlB', 'scFlC', 'scFlD'][(i + j) % 4], 0.07,
+        x + Math.cos(a) * 0.07, SC_GY + 0.92, Z1 + 0.42 + Math.sin(a) * 0.07, 1, 0.7, 1);
+    }
+  }
+  /* 招牌 */
+  b.box('scSignA', 3.20, 0.52, 0.12, (X0 + X1) * 0.5, SC_GY + 2.78, Z1 + 0.06);
+  for (let i = 0; i < 5; i++) {
+    b.box('scPaintW', 0.30, 0.26, 0.03, X0 + 0.95 + i * 0.55, SC_GY + 2.78, Z1 + 0.13);
+  }
+
+  /* 二层：理发店 */
+  y0 = SC_GY + SH_FL + 0.02;
+  scBlock(b, 'scFl2', X0 + 0.28, X1 - 0.28, Z0 + 0.30, Z1, y0 - 0.03, y0);
+  for (let i = 0; i < 2; i++) {
+    const x = X0 + 1.30 + i * 1.75;
+    b.box('scChair', 0.56, 0.10, 0.56, x, y0 + 0.52, -1.55);
+    b.box('scChair', 0.56, 0.58, 0.12, x, y0 + 0.82, -1.82);
+    b.cyl('scMetalD', 0.05, 0.05, 0.50, 6, x, y0 + 0.26, -1.55);
+    b.cyl('scMetalD', 0.28, 0.28, 0.04, 10, x, y0 + 0.03, -1.55);
+    /* 镜台就在椅子正前方（朝切面） */
+    b.box('scMirror', 0.86, 1.10, 0.05, x, y0 + 1.46, -2.55);
+    b.box('scCounter', 0.92, 0.82, 0.34, x, y0 + 0.41, -2.55);
+  }
+  b.box('scCounter', 1.30, 0.94, 0.58, X1 - 1.00, y0 + 0.47, -0.72);
+  for (let i = 0; i < 3; i++) {
+    b.box('scNeonC', 0.80, 0.10, 0.04, X0 + 1.30 + i * 1.72, y0 + 2.56, -0.60);
+  }
+  scPed(b, X0 + 1.30, y0, -1.22, 0.1, 'scShirtD', 'scSkin2', 'sit');
+  scPed(b, X0 + 3.05, y0, -2.05, 3.1, 'scShirtA', 'scSkin1');
+
+  /* 三层：住户 */
+  y0 = SC_GY + SH_FL * 2 + 0.02;
+  scBlock(b, 'scFl4', X0 + 0.28, X1 - 0.28, Z0 + 0.30, Z1, y0 - 0.03, y0);
+  /* 床：床头贴左墙 */
+  b.box('scBedBase', 1.72, 0.36, 1.38, X0 + 1.28, y0 + 0.18, -2.05);
+  b.box('scBed', 1.72, 0.24, 1.34, X0 + 1.28, y0 + 0.46, -2.05);
+  b.box('scQuilt', 1.12, 0.20, 1.36, X0 + 1.58, y0 + 0.62, -2.05, 0, 0, 0);
+  b.box('scPillow', 0.40, 0.16, 1.00, X0 + 0.66, y0 + 0.66, -2.05);
+  b.box('scWoodD', 0.12, 1.02, 1.46, X0 + 0.40, y0 + 0.48, -2.05);
+  b.box('scWood', 0.42, 0.44, 0.42, X0 + 0.58, y0 + 0.22, -0.85);
+  b.cyl('scMetalD', 0.024, 0.024, 0.30, 6, X0 + 0.58, y0 + 0.60, -0.85);
+  b.cyl('scLampShade', 0.14, 0.10, 0.20, 10, X0 + 0.58, y0 + 0.80, -0.85);
+  /* 书桌 */
+  b.box('scDesk', 1.10, 0.06, 0.62, X1 - 1.25, y0 + 0.74, -1.60);
+  for (let i = 0; i < 2; i++) {
+    b.box('scMetalD', 0.06, 0.72, 0.56, X1 - 1.75 + i * 1.00, y0 + 0.37, -1.60);
+  }
+  b.box('scChair', 0.40, 0.06, 0.40, X1 - 1.25, y0 + 0.44, -2.15);
+  b.box('scChair', 0.40, 0.42, 0.06, X1 - 1.25, y0 + 0.64, -2.33);
+  b.box('scGlass', 0.60, 0.40, 0.04, X1 - 1.25, y0 + 0.96, -1.85);
+  b.box('scRug2', 1.60, 0.02, 1.10, X1 - 1.55, y0 + 0.014, -3.30);
+  scPed(b, X1 - 1.25, y0, -2.55, 3.2, 'scShirtB', 'scSkin1');
+
+  /* 楼间的一线天空：小楼与主楼之间留的窄缝，种一丛爬藤 */
+  for (let i = 0; i < 6; i++) {
+    b.cyl('scLeaf2', 0.02, 0.02, 1.10, 4,
+      S_W + 0.30 + scR(i * 3.7) * 0.42, SC_GY + 0.55 + i * 0.30,
+      -1.60 + scR(i * 5.1) * 1.60);
+    b.sph(i % 2 ? 'scLeaf1' : 'scLeaf3', 0.16,
+      S_W + 0.42 + scR(i * 7.3) * 0.30, SC_GY + 1.05 + i * 0.30,
+      -1.60 + scR(i * 9.7) * 1.60, 1.1, 0.8, 1);
+  }
+}
+
+/* ------------------------------------------------------------ 左侧广场 */
+function scPlaza(b) {
+  const X0 = SC_X0, X1 = -S_W - 0.30;
+  scBlock(b, 'scPaving', X0, X1, SC_Z0, SC_ZH, SC_GY - 0.06, SC_GY);
+
+  /* 铺装分缝 */
+  for (let i = 0; i < 7; i++) {
+    b.box('scPavingD', X1 - X0, 0.012, 0.05, (X0 + X1) * 0.5, SC_GY + 0.002,
+      SC_Z0 + 0.9 + i * 1.55);
+  }
+  for (let i = 0; i < 4; i++) {
+    b.box('scPavingD', 0.05, 0.012, SC_ZH - SC_Z0, X0 + 0.9 + i * 1.35,
+      SC_GY + 0.002, (SC_Z0 + SC_ZH) * 0.5);
+  }
+
+  /* 广场中心一块圆形花坛：三圈矮墙 + 一棵树 + 花 */
+  const cx = -7.05, cz = -1.55;
+  b.cyl('scStoneW', 1.32, 1.38, 0.42, 20, cx, SC_GY + 0.21, cz);
+  b.cyl('scSoil1', 1.10, 1.10, 0.06, 20, cx, SC_GY + 0.40, cz);
+  scTree(b, cx, cz, 3.90, 1.35);
+  for (let i = 0; i < 14; i++) {
+    const a = scR(i * 3.3) * 6.283;
+    const r = 0.35 + scR(i * 5.7) * 0.62;
+    b.sph(['scFlA', 'scFlB', 'scFlC', 'scFlD'][i % 4], 0.09,
+      cx + Math.cos(a) * r, SC_GY + 0.48, cz + Math.sin(a) * r, 1, 0.7, 1);
+  }
+
+  /* 两张长椅（对着花坛） */
+  for (let i = 0; i < 2; i++) {
+    const z = cz + (i ? 2.10 : -2.10);
+    b.box('scWood', 2.00, 0.07, 0.42, cx, SC_GY + 0.44, z);
+    b.box('scWood', 0.42, 0.07, 0.44, cx - 1.20, SC_GY + 0.22, z, 0, 0, Math.PI * 0.5);
+    for (let j = 0; j < 2; j++) {
+      b.box('scMetalD', 0.07, 0.44, 0.40, cx + (j ? 0.80 : -0.80), SC_GY + 0.22, z);
+    }
+  }
+
+  /* 一盏草坪灯 + 一个垃圾分类亭 */
+  b.cyl('scMetalD', 0.04, 0.04, 1.40, 6, X0 + 0.85, SC_GY + 0.70, 2.35);
+  b.cyl('scLampShade', 0.20, 0.13, 0.22, 10, X0 + 0.85, SC_GY + 1.46, 2.35);
+  b.box('scShed', 1.55, 1.28, 0.92, X0 + 1.15, SC_GY + 0.64, -4.85);
+  b.box('scShedD', 1.65, 0.10, 1.02, X0 + 1.15, SC_GY + 1.32, -4.85);
+  for (let i = 0; i < 2; i++) {
+    b.cyl('scMetalD', 0.16, 0.14, 0.42, 8, X0 + 0.85 + i * 0.62, SC_GY + 0.21, -4.55);
+  }
+
+  /* 广场与楼之间的窄巷：堆几个纸箱与一辆推车 */
+  b.box('scCarton', 0.44, 0.36, 0.40, -4.98, SC_GY + 0.18, -5.55);
+  b.box('scCarton', 0.36, 0.30, 0.34, -4.95, SC_GY + 0.50, -5.62, 0, 0.28, 0);
+  b.box('scCarton', 0.40, 0.32, 0.36, -4.72, SC_GY + 0.16, -4.95, 0, 0.6, 0);
+  for (let i = 0; i < 2; i++) {
+    b.torus('scTire', 0.16, 0.035, -5.20, SC_GY + 0.18, -3.60 + i * 0.62, 0, 0, 0);
+  }
+  b.box('scMetalL', 0.60, 0.05, 0.62, -5.20, SC_GY + 0.36, -3.30);
+  b.to('scMetalL', 0.022, -5.20, SC_GY + 0.36, -3.00, -5.20, SC_GY + 0.86, -2.70, 5);
+  b.box('scMetalL', 0.30, 0.04, 0.30, -5.20, SC_GY + 0.88, -2.68);
+}
+
+/* ------------------------------------------------------------ 左邻：四层小楼 */
+/* 只做剖切面这一侧：它和主楼之间留 0.9 米缝，两栋楼才分得开。
+   一栋楼只是「楼剖面」，两栋才是「城市剖面」。 */
+function scLeftBlock(b) {
+  const X0 = -9.35, X1 = -5.45, ZB = -6.30, ZF = 0.10;
+  const FL = 3.05, N = 4, T = 0.30;
+  const TOP = SC_GY + N * FL;
+  const XL = X0 + T, XR = X1 - T;
+
+  /* 后墙、左外墙、右外墙（右墙朝主楼，只有一条缝，但得在） */
+  /* 立面用砖：一条街上三栋楼全是同一种水泥色，最先垮掉的就是「城市」这件事 */
+  scBlock(b, 'scBrickW2', X0, X1, ZB, ZB + T, SC_GY - 0.26, TOP);
+  scBlock(b, 'scBrickW2', X0, X0 + T, ZB + T, ZF, SC_GY - 0.26, TOP);
+  scBlock(b, 'scBrickW2', X1 - T, X1, ZB + T, ZF, SC_GY - 0.26, TOP);
+
+  /* 楼板与切面 */
+  for (let k = 0; k <= N; k++) {
+    const y = SC_GY + k * FL;
+    scBlock(b, 'scConD', X0, X1, ZB + T, ZF, y - 0.22, y);
+    b.box('scCut', X1 - X0, 0.20, 0.04, (X0 + X1) * 0.5, y - 0.11, ZF + 0.02);
+    for (let i = 0; i < 5; i++) {
+      b.box('scStoneP', 0.05, 0.04, 0.03,
+        X0 + 0.55 + scR(k * 5.1 + i * 2.3) * (X1 - X0 - 1.1),
+        y - 0.11 + (scR(k * 7.3 + i) - 0.5) * 0.10, ZF + 0.042);
+    }
+  }
+
+  /* 屋顶：女儿墙 + 晒衣绳 + 太阳能热水器 */
+  b.box('scBrickW2', X1 - X0, 0.44, 0.20, (X0 + X1) * 0.5, TOP + 0.22, ZF - 0.10);
+  b.box('scBrickW2', X1 - X0, 0.44, 0.20, (X0 + X1) * 0.5, TOP + 0.22, ZB + 0.42);
+  b.box('scBrickW2', 0.20, 0.44, ZF - ZB, X0 + 0.10, TOP + 0.22, (ZF + ZB) * 0.5);
+  for (let i = 0; i < 2; i++) {
+    b.cyl('scMetalD', 0.035, 0.035, 2.30, 6, X0 + 0.75 + i * 1.55, TOP + 1.15, ZB + 2.20);
+  }
+  b.to('scRope', 0.012, X0 + 0.55, TOP + 1.62, ZB + 2.20,
+    X0 + 2.35, TOP + 1.58, ZB + 2.20, 4);
+  for (let i = 0; i < 4; i++) {
+    b.box(['scClothA', 'scClothB', 'scClothC', 'scClothA'][i], 0.38, 0.62, 0.03,
+      X0 + 0.85 + i * 0.42, TOP + 1.32, ZB + 2.21);
+  }
+  b.box('scMetal', 1.30, 0.12, 0.90, X1 - 1.30, TOP + 0.72, ZB + 1.30, 0.42, 0, 0);
+  b.box('scMetalD', 1.10, 0.30, 0.70, X1 - 1.30, TOP + 0.55, ZB + 1.70);
+
+  /* ---- 一层：门厅 + 快递柜 + 自行车 ---- */
+  /* ★ 剖面里的家具必须靠切面摆。摆在后墙边，上面那块楼板会把它整片挡住 ——
+     剖面模型最容易犯的错，就是一屋子东西全藏在板底下。 */
+  let y0 = SC_GY + 0.02;
+  scBlock(b, 'scFl2', XL, XR, ZB + T, ZF, y0 - 0.03, y0);
+  /* 快递柜：贴着右墙，正面朝切面 */
+  b.box('scLocker', 1.10, 1.85, 0.44, XR - 0.60, y0 + 0.94, -1.55, 0, Math.PI * 0.5, 0);
+  for (let r = 0; r < 3; r++) {
+    for (let c = 0; c < 3; c++) {
+      b.box('scLockerD', 0.04, 0.44, 0.30, XR - 0.82,
+        y0 + 0.42 + r * 0.58, -2.00 + c * 0.34);
+    }
+  }
+  /* 信箱墙：挂左墙，正对切面 */
+  b.box('scMetalD', 0.50, 1.10, 0.14, XL + 0.30, y0 + 1.40, -1.90, 0, Math.PI * 0.5, 0);
+  for (let r = 0; r < 3; r++) {
+    for (let c = 0; c < 3; c++) {
+      b.box('scMetalL', 0.14, 0.28, 0.30, XL + 0.52,
+        y0 + 1.02 + r * 0.34, -2.10 + c * 0.34);
+    }
+  }
+  /* 后墙挂画 */
+  b.box('scArtF', 0.60, 0.46, 0.04, (XL + XR) * 0.5, y0 + 1.72, ZB + 0.36);
+  b.box('scArt2', 0.52, 0.38, 0.03, (XL + XR) * 0.5, y0 + 1.72, ZB + 0.385);
+  /* 楼梯（贴左墙，一跑到顶） */
+  for (let k = 0; k < N; k++) {
+    const y = SC_GY + k * FL;
+    scSteps(b, 'scConD', XL + 0.06, XL + 1.02, ZF - 0.75, y + 0.06, 8, 0.25, 0.372);
+  }
+  /* 自行车 + 门垫 */
+  b.box('scRug', 1.40, 0.02, 0.90, XR - 1.05, y0 + 0.012, ZF - 0.85);
+  b.torus('scTire', 0.28, 0.032, XR - 0.55, y0 + 0.42, ZF - 1.95, 0, 0, 0);
+  b.torus('scTire', 0.28, 0.032, XR - 1.35, y0 + 0.42, ZF - 1.95, 0, 0, 0);
+  b.to('scMetalL', 0.026, XR - 0.55, y0 + 0.42, ZF - 1.95, XR - 0.95, y0 + 0.84, ZF - 1.95, 5);
+  b.to('scMetalL', 0.026, XR - 0.95, y0 + 0.84, ZF - 1.95, XR - 1.35, y0 + 0.42, ZF - 1.95, 5);
+  b.box('scMetalL', 0.32, 0.04, 0.04, XR - 0.95, y0 + 0.86, ZF - 1.95);
+
+  /* ---- 二层：厨房 + 餐桌 ---- */
+  y0 = SC_GY + FL + 0.02;
+  scBlock(b, 'scFl1', XL, XR, ZB + T, ZF, y0 - 0.03, y0);
+  /* 灶台沿右墙一长条，台面朝室内 */
+  b.box('scCounter', 0.64, 0.86, 2.55, XR - 0.34, y0 + 0.43, -1.85);
+  b.box('scCounterD', 0.68, 0.08, 2.59, XR - 0.34, y0 + 0.88, -1.85);
+  for (let i = 0; i < 2; i++) {
+    b.cyl('scMetalD', 0.13, 0.13, 0.05, 10, XR - 0.34, y0 + 0.90, -1.10 - i * 0.86);
+  }
+  b.box('scMetalD', 0.26, 1.20, 0.44, XR - 0.62, y0 + 0.60, -0.62);
+  /* 吊柜 + 油烟机 */
+  b.box('scCabinet', 0.36, 0.60, 2.40, XR - 0.20, y0 + 2.10, -1.85);
+  b.box('scMetalD', 0.44, 0.28, 0.66, XR - 0.66, y0 + 2.00, -1.10);
+  /* 冰箱放到前角 */
+  b.box('scFridge', 0.66, 1.70, 0.68, XR - 0.80, y0 + 0.85, -3.30);
+  b.box('scFridgeD', 0.64, 0.03, 0.66, XR - 0.80, y0 + 1.04, -3.30);
+  /* 餐桌四椅，摆在窗前 */
+  b.box('scDesk', 0.94, 0.06, 1.34, XL + 1.35, y0 + 0.74, -1.55);
+  for (let i = 0; i < 4; i++) {
+    const cx = XL + 1.35 + (i < 2 ? -0.66 : 0.66);
+    const cz = -1.55 + (i % 2 ? -0.40 : 0.40);
+    b.box('scChair', 0.32, 0.06, 0.32, cx, y0 + 0.44, cz);
+    b.box('scChair', 0.32, 0.40, 0.05, cx, y0 + 0.64, cz + (i % 2 ? -0.15 : 0.15));
+    b.to('scMetalD', 0.018, cx, y0 + 0.42, cz, cx, y0 + 0.02, cz, 4);
+  }
+  b.cyl('scPot', 0.10, 0.08, 0.18, 8, XL + 0.30, y0 + 0.84, ZF - 0.55);
+  for (let i = 0; i < 3; i++) {
+    b.sph(i % 2 ? 'scLeaf1' : 'scLeaf3', 0.13,
+      XL + 0.30 + (i - 1) * 0.09, y0 + 0.99 + i * 0.05, ZF - 0.55, 1.1, 0.8, 1);
+  }
+  scPed(b, XL + 1.62, y0, -3.00, 0.5, 'scShirtD', 'scSkin1');
+
+  /* ---- 三层：卧室 ---- */
+  y0 = SC_GY + FL * 2 + 0.02;
+  scBlock(b, 'scFl4', XL, XR, ZB + T, ZF, y0 - 0.03, y0);
+  /* 床：床头贴右墙，床身朝左伸，从切面一眼看到整张床 */
+  b.box('scBedBase', 1.72, 0.36, 1.42, XR - 0.98, y0 + 0.18, -1.72);
+  b.box('scBed', 1.72, 0.24, 1.38, XR - 0.98, y0 + 0.46, -1.72);
+  b.box('scQuilt', 1.10, 0.20, 1.40, XR - 1.28, y0 + 0.62, -1.72, 0, 0, 0);
+  b.box('scPillow', 0.40, 0.16, 1.04, XR - 0.36, y0 + 0.66, -1.72);
+  b.box('scWoodD', 0.12, 1.02, 1.50, XR - 0.10, y0 + 0.48, -1.72);
+  /* 床头柜 + 台灯 */
+  b.box('scWood', 0.42, 0.44, 0.42, XR - 0.28, y0 + 0.22, -2.72);
+  b.cyl('scMetalD', 0.024, 0.024, 0.30, 6, XR - 0.28, y0 + 0.60, -2.72);
+  b.cyl('scLampShade', 0.14, 0.10, 0.20, 10, XR - 0.28, y0 + 0.80, -2.72);
+  /* 衣柜只能贴后墙：摆在切面附近会把整层挡成一块木板 */
+  b.box('scWardrobe', 1.16, 1.94, 0.50, XL + 2.35, y0 + 0.98, -3.30);
+  b.box('scWardrobeD', 1.12, 1.90, 0.04, XL + 2.35, y0 + 0.98, -3.56);
+  b.box('scWood', 0.50, 0.42, 0.46, XL + 0.55, y0 + 0.22, -2.55);
+  b.cyl('scMetalD', 0.024, 0.024, 0.26, 6, XL + 0.55, y0 + 0.56, -2.55);
+  b.cyl('scLampShade', 0.15, 0.11, 0.20, 10, XL + 0.55, y0 + 0.74, -2.55);
+  b.box('scRug2', 1.40, 0.02, 0.90, XL + 1.45, y0 + 0.014, -1.05);
+  scPed(b, XR - 1.05, y0, -1.72, 1.2, 'scShirtA', 'scSkin2', 'sit');
+
+  /* ---- 四层：起居 + 露台门 ---- */
+  y0 = SC_GY + FL * 3 + 0.02;
+  scBlock(b, 'scFl3', XL, XR, ZB + T, ZF, y0 - 0.03, y0);
+  /* 沙发面朝切面，背靠后墙 */
+  b.box('scSofa', 1.86, 0.42, 0.84, XL + 1.35, y0 + 0.23, -3.55);
+  b.box('scSofa', 1.86, 0.50, 0.22, XL + 1.35, y0 + 0.60, -3.95);
+  b.box('scSofaD', 0.22, 0.44, 0.84, XL + 0.50, y0 + 0.32, -3.55);
+  b.box('scSofaD', 0.22, 0.44, 0.84, XL + 2.20, y0 + 0.32, -3.55);
+  b.box('scCushion', 0.42, 0.28, 0.16, XL + 0.95, y0 + 0.48, -3.60, 0, 0.10, 0);
+  b.box('scCushion', 0.42, 0.28, 0.16, XL + 1.75, y0 + 0.48, -3.60, 0, -0.10, 0);
+  /* 茶几 */
+  b.box('scWood', 0.94, 0.32, 0.66, XL + 1.35, y0 + 0.18, -2.35);
+  b.box('scWoodL', 1.00, 0.06, 0.72, XL + 1.35, y0 + 0.36, -2.35);
+  /* 电视挂右墙 */
+  b.box('scGlass', 0.06, 0.86, 1.30, XR - 0.06, y0 + 1.34, -2.10);
+  b.box('scWood', 0.42, 0.34, 1.50, XR - 0.28, y0 + 0.17, -2.10);
+  /* 露台门：朝着切面开 */
+  b.box('scGlass', 1.00, 1.92, 0.06, XL + 2.60, y0 + 1.00, ZF - 0.05);
+  b.box('scConL', 1.16, 0.10, 0.10, XL + 2.60, y0 + 2.00, ZF - 0.05);
+  b.box('scConL', 0.10, 2.00, 0.10, XL + 2.08, y0 + 1.00, ZF - 0.05);
+  b.box('scConL', 0.10, 2.00, 0.10, XL + 3.12, y0 + 1.00, ZF - 0.05);
+  b.cyl('scPot', 0.14, 0.11, 0.26, 8, XL + 0.42, y0 + 0.14, ZF - 0.60);
+  for (let i = 0; i < 3; i++) {
+    b.sph(i % 2 ? 'scLeaf1' : 'scLeaf2', 0.20,
+      XL + 0.42 + (i - 1) * 0.11, y0 + 0.46 + i * 0.09, ZF - 0.60, 1.05, 0.9, 1);
+  }
+  scPed(b, XL + 1.70, y0, -2.55, 3.4, 'scShirtC', 'scSkin1');
+}
+
+/* ------------------------------------------------------------ 组装 */
+function buildSecAll() {
+  const g = new T.Group();
+  const b = new Builder();
+  scEarth(b);
+  scTunnel(b);
+  scStreet(b);
+  scLeftBlock(b);
+  scShell(b);
+  scFacade(b, S_W, 1);
+  scFacade(b, -S_W, -1);
+  scCore(b);
+  for (let k = 0; k < S_N; k++) scFloor(b, k);
+  scShop(b);
+  b.build(g, {
+    noOutline: ['scLeaf1', 'scLeaf2', 'scLeaf3', 'scSoil1', 'scSoil2', 'scSoil3',
+      'scRock', 'scStone', 'scStoneD', 'scStoneP', 'scAsphalt', 'scAsphaltD',
+      'scPaving', 'scPavingD', 'scPaintW', 'scPaintR', 'scPaintY',
+      'scNeonW', 'scNeonC', 'scTrainWin', 'scSignA', 'scSignB',
+      'scGoodsA', 'scGoodsB', 'scGoodsC', 'scFlA', 'scFlB', 'scFlC', 'scFlD',
+      'scCut', 'scRug', 'scRug2', 'scMatG', 'scMirror', 'scGlassW',
+      'scTunnelDark', 'scSkirt']
+  });
+  scene.add(g);
+
+  /* 每层一盏室内灯：暖白，压在切面内侧的顶棚下 */
+  for (let k = 0; k < S_N; k++) {
+    const y = SC_GY + k * S_FL + S_FL - 0.55;
+    const lp = new T.PointLight(k === 4 || k === 5 ? 0xffe6c2 : 0xf4f6ff,
+      4.6, 7.4, 2);
+    lp.position.set(-0.6, y + 0.30, -1.60);
+    scene.add(lp);
+  }
+  /* 隧道两盏冷光 + 路灯一盏暖光 */
+  [[-4.6], [3.2]].forEach(function (q) {
+    const lp = new T.PointLight(0xdff0ff, 5.0, 5.6, 2);
+    lp.position.set(q[0], T_TY - 0.30, 1.20);
+    scene.add(lp);
+  });
+  const sl = new T.PointLight(0xffd9a0, 6.0, 6.4, 2);
+  sl.position.set(4.95, SC_GY + 4.05, 2.45);
+  scene.add(sl);
+
+  if (window.__expose) {
+    window.__sec = { floors: S_N, top: S_TOP, cut: SC_ZH };
+  }
+}
+
   /* ================= 组装 ================= */
   const TOWER = !!PS.tower;
   const STORE = !!PS.store;
   const CLUB = !!PS.club;
   const WRH = !!PS.wh;
-  if (RW) {
+  if (SEC) {
+    buildSecAll();
+  } else if (RW) {
     buildRwAll();
   } else if (LN) {
     buildLnAll();
@@ -13630,7 +14789,9 @@ function buildRwAll() {
 
   /* 室内暖光 */
   const LAMPK = cfg(PS.lampK, 1);
-  if (RW) {
+  if (SEC) {
+    /* 每层一盏室内灯 + 隧道两盏 + 路灯一盏，都在 buildSecAll() 里按位置布好 */
+  } else if (RW) {
     /* 春日上午的散射光已经够亮，不设点光；一放暖灯就变成傍晚了 */
   } else if (LN) {
     /* 灯街的 6 盏暖点光已在 buildLnAll() 内按灯位布置 */
@@ -13812,23 +14973,23 @@ function buildRwAll() {
   }
 
   const VEG = PS.veg || {};
-  const willowPos = cfg(VEG.willows, (STORE || CLUB || JD || CYB || KFC || RL || LN || RW) ? [] : [[4.0, -4.35, 0.95], [-6.5, 1.95, 0.72]]);
+  const willowPos = cfg(VEG.willows, (STORE || CLUB || JD || CYB || KFC || RL || LN || RW || SEC) ? [] : [[4.0, -4.35, 0.95], [-6.5, 1.95, 0.72]]);
   for (let i = 0; i < willowPos.length; i++) {
     scene.add(willow(willowPos[i][0], willowPos[i][1], willowPos[i][2]));
   }
 
-  if (!STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW) {
+  if (!STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW && !SEC) {
     boatGroup = buildBoat(5.9, 1.15, Math.PI / 2 + 0.05);
     scene.add(boatGroup);
   }
 
-  const bamPos = cfg(VEG.bamboo, (STORE || CLUB || WRH || JD || CYB || KFC || RL || LN || RW) ? [] : [[-7.0, -4.6, 1.0], [-6.9, 6.9, 0.75]]);
+  const bamPos = cfg(VEG.bamboo, (STORE || CLUB || WRH || JD || CYB || KFC || RL || LN || RW || SEC) ? [] : [[-7.0, -4.6, 1.0], [-6.9, 6.9, 0.75]]);
   for (let i = 0; i < bamPos.length; i++) scene.add(bamboo(bamPos[i][0], bamPos[i][1], bamPos[i][2]));
-  const potPos = cfg(VEG.pots, (STORE || CLUB || WRH || JD || CYB || KFC || RL || LN || RW) ? [] : [[1.85, 2.35], [2.1, -2.55]]);
+  const potPos = cfg(VEG.pots, (STORE || CLUB || WRH || JD || CYB || KFC || RL || LN || RW || SEC) ? [] : [[1.85, 2.35], [2.1, -2.55]]);
   for (let i = 0; i < potPos.length; i++) scene.add(pot(potPos[i][0], potPos[i][1]));
 
   /* ================= 招牌 / 布幡 / 晾布 ================= */
-  if (!STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW) {
+  if (!STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW && !SEC) {
   const plaqueMat = new T.MeshBasicMaterial({ map: TEX.plaque });
   const psz = cfg(PS.plaqueSize, [1.55, 0.46]);
   const plaque = new T.Mesh(new T.PlaneGeometry(psz[0], psz[1]), plaqueMat);
@@ -13852,7 +15013,7 @@ function buildRwAll() {
     'uniform sampler2D map; varying vec2 vUv;\n' +
     'void main(){ gl_FragColor = texture2D(map, vUv); }';
 
-  if (!TOWER && !STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW) {
+  if (!TOWER && !STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW && !SEC) {
   const bannerMat = new T.ShaderMaterial({
     uniforms: { uTime: bannerUni.uTime, uAmp: { value: 0.11 }, map: { value: TEX.banner } },
     vertexShader: clothVert, fragmentShader: clothFrag, side: T.DoubleSide
@@ -13880,14 +15041,14 @@ function buildRwAll() {
     vertexShader: clothVert, fragmentShader: clothFrag, side: T.DoubleSide
   });
   const cloths = [];
-  if (!TOWER && !STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW) for (let i = 0; i < 2; i++) {
+  if (!TOWER && !STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW && !SEC) for (let i = 0; i < 2; i++) {
     const c = new T.Mesh(new T.PlaneGeometry(0.7, 1.05, 4, 6), clothMat);
     c.position.set(2.62 + i * 0.86, 1.5 - i * 0.05, -1.95);
     c.rotation.y = -0.04 + i * 0.08;
     scene.add(c);
     cloths.push(c);
   }
-  if (!TOWER && !STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW) (function () {
+  if (!TOWER && !STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW && !SEC) (function () {
     const b = new Builder();
     const g = new T.Group();
     b.cyl('woodDark', 0.055, 0.065, 2.15, 6, 2.24, 1.07, -1.95);
@@ -13908,7 +15069,7 @@ function buildRwAll() {
   /* ================= 屋檐铜铃 ================= */
   const bells = [];
   (function () {
-    const pos = (STORE || CLUB || JD || CYB || KFC || RL || LN || RW) ? [] : cfg(PS.bellPos, [[2.78, 5.86, 3.08], [2.78, 5.86, -3.86], [-5.98, 5.86, 3.08], [-5.98, 5.86, -3.86]]);
+    const pos = (STORE || CLUB || JD || CYB || KFC || RL || LN || RW || SEC) ? [] : cfg(PS.bellPos, [[2.78, 5.86, 3.08], [2.78, 5.86, -3.86], [-5.98, 5.86, 3.08], [-5.98, 5.86, -3.86]]);
     for (let i = 0; i < pos.length; i++) {
       const g = new T.Group();
       g.position.set(pos[i][0], pos[i][1], pos[i][2]);
@@ -13939,7 +15100,7 @@ function buildRwAll() {
     patches.push({ m: p, base: op, x0: x, z0: z });
     return p;
   }
-  if (STORE || CLUB || KFC || RL || LN || RW) {
+  if (STORE || CLUB || KFC || RL || LN || RW || SEC) {
     // 玻璃幕面，不做木格窗光斑
   } else if (TOWER) {
     addPatch(4.4, 4.4, -2.05 + 3.2, 1.24, -0.2, 0.1, 0.18);
@@ -14003,7 +15164,7 @@ function buildRwAll() {
     smokes.push(new Smoke(-3.10, 2.20, 6.10, 0.70, 5));
   } else if (JD) {
     smokes.push(new Smoke(DHCX + 0.30, DH_RG + 0.92, DW1 - 0.62, 1.15, 7));
-  } else if (!TOWER && !STORE && !CLUB && !WRH && !CYB && !KFC && !RL && !LN && !RW) {
+  } else if (!TOWER && !STORE && !CLUB && !WRH && !CYB && !KFC && !RL && !LN && !RW && !SEC) {
     smokes.push(new Smoke(-1.62, FL + 0.88, 0.73, 1.0, 6));
     smokes.push(new Smoke(-3.55, FL + 0.66, -2.3, 1.2, 7));
     smokes.push(new Smoke(2.3, F2 + 0.8, -0.5, 0.9, 5));
