@@ -1084,6 +1084,73 @@
       },
       veg: { willows: [], bamboo: [], pots: [] },
       cam: { theta: 1.20, phi: 1.245, dist: 51.0, target: [0.0, 7.45, -0.40] }
+    },
+    /* ---------------------------------------------------------
+       桌面上的世界（第 16 套）
+       深夜，一盏台灯。光圈里一本摊开的书，书页上是一座城：
+       咖啡渍是它的湖，回形针是它的环线，笔筒里的笔是它的摩天楼。
+       全场只有一个光源 —— 灯罩里的 SpotLight。光圈之外不是暗，是黑。
+       --------------------------------------------------------- */
+    desk: {
+      id: 'desk',
+      title: '桌面上的世界',
+      desk: true,
+      emis: 1.0,
+      lampK: 1.0,
+      sky: ['#07080a', '#080a0d', '#0a0c10', '#0b0e12'],
+      vig: 'rgba(0,0,0,0.52)',
+      distMax: 3.4,
+      targetR: 0.46,
+      shadowSpan: 0.90,
+      shadowFar: 4.0,
+      camFar: 40,
+      palette: {
+        /* 桌面：深胡桃木，光里才见红 */
+        dkDesk: 0x4a3428, dkDeskD: 0x3b2a20, dkDeskL: 0x5a4032,
+        /* 书：米白纸、深蓝封面、墨色文字 */
+        dkPaper: 0xd9d0ba, dkPaperD: 0xbcb39c, dkCover: 0x27364b, dkInk: 0x6a6459,
+        dkField: 0xc9c0ab,
+        /* 咖啡：白瓷、深褐液面、浅褐渍 */
+        dkSaucer: 0xe8e3d8, dkSaucerD: 0xcfc8ba,
+        dkCup: 0xc8c1b0, dkCupD: 0xa8a294,
+        dkCoffee: 0x3a2216, dkWater: 0x3a2112, dkShore: 0xd8c8a8,
+        dkStain: 0x7a5636, dkStainD: 0x553a24,
+        /* 金属与文具 */
+        dkSteel: 0x9aa0a6, dkSteelD: 0x6b7178,
+        dkPenA: 0x2f4f6b, dkPenB: 0xb0442f, dkPenC: 0x3f6b4a, dkPenD: 0xc9a13b,
+        dkPenTip: 0x2a2c30, dkPenCap: 0x8d9298,
+        dkEraser: 0xe4b7b0, dkEraserS: 0xe8e4d8,
+        dkPencil: 0xd9a441, dkPencilTip: 0xd8c8a8, dkPencilLead: 0x2f3136,
+        dkNote: 0xf2dd6a, dkNoteD: 0xd8c451,
+        dkRuler: 0xcfe0e4, dkRulerM: 0x8fa4ac,
+        dkClip: 0xc2c8ce,
+        /* 台灯 */
+        dkLampBase: 0x3c4046, dkLampBaseD: 0x2a2d32,
+        dkLampArm: 0x4a4f56, dkLampJoint: 0x6b7178,
+        dkShade: 0x2c554d, dkShadeD: 0x1e3b36, dkShadeIn: 0xfff0c8,
+        dkBulb: 0xfff6dc,
+        /* 城：沥青、屋面、六种楼、窗、树、车 */
+        dkRoad: 0x4e4b46, dkRoof: 0x35332f, dkWin: 0x6f685c,
+        dkBld1: 0xa89f8c, dkBld2: 0x9a5f4a, dkBld3: 0xc2b8a2,
+        dkBld4: 0x7f7466, dkBld5: 0x7f94a0, dkBld6: 0x6e6458,
+        dkDeck: 0xa8a094, dkQuay: 0xc4bba4, dkPlaza: 0xcabfa8, dkBoat: 0xe0d8c4, dkBoatD: 0x8e8472,
+        dkTree: 0x6f9450, dkTreeD: 0x527a3b,
+        dkCarA: 0xc9503e, dkCarB: 0xdfe2e4, dkCarC: 0x2f4f6b,
+        dkGlass: 0x9fc0cc
+      },
+      emit: {
+        dkShadeIn: { c: 0xfff4d8, e: 0xffe0a8 },
+        dkBulb:    { c: 0xfffaf0, e: 0xfff0cc }
+      },
+      light: {
+        /* 太阳只留一丝：它唯一的作用是让暗部不至于死黑，别抢灯 */
+        sun:  { color: 0xffd9a0, i: 0.16, pos: [0.9, 2.4, 0.7] },
+        fill: { color: 0x6f88a8, i: 0.16, pos: [-0.8, 0.7, -0.6] },
+        hemi: { sky: 0x2a3340, ground: 0x1a1512, i: 0.22 },
+        amb:  { color: 0x39414d, i: 0.16 }
+      },
+      veg: { willows: [], bamboo: [], pots: [] },
+      cam: { theta: 0.88, phi: 1.012, dist: 1.09, target: [-0.03, 0.050, 0.02] }
     }
   };
 });

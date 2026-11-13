@@ -14692,12 +14692,471 @@ function buildSecAll() {
   }
 }
 
+/* ============================================================
+   桌面上的世界（desk / DK）—— 第 16 套形制
+   深夜的书桌。只有一盏台灯亮着，光圈里是一本摊开的书，
+   书页上是一座城：一小片咖啡渍是它的湖，回形针是它的环线，
+   笔筒里那几支笔，是它的摩天楼。
+
+   比例：桌面 2.0×1.4 米，杯子 8.5 厘米，城里最高的一栋 3.5 厘米。
+   光只有一个来源 —— 台灯下的 SpotLight。光圈之外不是「暗」，是黑。
+   ============================================================ */
+const DK = !!PS.desk;
+
+const DK_W = 1.00, DK_D = 0.72;      // 桌面半宽 / 半深
+const DK_Y = 0;                       // 桌面上表面
+const BK_X = -0.05, BK_Z = 0.02;      // 书心
+const BK_A = 0.20;                    // 书绕 y 的转角
+
+/* 确定性伪随机 */
+function dkR(seed) {
+  const x = Math.sin(seed * 97.3 + 211.7) * 43758.5453;
+  return x - Math.floor(x);
+}
+
+/* 描边压成暖黑 */
+if (DK) OUTLINE.uniforms.uColor.value.set(0x2a211c);
+
+/* 任意多边形棱柱 */
+function dkSlab(b, key, pts, y0, y1) {
+  const sh = new T.Shape();
+  sh.moveTo(pts[0][0], -pts[0][1]);
+  for (let i = 1; i < pts.length; i++) sh.lineTo(pts[i][0], -pts[i][1]);
+  sh.closePath();
+  const g = new T.ExtrudeGeometry(sh, {
+    depth: Math.max(0.0004, y1 - y0), bevelEnabled: false, curveSegments: 1, steps: 1
+  });
+  g.rotateX(-Math.PI / 2);
+  g.translate(0, y0, 0);
+  b.add(key, g);
+  return g;
+}
+
+function dkBox(b, key, x0, x1, z0, z1, y0, y1) {
+  return dkSlab(b, key, [[x0, z0], [x1, z0], [x1, z1], [x0, z1]], y0, y1);
+}
+
+/* 书的局部坐标：绕书心转 BK_A */
+function bk(cx, cz) {
+  const c = Math.cos(BK_A), s = Math.sin(BK_A);
+  return [BK_X + cx * c - cz * s, BK_Z + cx * s + cz * c];
+}
+
+/* 光锥的竖向渐隐：靠近灯罩亮，落到桌面就化开 */
+const dkConeTex = canvasTex(8, 64, function (c, w, h) {
+  const g = c.createLinearGradient(0, 0, 0, h);
+  g.addColorStop(0, 'rgba(255,255,255,0)');
+  g.addColorStop(0.55, 'rgba(255,255,255,0.45)');
+  g.addColorStop(1, 'rgba(255,255,255,1)');
+  c.fillStyle = g; c.fillRect(0, 0, w, h);
+});
+
+/* ------------------------------------------------------------ 桌面 */
+function dkDesk(b) {
+  /* 一整块实木。桌沿要超出画幅，不然会看见「一块浮着的板」 */
+  dkBox(b, 'dkDesk', -DK_W, DK_W, -DK_D, DK_D, DK_Y - 0.045, DK_Y);
+  /* 木纹：几道很浅的长条，色差极小，只在光里透出来 */
+  for (let i = 0; i < 16; i++) {
+    const z = -DK_D + 0.06 + i * (DK_D * 2 - 0.12) / 15 + (dkR(i * 9.1) - 0.5) * 0.03;
+    const w = 0.004 + dkR(i * 3.1) * 0.026;
+    b.box(i % 3 ? 'dkDeskD' : 'dkDeskL', DK_W * 2, 0.0010, w,
+      0, DK_Y + 0.0005, z);
+  }
+}
+
+/* ------------------------------------------------------------ 书 */
+function dkBook(b) {
+  const PW = 0.118, PD = 0.300;      // 单页宽 / 页深
+  const TH = 0.014;                  // 页厚（整本书的厚度）
+
+  /* 书脊方向的页块：两页各一块，微微向上翘 1.2° */
+  for (let s = -1; s <= 1; s += 2) {
+    const cx = s * PW * 0.5;
+    const p = bk(cx, 0);
+    b.box('dkPaper', PW * 0.94, TH, PD, p[0], DK_Y + TH * 0.5 + 0.001, p[1],
+      0, BK_A, s * 0.021);
+    /* 页边的层叠：三条很薄的深色缝，书才有厚度 */
+    for (let i = 0; i < 3; i++) {
+      const pp = bk(cx, 0);
+      b.box('dkPaperD', PW * 0.94, 0.0012, PD * 0.998,
+        pp[0], DK_Y + 0.0035 + i * 0.0038, pp[1], 0, BK_A, s * 0.021);
+    }
+    /* 封面在下面露一圈 */
+    const pc = bk(cx, 0);
+    b.box('dkCover', PW * 1.02, 0.0035, PD * 1.04,
+      pc[0], DK_Y - 0.0003, pc[1], 0, BK_A, s * 0.021);
+  }
+  /* 书底的一层软阴影：没有它，书是「贴」在桌上而不是「放」在桌上 */
+  const ao = new T.Mesh(new T.PlaneGeometry(0.30, 0.36), new T.MeshBasicMaterial({
+    map: lnSoftTex, color: 0x120c08, transparent: true, opacity: 0.55,
+    depthWrite: false, fog: false, side: T.DoubleSide
+  }));
+  ao.rotation.x = -Math.PI / 2;
+  ao.rotation.z = BK_A;
+  ao.position.set(BK_X, DK_Y + 0.0002, BK_Z);
+  ao.renderOrder = 2;
+  scene.add(ao);
+
+  /* 书脊 */
+  const ps = bk(0, 0);
+  b.box('dkCover', 0.010, TH + 0.004, PD * 1.04, ps[0], DK_Y + TH * 0.5, ps[1], 0, BK_A, 0);
+
+  /* 文字：每页 16 行，行高 0.0035；只有光里的那几行看得见 */
+  for (let s = -1; s <= 1; s += 2) {
+    for (let i = 0; i < 34; i++) {
+      const cz = -PD * 0.44 + i * 0.0076;
+      if (dkR(i * 3.7 + s) < 0.12) continue;
+      const w = PW * (0.42 + dkR(i * 5.1 + s) * 0.44);
+      const p = bk(s * PW * 0.5, cz);
+      b.box('dkInk', w, 0.0006, 0.0016, p[0], DK_Y + 0.0151, p[1], 0, BK_A, s * 0.021);
+    }
+  }
+}
+
+/* ------------------------------------------------------------ 咖啡杯 */
+function dkCup(b) {
+  const cx = 0.335, cz = -0.145;
+  /* 杯垫 */
+  b.cyl('dkSaucer', 0.062, 0.058, 0.006, 18, cx, DK_Y + 0.003, cz);
+  b.cyl('dkSaucerD', 0.063, 0.063, 0.0016, 18, cx, DK_Y + 0.0062, cz);
+  /* 杯身：下窄上宽 */
+  b.cyl('dkCup', 0.043, 0.033, 0.082, 18, cx, DK_Y + 0.047, cz);
+  b.cyl('dkCupD', 0.0445, 0.0445, 0.004, 18, cx, DK_Y + 0.088, cz);
+  /* 咖啡液面 */
+  b.cyl('dkCoffee', 0.0395, 0.0395, 0.002, 16, cx, DK_Y + 0.081, cz);
+  /* 把手：一个竖立的圆环，套在杯身外侧 */
+  b.torus('dkCup', 0.021, 0.0046, cx + 0.040, DK_Y + 0.050, cz, 0, Math.PI * 0.5, 0);
+  /* 杯口的一缕热气：三片极淡的加色片 */
+  for (let i = 0; i < 3; i++) {
+    const m = new T.Mesh(new T.PlaneGeometry(0.03, 0.10), new T.MeshBasicMaterial({
+      map: lnSoftTex, color: 0xfff0d8, transparent: true, opacity: 0.10 - i * 0.02,
+      blending: T.AdditiveBlending, depthWrite: false, fog: false, side: T.DoubleSide
+    }));
+    m.position.set(cx + (i - 1) * 0.012, DK_Y + 0.135 + i * 0.008, cz);
+    m.rotation.y = 0.4 + i * 0.5;
+    scene.add(m);
+  }
+}
+
+/* ------------------------------------------------------------ 笔筒 */
+function dkHold(b) {
+  const cx = -0.475, cz = -0.235;
+  b.cyl('dkSteel', 0.047, 0.041, 0.105, 14, cx, DK_Y + 0.0525, cz);
+  b.cyl('dkSteelD', 0.048, 0.048, 0.004, 14, cx, DK_Y + 0.103, cz);
+  b.cyl('dkSteelD', 0.042, 0.042, 0.004, 14, cx, DK_Y + 0.002, cz);
+  /* 里面插的几支笔 —— 从远处看，它们就是这座城的摩天楼 */
+  const pens = [
+    [-0.020, 0.008, 0.075, 0.10, 'dkPenA', 0.03],
+    [0.014, -0.010, 0.205, 0.00, 'dkPenB', 0.00],
+    [-0.006, 0.018, 0.150, -0.05, 'dkPenC', 0.00],
+    [0.020, 0.014, 0.180, 0.04, 'dkPenD', 0.00],
+    [-0.018, -0.014, 0.120, 0.02, 'dkPenB', 0.00],
+    [0.004, 0.004, 0.235, -0.02, 'dkPenA', 0.00]
+  ];
+  for (let i = 0; i < pens.length; i++) {
+    const p = pens[i];
+    const x = cx + p[0], z = cz + p[1];
+    b.cyl(p[4], 0.0042, 0.0042, p[2], 6, x + p[3] * 0.02, DK_Y + 0.10 + p[2] * 0.5, z,
+      p[3], 0, i * 0.4);
+    /* 笔尖/笔帽 */
+    b.cyl(i % 2 ? 'dkPenTip' : 'dkPenCap', 0.0044, 0.0044, 0.016, 6,
+      x + p[3] * 0.024, DK_Y + 0.10 + p[2] + 0.006, z, p[3], 0, i * 0.4);
+  }
+}
+
+/* ------------------------------------------------------------ 文具 */
+function dkTools(b) {
+  /* 橡皮：粉白块，带一截纸套 */
+  b.box('dkEraser', 0.056, 0.021, 0.028, 0.415, DK_Y + 0.0105, 0.255, 0, 0.22, 0);
+  b.box('dkEraserS', 0.036, 0.0215, 0.0285, 0.404, DK_Y + 0.011, 0.252, 0, 0.22, 0);
+
+  /* 铅笔：横躺在便利贴旁，笔杆六棱用六段薄板近似 */
+  const py = DK_Y + 0.0074, pz = 0.335;
+  b.cyl('dkPencil', 0.0072, 0.0072, 0.165, 6, -0.075, py, pz, 0, 0, Math.PI * 0.5);
+  /* 笔尖 */
+  b.cyl('dkPencilTip', 0.0072, 0.0008, 0.022, 6, -0.169, py, pz, 0, 0, Math.PI * 0.5);
+  b.cyl('dkPencilLead', 0.0022, 0.0004, 0.006, 6, -0.183, py, pz, 0, 0, Math.PI * 0.5);
+  /* 笔尾金属箍 + 橡皮头 */
+  b.cyl('dkSteel', 0.0076, 0.0076, 0.012, 8, 0.014, py, pz, 0, 0, Math.PI * 0.5);
+  b.cyl('dkEraser', 0.0068, 0.0068, 0.010, 8, 0.025, py, pz, 0, 0, Math.PI * 0.5);
+
+  /* 便利贴：微微翘起的一角 */
+  b.box('dkNote', 0.078, 0.0016, 0.078, -0.305, DK_Y + 0.0009, 0.310, 0, -0.16, 0);
+  b.box('dkNoteD', 0.078, 0.0017, 0.012, -0.305, DK_Y + 0.0010, 0.271, 0, -0.16, 0);
+  /* 翘起的那一角：一块小三角板 */
+  const cn = bk;
+  b.box('dkNote', 0.030, 0.0016, 0.030, -0.268, DK_Y + 0.0086, 0.344, 0.42, -0.16, 0.30);
+
+  /* 尺子：半透明塑料，带刻度 */
+  b.box('dkRuler', 0.310, 0.0026, 0.034, 0.115, DK_Y + 0.0014, -0.375, 0, 0.03, 0);
+  for (let i = 0; i < 26; i++) {
+    b.box('dkRulerM', 0.0012, 0.0006, (i % 5 ? 0.008 : 0.014),
+      0.115 - 0.145 + i * 0.0118, DK_Y + 0.0028, -0.375 + 0.010, 0, 0.03, 0);
+  }
+
+  /* 回形针：三段弯折的细钢丝，斜放在桌角 —— 它是这座城的环线 */
+  const cxc = -0.545, czc = 0.145;
+  for (let i = 0; i < 3; i++) {
+    const off = i * 0.0025;
+    b.to('dkClip', 0.0016, cxc - 0.022 + off * 2, DK_Y + 0.0017, czc + off,
+      cxc + 0.024 + off * 2, DK_Y + 0.0017, czc + off, 4);
+    b.to('dkClip', 0.0016, cxc + 0.024 + off * 2, DK_Y + 0.0017, czc + off,
+      cxc + 0.024 + off * 2, DK_Y + 0.0017, czc + 0.020 + off, 4);
+    b.to('dkClip', 0.0016, cxc + 0.024 + off * 2, DK_Y + 0.0017, czc + 0.020 + off,
+      cxc - 0.014 + off * 2, DK_Y + 0.0017, czc + 0.020 + off, 4);
+  }
+}
+
+/* ------------------------------------------------------------ 台灯 */
+function dkLamp(b) {
+  const bx = 0.640, bz = -0.360;
+  /* 底盘 */
+  b.cyl('dkLampBase', 0.098, 0.106, 0.016, 20, bx, DK_Y + 0.008, bz);
+  b.cyl('dkLampBaseD', 0.100, 0.100, 0.003, 20, bx, DK_Y + 0.0175, bz);
+  /* 灯杆：两节，中间一个关节 */
+  b.to('dkLampArm', 0.011, bx, DK_Y + 0.016, bz, bx - 0.045, DK_Y + 0.300, bz + 0.035, 8);
+  b.sph('dkLampJoint', 0.016, bx - 0.045, DK_Y + 0.300, bz + 0.035);
+  b.to('dkLampArm', 0.010, bx - 0.045, DK_Y + 0.300, bz + 0.035,
+    bx - 0.255, DK_Y + 0.372, bz + 0.235, 8);
+  b.sph('dkLampJoint', 0.014, bx - 0.255, DK_Y + 0.372, bz + 0.235);
+
+  /* 灯罩：一个上窄下阔的锥台，内壁自发光 */
+  const sx = bx - 0.255, sy = DK_Y + 0.360, sz = bz + 0.235;
+  /* 灯罩：一条车削轮廓。
+     ★ 不要用几个圆柱叠出弧度 —— 每段圆柱各带一圈描边，叠起来就是三层绿饼。 */
+  const prof = [];
+  for (let i = 0; i <= 7; i++) {
+    const t = i / 7;
+    prof.push(new T.Vector2(0.048 + 0.052 * Math.pow(t, 0.82), 0.046 - t * 0.094));
+  }
+  const shg = new T.LatheGeometry(prof, 22);
+  shg.translate(sx, sy, sz);
+  b.add('dkShade', shg);
+  b.cyl('dkShadeIn', 0.046, 0.093, 0.004, 20, sx, sy - 0.047, sz);
+  b.cyl('dkShadeD', 0.050, 0.050, 0.006, 20, sx, sy + 0.048, sz);
+  b.sph('dkBulb', 0.020, sx, sy - 0.032, sz);
+
+  /* 光锥：从灯罩口到桌面的一截空气。★ 必须上下渐隐，
+     否则它就是一个硬边的三角形贴在桌面上，一眼假 */
+  const cone = new T.Mesh(
+    new T.CylinderGeometry(0.098, 0.42, sy - DK_Y - 0.02, 26, 1, true),
+    new T.MeshBasicMaterial({
+      map: dkConeTex, color: 0xffd9a0, transparent: true, opacity: 0.065,
+      blending: T.AdditiveBlending, depthWrite: false, side: T.DoubleSide, fog: false
+    }));
+  cone.position.set(sx, DK_Y + (sy - DK_Y) * 0.5, sz);
+  cone.renderOrder = 4;
+  scene.add(cone);
+
+  /* 灯下的光圈：一圈暖色加色片，压出「桌面被照亮的一块」 */
+  const pool = new T.Mesh(new T.PlaneGeometry(0.78, 0.78), new T.MeshBasicMaterial({
+    map: lnSoftTex, color: 0xffcf92, transparent: true, opacity: 0.07,
+    blending: T.AdditiveBlending, depthWrite: false, fog: false, side: T.DoubleSide
+  }));
+  pool.rotation.x = -Math.PI / 2;
+  pool.position.set(sx - 0.16, DK_Y + 0.0016, sz + 0.12);
+  pool.renderOrder = 3;
+  scene.add(pool);
+
+  return { x: sx, y: sy, z: sz };
+}
+
+/* ------------------------------------------------------------ 书页上的城 */
+function dkCity(b) {
+  const PW = 0.118, PD = 0.300;
+  const GY = DK_Y + 0.0152;          // 城市地面 = 书页顶面（别浮起来）
+
+  /* 街道：先用格子定好街网，楼再往格子里坐。
+     ★ 不要手写一堆坐标去「摆」城市 —— 摆出来一定是散的。
+       格子决定街，街决定城；空格就是街，湖就是挖掉的几格。 */
+  const CX0 = -0.090, CX1 = 0.106, CZ0 = -0.136, CZ1 = 0.136;
+  const NX = 7, NZ = 9;
+  const DXX = (CX1 - CX0) / NX, DZZ = (CZ1 - CZ0) / NZ;
+  const LK = [0.082, 0.052];          // 湖心（书的局部坐标）
+
+  /* 街：沿格线铺细条，横竖各一套 */
+  for (let i = 1; i < NX; i++) {
+    const x = CX0 + DXX * i, p = bk(x, 0);
+    b.box('dkRoad', 0.0035, 0.0006, CZ1 - CZ0 - 0.006, p[0], GY + 0.0004, p[1], 0, BK_A, 0);
+  }
+  for (let i = 1; i < NZ; i++) {
+    const z = CZ0 + DZZ * i, p = bk(0, z);
+    b.box('dkRoad', CX1 - CX0 - 0.006, 0.0006, 0.0035, p[0], GY + 0.0004, p[1], 0, BK_A, 0);
+  }
+
+  const put = function (cx, cz, w, d, h, key) {
+    const p = bk(cx, cz);
+    b.box(key, w, h, d, p[0], GY + h * 0.5, p[1], 0, BK_A, 0);
+    /* 屋面压深一圈，楼顶才不是一块平顶 */
+    b.box('dkRoof', w * 0.88, 0.0007, d * 0.88, p[0], GY + h + 0.0003, p[1], 0, BK_A, 0);
+    if (h > 0.026) {
+      b.cyl('dkSteelD', 0.0005, 0.0005, 0.006, 4, p[0], GY + h + 0.003, p[1]);
+    }
+    /* 窗：只在朝向相机的那一面画几道，够读就行 */
+    const rows = Math.floor(h / 0.0055);
+    for (let i = 0; i < rows; i++) {
+      b.box('dkWin', w * 0.90, 0.0011, 0.0004,
+        p[0], GY + 0.0035 + i * 0.0055, p[1] + d * 0.5, 0, BK_A, 0);
+      b.box('dkWin', 0.0004, 0.0011, d * 0.90,
+        p[0] + w * 0.5, GY + 0.0035 + i * 0.0055, p[1], 0, BK_A, 0);
+    }
+  };
+
+  const keys = ['dkBld1', 'dkBld2', 'dkBld3', 'dkBld4', 'dkBld5', 'dkBld6'];
+
+  /* 逐格生成：一格一到两栋，剩下的格留给湖、广场、公园 */
+  for (let ix = 0; ix < NX; ix++) {
+    for (let iz = 0; iz < NZ; iz++) {
+      const cx = CX0 + DXX * (ix + 0.5);
+      const cz = CZ0 + DZZ * (iz + 0.5);
+      const seed = ix * 17.3 + iz * 5.7;
+      const r0 = dkR(seed + 1.0);
+
+      /* 湖：挖掉湖心周围的几格 */
+      const dl = Math.sqrt((cx - LK[0]) * (cx - LK[0]) + (cz - LK[1]) * (cz - LK[1]));
+      if (dl < DXX * 1.30) continue;
+
+      /* 留白：广场与街心公园 */
+      if (r0 < 0.17) {
+        if (r0 < 0.08) {
+          const p = bk(cx, cz);
+          b.box('dkPlaza', DXX * 0.62, 0.0005, DZZ * 0.62, p[0], GY + 0.0004, p[1], 0, BK_A, 0);
+        } else {
+          for (let t = 0; t < 3; t++) {
+            const p = bk(cx + (dkR(seed + t * 3.3) - 0.5) * DXX * 0.30,
+              cz + (dkR(seed + t * 7.1) - 0.5) * DZZ * 0.30);
+            const ts = 0.0026 + dkR(seed + t * 5.1) * 0.0012;
+            b.cyl('dkTreeD', 0.0004, 0.0005, ts * 1.3, 4, p[0], GY + ts * 0.65, p[1]);
+            b.sph(t % 2 ? 'dkTree' : 'dkTreeD', ts, p[0], GY + ts * 1.5, p[1], 1.1, 0.95, 1.05);
+          }
+        }
+        continue;
+      }
+
+      const w = DXX * (0.46 + dkR(seed + 2.3) * 0.22);
+      const d = DZZ * (0.46 + dkR(seed + 5.3) * 0.22);
+      /* 高度差别要够狠：绝大多数是矮房，少数几栋冒出来，才像城 */
+      let h = 0.009 + Math.pow(dkR(seed + 6.1), 3.1) * 0.034;
+      const dc = Math.sqrt((cx + 0.010) * (cx + 0.010) + (cz + 0.010) * (cz + 0.010));
+      if (dc < 0.055) h *= 1.45;              // 市中心一撮高楼
+      if (dkR(seed + 21.7) < 0.07) h *= 1.9;  // 偶尔冒出一栋塔
+      put(cx, cz, w, d, h, keys[Math.floor(dkR(seed + 8.9) * 6) % 6]);
+      /* 少数格子裂成两栋，城市才有密度差 */
+      if (dkR(seed + 11.3) < 0.26) {
+        const w2 = DXX * 0.26, d2 = DZZ * 0.26;
+        put(cx + (dkR(seed + 13.1) - 0.5) * DXX * 0.30,
+          cz + (dkR(seed + 14.7) - 0.5) * DZZ * 0.30,
+          w2, d2, 0.010 + dkR(seed + 16.3) * 0.012,
+          keys[Math.floor(dkR(seed + 18.5) * 6) % 6]);
+      }
+    }
+  }
+
+  /* 全城最高的地标，立在湖的西北岸 */
+  put(0.056, 0.014, 0.018, 0.018, 0.042, 'dkBld1');
+  put(0.056, 0.014, 0.011, 0.011, 0.010, 'dkBld6');
+
+  /* 湖：右页偏南的一片咖啡渍。★ 一定要放在「前排没有楼」的地方，
+     不然从机位看过去，湖被自己城里的房子挡得一点不剩。 */
+  const qy = bk(0.082, 0.052);
+  b.cyl('dkQuay', 0.0330, 0.0330, 0.0006, 20, qy[0], GY + 0.0004, qy[1]);
+  b.cyl('dkStainD', 0.0292, 0.0292, 0.0006, 20, qy[0], GY + 0.0006, qy[1]);
+  b.cyl('dkStain', 0.0262, 0.0262, 0.0006, 20, qy[0], GY + 0.0008, qy[1]);
+  b.cyl('dkShore', 0.0240, 0.0240, 0.0007, 20, qy[0], GY + 0.0009, qy[1]);
+  b.cyl('dkWater', 0.0226, 0.0226, 0.0007, 20, qy[0], GY + 0.0011, qy[1]);
+  /* 两条小船：一叶扁舟，比楼还小 */
+  for (let i = 0; i < 2; i++) {
+    const bx2 = qy[0] + (i ? 0.008 : -0.007), bz2 = qy[1] + (i ? -0.006 : 0.007);
+    b.box('dkBoat', 0.0090, 0.0014, 0.0034, bx2, GY + 0.0019, bz2, 0, BK_A + 0.5 * i, 0);
+    b.box('dkBoatD', 0.0030, 0.0018, 0.0026, bx2, GY + 0.0030, bz2, 0, BK_A + 0.5 * i, 0);
+  }
+
+  /* 跨湖的桥：一段极薄的板 + 两边栏杆 */
+  const pb = bk(0.082, 0.052);
+  b.box('dkDeck', 0.062, 0.0016, 0.010, pb[0], GY + 0.0086, pb[1], 0, BK_A, 0);
+  for (let i = 0; i < 2; i++) {
+    b.box('dkSteelD', 0.052, 0.0012, 0.0008,
+      pb[0], GY + 0.0092, pb[1] + (i ? 0.0052 : -0.0052), 0, BK_A, 0);
+  }
+
+  /* 树：小绿球，成排种在街边 */
+  const trees = [
+    [-0.062, -0.062], [-0.028, -0.058], [0.008, -0.064], [0.044, -0.060],
+    [-0.064, 0.056], [-0.020, 0.062], [0.006, -0.008], [0.078, 0.060],
+    [-0.056, 0.126], [-0.018, 0.128], [0.022, 0.124], [0.070, 0.126],
+    [-0.092, 0.004], [0.092, -0.044], [-0.036, -0.118], [0.048, -0.120]
+  ];
+  for (let i = 0; i < trees.length; i++) {
+    const p = bk(trees[i][0], trees[i][1]);
+    const s = 0.0026 + dkR(i * 3.3) * 0.0014;
+    b.cyl('dkTreeD', 0.0004, 0.0005, s * 1.3, 4, p[0], GY + s * 0.65, p[1]);
+    b.sph(i % 2 ? 'dkTree' : 'dkTreeD', s, p[0], GY + s * 1.5, p[1], 1.1, 0.95, 1.05);
+  }
+
+  /* 车：街上的小方盒，红白蓝三种 */
+  const cars = [
+    [-0.070, -0.115, 0.000, 'dkCarA'], [-0.020, -0.115, 0.000, 'dkCarB'],
+    [0.030, -0.115, 0.000, 'dkCarC'], [0.070, 0.075, 0.000, 'dkCarA'],
+    [-0.055, 0.030, 0.000, 'dkCarB'], [0.062, -0.060, 0.000, 'dkCarC']
+  ];
+  for (let i = 0; i < cars.length; i++) {
+    const q = cars[i];
+    const p = bk(q[0], q[1]);
+    b.box(q[3], 0.0052, 0.0018, 0.0026, p[0], GY + 0.0024, p[1], 0, BK_A + 0.02 * i, 0);
+    b.box('dkGlass', 0.0026, 0.0014, 0.0027, p[0], GY + 0.0036, p[1], 0, BK_A + 0.02 * i, 0);
+  }
+}
+
+/* ------------------------------------------------------------ 组装 */
+function buildDkAll() {
+  const g = new T.Group();
+  const b = new Builder();
+  dkDesk(b);
+  dkBook(b);
+  dkCity(b);
+  dkCup(b);
+  dkHold(b);
+  dkTools(b);
+  const lamp = dkLamp(b);
+  b.build(g, {
+    noOutline: ['dkDesk', 'dkDeskD', 'dkDeskL', 'dkPaper', 'dkPaperD', 'dkInk',
+      'dkField', 'dkRoad', 'dkWin', 'dkStain', 'dkStainD', 'dkWater',
+      'dkTree', 'dkTreeD', 'dkShadeIn', 'dkBulb', 'dkNote', 'dkCoffee',
+      'dkRulerM', 'dkGlass', 'dkField']
+  });
+  scene.add(g);
+
+  /* ★ 全场只有一个光源：灯罩里的那一盏。
+     其余位置不是「暗」，是黑 —— 所以面光只留一丝，够勾出轮廓就行。 */
+  /* ★ 光要落在书上，不是落在杯子上 —— 杯子只是配角 */
+  const spot = new T.SpotLight(0xffd9a0, 1.45, 3.0, 0.68, 0.72, 1.55);
+  spot.position.set(lamp.x, lamp.y - 0.035, lamp.z);
+  spot.target.position.set(BK_X, DK_Y, BK_Z + 0.02);
+  scene.add(spot);
+  scene.add(spot.target);
+
+  /* 灯罩自身的暖光：让灯是「亮着的」，不是一块黑铁 */
+  const glow = new T.PointLight(0xffc98a, 0.55, 0.5, 2);
+  glow.position.set(lamp.x, lamp.y - 0.06, lamp.z);
+  scene.add(glow);
+  /* 灯臂与底座的补光：没有它，灯罩就是浮在空中的一个绿锥体 */
+  const rim = new T.PointLight(0xffb877, 0.20, 0.62, 2);
+  rim.position.set(lamp.x + 0.08, lamp.y - 0.24, lamp.z + 0.10);
+  scene.add(rim);
+
+  if (window.__expose) {
+    window.__dk = { lamp: lamp, deskW: DK_W, deskD: DK_D };
+  }
+}
+
   /* ================= 组装 ================= */
   const TOWER = !!PS.tower;
   const STORE = !!PS.store;
   const CLUB = !!PS.club;
   const WRH = !!PS.wh;
-  if (SEC) {
+  if (DK) {
+    buildDkAll();
+  } else if (SEC) {
     buildSecAll();
   } else if (RW) {
     buildRwAll();
@@ -14789,7 +15248,9 @@ function buildSecAll() {
 
   /* 室内暖光 */
   const LAMPK = cfg(PS.lampK, 1);
-  if (SEC) {
+  if (DK) {
+    /* 全场唯一的光源是灯罩里的聚光灯，已在 buildDkAll() 内布好 */
+  } else if (SEC) {
     /* 每层一盏室内灯 + 隧道两盏 + 路灯一盏，都在 buildSecAll() 里按位置布好 */
   } else if (RW) {
     /* 春日上午的散射光已经够亮，不设点光；一放暖灯就变成傍晚了 */
@@ -14973,23 +15434,23 @@ function buildSecAll() {
   }
 
   const VEG = PS.veg || {};
-  const willowPos = cfg(VEG.willows, (STORE || CLUB || JD || CYB || KFC || RL || LN || RW || SEC) ? [] : [[4.0, -4.35, 0.95], [-6.5, 1.95, 0.72]]);
+  const willowPos = cfg(VEG.willows, (STORE || CLUB || JD || CYB || KFC || RL || LN || RW || SEC || DK) ? [] : [[4.0, -4.35, 0.95], [-6.5, 1.95, 0.72]]);
   for (let i = 0; i < willowPos.length; i++) {
     scene.add(willow(willowPos[i][0], willowPos[i][1], willowPos[i][2]));
   }
 
-  if (!STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW && !SEC) {
+  if (!STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW && !SEC && !DK) {
     boatGroup = buildBoat(5.9, 1.15, Math.PI / 2 + 0.05);
     scene.add(boatGroup);
   }
 
-  const bamPos = cfg(VEG.bamboo, (STORE || CLUB || WRH || JD || CYB || KFC || RL || LN || RW || SEC) ? [] : [[-7.0, -4.6, 1.0], [-6.9, 6.9, 0.75]]);
+  const bamPos = cfg(VEG.bamboo, (STORE || CLUB || WRH || JD || CYB || KFC || RL || LN || RW || SEC || DK) ? [] : [[-7.0, -4.6, 1.0], [-6.9, 6.9, 0.75]]);
   for (let i = 0; i < bamPos.length; i++) scene.add(bamboo(bamPos[i][0], bamPos[i][1], bamPos[i][2]));
-  const potPos = cfg(VEG.pots, (STORE || CLUB || WRH || JD || CYB || KFC || RL || LN || RW || SEC) ? [] : [[1.85, 2.35], [2.1, -2.55]]);
+  const potPos = cfg(VEG.pots, (STORE || CLUB || WRH || JD || CYB || KFC || RL || LN || RW || SEC || DK) ? [] : [[1.85, 2.35], [2.1, -2.55]]);
   for (let i = 0; i < potPos.length; i++) scene.add(pot(potPos[i][0], potPos[i][1]));
 
   /* ================= 招牌 / 布幡 / 晾布 ================= */
-  if (!STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW && !SEC) {
+  if (!STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW && !SEC && !DK) {
   const plaqueMat = new T.MeshBasicMaterial({ map: TEX.plaque });
   const psz = cfg(PS.plaqueSize, [1.55, 0.46]);
   const plaque = new T.Mesh(new T.PlaneGeometry(psz[0], psz[1]), plaqueMat);
@@ -15013,7 +15474,7 @@ function buildSecAll() {
     'uniform sampler2D map; varying vec2 vUv;\n' +
     'void main(){ gl_FragColor = texture2D(map, vUv); }';
 
-  if (!TOWER && !STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW && !SEC) {
+  if (!TOWER && !STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW && !SEC && !DK) {
   const bannerMat = new T.ShaderMaterial({
     uniforms: { uTime: bannerUni.uTime, uAmp: { value: 0.11 }, map: { value: TEX.banner } },
     vertexShader: clothVert, fragmentShader: clothFrag, side: T.DoubleSide
@@ -15041,14 +15502,14 @@ function buildSecAll() {
     vertexShader: clothVert, fragmentShader: clothFrag, side: T.DoubleSide
   });
   const cloths = [];
-  if (!TOWER && !STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW && !SEC) for (let i = 0; i < 2; i++) {
+  if (!TOWER && !STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW && !SEC && !DK) for (let i = 0; i < 2; i++) {
     const c = new T.Mesh(new T.PlaneGeometry(0.7, 1.05, 4, 6), clothMat);
     c.position.set(2.62 + i * 0.86, 1.5 - i * 0.05, -1.95);
     c.rotation.y = -0.04 + i * 0.08;
     scene.add(c);
     cloths.push(c);
   }
-  if (!TOWER && !STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW && !SEC) (function () {
+  if (!TOWER && !STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW && !SEC && !DK) (function () {
     const b = new Builder();
     const g = new T.Group();
     b.cyl('woodDark', 0.055, 0.065, 2.15, 6, 2.24, 1.07, -1.95);
@@ -15069,7 +15530,7 @@ function buildSecAll() {
   /* ================= 屋檐铜铃 ================= */
   const bells = [];
   (function () {
-    const pos = (STORE || CLUB || JD || CYB || KFC || RL || LN || RW || SEC) ? [] : cfg(PS.bellPos, [[2.78, 5.86, 3.08], [2.78, 5.86, -3.86], [-5.98, 5.86, 3.08], [-5.98, 5.86, -3.86]]);
+    const pos = (STORE || CLUB || JD || CYB || KFC || RL || LN || RW || SEC || DK) ? [] : cfg(PS.bellPos, [[2.78, 5.86, 3.08], [2.78, 5.86, -3.86], [-5.98, 5.86, 3.08], [-5.98, 5.86, -3.86]]);
     for (let i = 0; i < pos.length; i++) {
       const g = new T.Group();
       g.position.set(pos[i][0], pos[i][1], pos[i][2]);
@@ -15100,7 +15561,7 @@ function buildSecAll() {
     patches.push({ m: p, base: op, x0: x, z0: z });
     return p;
   }
-  if (STORE || CLUB || KFC || RL || LN || RW || SEC) {
+  if (STORE || CLUB || KFC || RL || LN || RW || SEC || DK) {
     // 玻璃幕面，不做木格窗光斑
   } else if (TOWER) {
     addPatch(4.4, 4.4, -2.05 + 3.2, 1.24, -0.2, 0.1, 0.18);
@@ -15164,7 +15625,7 @@ function buildSecAll() {
     smokes.push(new Smoke(-3.10, 2.20, 6.10, 0.70, 5));
   } else if (JD) {
     smokes.push(new Smoke(DHCX + 0.30, DH_RG + 0.92, DW1 - 0.62, 1.15, 7));
-  } else if (!TOWER && !STORE && !CLUB && !WRH && !CYB && !KFC && !RL && !LN && !RW && !SEC) {
+  } else if (!TOWER && !STORE && !CLUB && !WRH && !CYB && !KFC && !RL && !LN && !RW && !SEC && !DK) {
     smokes.push(new Smoke(-1.62, FL + 0.88, 0.73, 1.0, 6));
     smokes.push(new Smoke(-3.55, FL + 0.66, -2.3, 1.2, 7));
     smokes.push(new Smoke(2.3, F2 + 0.8, -0.5, 0.9, 5));
