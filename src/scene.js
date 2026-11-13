@@ -12118,12 +12118,1431 @@ function buildRlAll() {
   rlSnowFall();
 }
 
+/* ============================================================
+   废墟 · 春回（ruin / RW）—— 第 14 套形制
+   半塌的两层水泥小屋：背墙与左墙还站着，前墙与右墙垮了一半，
+   二层楼板断成 L 形，一块大板斜插进瓦砾堆。一棵树从楼板缺口里
+   长出来，树冠盖过残墙；藤蔓垂落、野花铺满、积水映天光，
+   逆光里飘着花瓣与尘埃。
+   主角不是房子，是「没有人之后，春天照样来了」。
+   ============================================================ */
+const RW = !!PS.ruin;
+
+const RW_X0 = -10.2, RW_X1 = 10.2;
+const RW_Z0 = -8.2, RW_Z1 = 8.2;
+const RW_GY = 0.14;       // 草地顶面
+const RW_BT = -1.10;      // 展台底
+
+const R_X0 = -5.80, R_X1 = 5.20;   // 主屋外轮廓
+const R_Z0 = -4.70, R_Z1 = 4.50;
+const R_T  = 0.36;                 // 墙厚
+const R_FL = 0.20;                 // 室内地坪
+const R_H1 = 3.46;                 // 一层墙顶
+const R_SB = 3.24, R_SL = 3.46;    // 二层楼板底 / 面
+const R_H2 = 6.40;                 // 二层墙顶
+
+/* 春日废墟的描边压成冷灰墨绿，别用民居的纯黑 */
+if (RW) OUTLINE.uniforms.uColor.value.set(0x38413c);
+
+/* 确定性伪随机：每轮构建、每张截图完全一致 */
+function rwR(seed) {
+  const x = Math.sin(seed * 127.1 + 311.7) * 43758.5453;
+  return x - Math.floor(x);
+}
+
+/* 任意折线 → 水平棱柱（pts 是 [x,z]） */
+function rwSlab(b, key, pts, y0, y1) {
+  const sh = new T.Shape();
+  sh.moveTo(pts[0][0], -pts[0][1]);
+  for (let i = 1; i < pts.length; i++) sh.lineTo(pts[i][0], -pts[i][1]);
+  sh.closePath();
+  const g = new T.ExtrudeGeometry(sh, {
+    depth: y1 - y0, bevelEnabled: false, curveSegments: 1, steps: 1
+  });
+  g.rotateX(-Math.PI / 2);
+  g.translate(0, y0, 0);
+  b.add(key, g);
+}
+
+/* 断墙：整面墙做成「带洞口的挤出多边形」。
+   ★ 不要用一堆小盒子拼：每块盒子都有自己的反向外壳，接缝处会漏出
+     一圈圈深色描边，远看就是满墙砖缝。整块挤出只有一个轮廓。 */
+function rwWall(b, key, axis, at, a0, a1, y0, y1, holes, opt) {
+  opt = opt || {};
+  const thick = opt.thick !== undefined ? opt.thick : R_T;
+  const amp = opt.amp || 0;
+  const slope = opt.slope || 0;
+  const dir = opt.dir || 0;
+  const seed = opt.seed || 1;
+  holes = holes || [];
+
+  /* 顶边控制点：每 0.92 米一个，中间线性过渡。
+     逐点独立抖动会变成「梳子」，低频起伏才像整片墙塌下来。 */
+  const cn = Math.max(4, Math.ceil((a1 - a0) / 0.92));
+  const ctrl = [];
+  for (let k = 0; k <= cn; k++) {
+    const t = k / cn;
+    const free = dir > 0 ? t : (dir < 0 ? 1 - t : 0.5);
+    ctrl.push(y1 - slope * free * free
+      - amp * (0.06 + 0.52 * rwR(seed + k * 3.17) + 0.95 * free * free)
+      + (rwR(seed * 2.3 + k * 7.31) - 0.5) * 0.20);
+  }
+  const topAt = function (a, i) {
+    const u = (a - a0) / Math.max(0.001, a1 - a0) * cn;
+    const k = Math.min(cn - 1, Math.floor(u));
+    const f = u - k;
+    let v = ctrl[k] * (1 - f) + ctrl[k + 1] * f;
+    v += (rwR(seed + i * 4.7) - 0.5) * 0.09;
+    if (rwR(seed * 1.9 + i * 7.31) < 0.055) v -= 0.16 + rwR(seed + i) * 0.26;
+    return Math.max(y0 + 0.22, v);
+  };
+
+  /* 洞口上沿必须留在顶边以下，否则 hole 会破出轮廓 */
+  let holeTop = y0;
+  for (let i = 0; i < holes.length; i++) holeTop = Math.max(holeTop, holes[i][3]);
+
+  const N = Math.max(10, Math.ceil((a1 - a0) / 0.20));
+  const sh = new T.Shape();
+  sh.moveTo(a0, y0);
+  sh.lineTo(a1, y0);
+  for (let i = N; i >= 0; i--) {
+    const a = a0 + (a1 - a0) * i / N;
+    sh.lineTo(a, Math.max(topAt(a, i), holeTop + 0.14));
+  }
+  sh.closePath();
+
+  for (let i = 0; i < holes.length; i++) {
+    const q = holes[i];
+    const hp = new T.Path();
+    hp.moveTo(q[0], q[2]);
+    hp.lineTo(q[1], q[2]);
+    hp.lineTo(q[1], q[3]);
+    hp.lineTo(q[0], q[3]);
+    hp.closePath();
+    sh.holes.push(hp);
+  }
+
+  const g = new T.ExtrudeGeometry(sh, {
+    depth: thick, bevelEnabled: false, curveSegments: 1, steps: 1
+  });
+  if (axis === 'x') {
+    g.translate(0, 0, at - thick * 0.5);
+  } else {
+    g.rotateY(-Math.PI * 0.5);
+    g.translate(at + thick * 0.5, 0, 0);
+  }
+  b.add(key, g);
+
+  /* 断口上的碎石块：打散过于干净的顶边 */
+  const rn = Math.round((a1 - a0) * 0.55);
+  for (let i = 0; i < rn; i++) {
+    const a = a0 + rwR(seed * 5.1 + i * 2.71) * (a1 - a0);
+    const t = (a - a0) / Math.max(0.001, a1 - a0);
+    const free = dir > 0 ? t : (dir < 0 ? 1 - t : 0.5);
+    if (rwR(seed * 7.3 + i * 3.91) > 0.25 + 0.35 * free) continue;
+    const top = topAt(a, i);
+    const w = 0.12 + rwR(seed + i * 1.7) * 0.26;
+    const h = 0.08 + rwR(seed + i * 2.9) * 0.22;
+    if (axis === 'x') {
+      b.box(i % 3 ? 'rwCon' : 'rwConD', w, h, thick * (0.66 + rwR(seed + i) * 0.4),
+        a, top + h * 0.16, at + (rwR(seed + i * 4.3) - 0.5) * 0.12,
+        0, rwR(seed + i * 5.1) * 0.6, rwR(seed + i * 6.7) * 0.22);
+    } else {
+      b.box(i % 3 ? 'rwCon' : 'rwConD', thick * (0.66 + rwR(seed + i) * 0.4), h, w,
+        at + (rwR(seed + i * 4.3) - 0.5) * 0.12, top + h * 0.16, a,
+        0, rwR(seed + i * 5.1) * 0.6, rwR(seed + i * 6.7) * 0.22);
+    }
+  }
+}
+
+/* 一根外露钢筋：两段折线，端点带一点随机 */
+function rwRebar(b, x, y, z, dx, dy, dz, len, r) {
+  const mx = x + dx * len * 0.55, my = y + dy * len * 0.55, mz = z + dz * len * 0.55;
+  const ex = x + dx * len + (rwR(x * 9.1 + z * 3.3) - 0.5) * 0.26;
+  const ey = y + dy * len + len * 0.22;
+  const ez = z + dz * len + (rwR(y * 7.7 + x * 5.1) - 0.5) * 0.26;
+  b.to('rwRebar', r, x, y, z, mx, my, mz, 5);
+  b.to('rwRebar', r * 0.92, mx, my, mz, ex, ey, ez, 5);
+}
+
+/* 一团藤：垂挂 4~6 节，节点带叶 */
+function rwVine(b, x, y, z, len, seed, side) {
+  const n = 4 + Math.floor(rwR(seed) * 3);
+  let px = x, py = y, pz = z;
+  for (let i = 0; i < n; i++) {
+    const k = (i + 1) / n;
+    const wob = Math.sin(seed + i * 1.7) * 0.10;
+    const nx = x + wob * k * 1.4 + (side || 1) * 0.10 * k;
+    const ny = y - len * k;
+    const nz = z + Math.cos(seed * 1.3 + i * 1.5) * 0.09 * k;
+    b.to('rwVine', 0.028, px, py, pz, nx, ny, nz, 4);
+    b.sph(i % 2 ? 'rwLeaf2' : 'rwLeaf3', 0.115,
+      nx + (rwR(seed + i * 3.1) - 0.5) * 0.28,
+      ny + 0.03,
+      nz + (rwR(seed + i * 5.7) - 0.5) * 0.24, 1.5, 0.42, 1.0);
+    px = nx; py = ny; pz = nz;
+  }
+}
+
+/* 一丛草：三片叶，细锥不进描边 */
+function rwTuft(b, x, z, h, seed) {
+  for (let i = 0; i < 3; i++) {
+    const a = rwR(seed + i * 2.3) * 6.283;
+    const lean = 0.18 + rwR(seed + i * 5.1) * 0.30;
+    const hh = h * (0.72 + rwR(seed + i * 7.7) * 0.55);
+    b.cyl(i === 0 ? 'rwGrassL' : (i === 1 ? 'rwGrass' : 'rwGrassD'),
+      0.006, 0.030, hh, 4,
+      x + Math.cos(a) * 0.045, RW_GY + hh * 0.5, z + Math.sin(a) * 0.045,
+      Math.cos(a) * lean, 0, -Math.sin(a) * lean);
+  }
+}
+
+/* 一朵野花：细茎 + 花冠 + 花心 */
+function rwFlower(b, x, z, h, key, seed) {
+  const lean = (rwR(seed) - 0.5) * 0.22;
+  b.cyl('rwVineD', 0.010, 0.013, h, 4, x, RW_GY + h * 0.5, z, lean, 0, lean * 0.7, 4);
+  const hx = x + lean * h * 0.5, hz = z + lean * h * 0.35;
+  b.sph(key, 0.085, hx, RW_GY + h, hz, 1, 0.52, 1);
+  b.sph('rwFlowerC', 0.030, hx, RW_GY + h + 0.022, hz);
+}
+
+/* ------------------------------------------------------------ 场地 */
+function rwBase(b) {
+  const X0 = RW_X0, X1 = RW_X1, Z0 = RW_Z0, Z1 = RW_Z1;
+
+  /* 切角八边形展台：不是一块薄托盘，而是一截「切开的土」。
+     地表混凝土薄边 → 表土 → 心土 → 碎石层，四层颜色各不相同，
+     侧面才有厚度，模型才不像浮在空中的贴纸。 */
+  const OUT = [
+    [X0 + 1.6, Z0], [X1 - 1.6, Z0], [X1, Z0 + 1.6], [X1, Z1 - 1.6],
+    [X1 - 1.6, Z1], [X0 + 1.6, Z1], [X0, Z1 - 1.6], [X0, Z0 + 1.6]
+  ];
+  rwSlab(b, 'rwBase', OUT, RW_GY - 0.24, RW_GY - 0.03);
+  rwSlab(b, 'rwEarthD', OUT, RW_GY - 0.62, RW_GY - 0.24);
+  rwSlab(b, 'rwEarth', OUT, RW_GY - 0.94, RW_GY - 0.62);
+  rwSlab(b, 'rwRubbleD', OUT, RW_BT, RW_GY - 0.94);
+
+  /* 土层里的碎石与树根，把平整的剖面切碎 */
+  for (let i = 0; i < 26; i++) {
+    const side = i % 4;
+    const t = rwR(i * 3.1 + 1);
+    const x = side < 2 ? X0 + 1.6 + t * (X1 - X0 - 3.2) : (side === 2 ? X0 : X1);
+    const z = side < 2 ? (side ? Z1 : Z0) : Z0 + 1.6 + t * (Z1 - Z0 - 3.2);
+    const y = RW_GY - 0.30 - rwR(i * 5.3 + 2) * 0.55;
+    const r = 0.09 + rwR(i * 7.7) * 0.17;
+    b.box('rwStone', r * 1.7, r * 1.1, r * 1.3,
+      x + (rwR(i * 9.1) - 0.5) * 0.2, y, z + (rwR(i * 11.3) - 0.5) * 0.2,
+      0, rwR(i * 13.1) * 3.14, rwR(i * 15.7) * 0.5);
+  }
+
+  /* 草地：内缩一圈，露出混凝土边 */
+  rwSlab(b, 'rwGrass', [
+    [X0 + 1.7, Z0 + 0.28], [X1 - 1.7, Z0 + 0.28], [X1 - 0.28, Z0 + 1.7],
+    [X1 - 0.28, Z1 - 1.7], [X1 - 1.7, Z1 - 0.28], [X0 + 1.7, Z1 - 0.28],
+    [X0 + 0.28, Z1 - 1.7], [X0 + 0.28, Z0 + 1.7]
+  ], RW_GY - 0.14, RW_GY);
+
+  /* 草地色斑：大块不规则深浅，打破「一块绿毯」 */
+  for (let i = 0; i < 7; i++) {
+    const cx = -7.0 + rwR(i * 3.1 + 1) * 14.0;
+    const cz = -5.6 + rwR(i * 5.3 + 2) * 11.2;
+    const rx = 1.30 + rwR(i * 7.7) * 1.55, rz = 0.95 + rwR(i * 9.1) * 1.15;
+    const pts = [];
+    for (let k = 0; k < 9; k++) {
+      const a = k / 9 * 6.283;
+      const j = 0.72 + rwR(i * 13.7 + k * 2.3) * 0.5;
+      pts.push([cx + Math.cos(a) * rx * j, cz + Math.sin(a) * rz * j]);
+    }
+    rwSlab(b, i % 3 === 0 ? 'rwGrassL' : 'rwGrassD', pts, RW_GY, RW_GY + 0.012);
+  }
+
+  /* 主屋地坪：碎成三块的混凝土，裂缝里全是草 */
+  const FY = R_FL;
+  rwSlab(b, 'rwConD', [
+    [R_X0 - 0.55, R_Z0 - 0.55], [R_X1 + 0.55, R_Z0 - 0.55],
+    [R_X1 + 0.55, -1.55], [3.05, -1.20], [3.05, 1.10],
+    [R_X1 + 0.20, 1.55], [R_X1 + 0.20, R_Z1 + 0.55],
+    [R_X0 - 0.55, R_Z1 + 0.55]
+  ], FY - 0.08, FY);
+
+  rwSlab(b, 'rwCon', [
+    [-1.10, R_Z0 - 0.40], [R_X1 + 0.40, R_Z0 - 0.40],
+    [R_X1 + 0.40, 0.15], [1.45, 0.45], [1.35, R_Z1 + 0.40],
+    [-1.10, R_Z1 + 0.40]
+  ], FY + 0.002, FY + 0.035);
+
+  /* 塌到草地上的那段墙板：屋子塌的时候飞出去的，
+     一半陷进草里，苔藓从上面长起来——废墟才不是只在墙里塌。 */
+  const SX = -7.15, SZ = 2.55, SR = -0.42;
+  b.box('rwCon', 2.45, 0.24, 1.55, SX, RW_GY + 0.10, SZ, 0.06, SR, 0.04);
+  b.box('rwConD', 1.30, 0.20, 0.90, SX + 0.95, RW_GY + 0.06, SZ - 0.85, 0.12, SR + 0.35, -0.06);
+  b.box('rwMoss', 1.10, 0.03, 0.70, SX - 0.35, RW_GY + 0.235, SZ + 0.18, 0, SR, 0);
+  b.box('rwMoss', 0.60, 0.03, 0.95, SX + 0.55, RW_GY + 0.235, SZ - 0.25, 0, SR + 0.2, 0);
+  for (let i = 0; i < 7; i++) {
+    rwRebar(b, SX + (rwR(i * 3.1) - 0.5) * 1.9, RW_GY + 0.22, SZ + (rwR(i * 5.3) - 0.5) * 1.2,
+      (rwR(i * 7.7) - 0.5) * 0.9, 0.82, (rwR(i * 9.1) - 0.5) * 0.9,
+      0.20 + rwR(i * 11.3) * 0.24, 0.028);
+  }
+  for (let i = 0; i < 10; i++) {
+    const r = 0.10 + rwR(i * 13.7) * 0.18;
+    b.box(i % 4 ? 'rwRubble' : 'rwBrick', r * 1.7, r, r * 1.4,
+      SX + (rwR(i * 15.1) - 0.5) * 3.4, RW_GY + r * 0.4,
+      SZ + (rwR(i * 17.3) - 0.5) * 2.4, 0, rwR(i * 19.1) * 3.14, 0);
+  }
+
+  /* 塌口甩到屋前草地上的碎块：从右下角一路散到院子里，
+     不然屋前那片草地就是一块干净的绿毯 */
+  for (let i = 0; i < 22; i++) {
+    const a = rwR(i * 3.7 + 11) * 6.283;
+    const rr = 2.0 + rwR(i * 5.9 + 4) * 4.6;
+    const r = 0.08 + rwR(i * 7.3) * 0.24;
+    b.box(i % 6 === 0 ? 'rwBrick' : (i % 3 ? 'rwRubbleD' : 'rwRubble'), r * 1.8, r, r * 1.5,
+      3.2 + Math.cos(a) * rr, RW_GY + r * 0.4, 5.0 + Math.sin(a) * rr * 0.70,
+      0, rwR(i * 9.1) * 3.14, 0);
+  }
+
+  /* 断掉的院栅栏：柱子还在，横杆掉了一半，界才划得出来 */
+  const FZ = [-1.15, 0.05, 1.25, 2.45, 3.65, 4.85];
+  for (let i = 0; i < FZ.length; i++) {
+    const lean = i === 2 ? 0.22 : (i === 4 ? -0.14 : 0.03);
+    b.box('rwWoodD', 0.11, 1.02 - (i % 3) * 0.10, 0.11,
+      -8.55 + (rwR(i * 3.3) - 0.5) * 0.12, RW_GY + 0.50, FZ[i], 0, 0, lean);
+  }
+  b.box('rwWood', 0.07, 0.09, 2.35, -8.55, RW_GY + 0.78, -0.55, 0, 0, 0.02);
+  b.box('rwWood', 0.07, 0.08, 1.55, -8.55, RW_GY + 0.74, 3.02, 0, 0.04, -0.03);
+  b.box('rwWoodD', 0.07, 0.09, 1.60, -8.28, RW_GY + 0.05, 4.35, 0, 0.62, 0.02);
+
+  /* 门口踩秃的一小片土：只在门边上，别再铺成一块泥斑 */
+  rwSlab(b, 'rwEarth', [
+    [R_X1 + 0.25, -3.30], [R_X1 + 2.15, -3.55], [R_X1 + 2.55, -0.75],
+    [R_X1 + 1.55, 0.95], [R_X1 + 0.25, 0.55]
+  ], RW_GY - 0.004, RW_GY + 0.016);
+
+  /* 门前碎石小径：从门口弯出画外，一条就够，铺成广场就不像废墟了 */
+  const PX = [4.85, 6.05, 7.20, 8.35, 9.55];
+  const PZ = [-2.45, -1.70, -0.35, 1.15, 2.75];
+  const PW = 0.72;
+  const pl = [], pr = [];
+  for (let i = 0; i < PX.length; i++) {
+    const i0 = Math.max(0, i - 1), i1 = Math.min(PX.length - 1, i + 1);
+    const dx = PX[i1] - PX[i0], dz = PZ[i1] - PZ[i0];
+    const L = Math.sqrt(dx * dx + dz * dz) || 1;
+    const nx = -dz / L, nz = dx / L;
+    pl.push([PX[i] + nx * PW, PZ[i] + nz * PW]);
+    pr.push([PX[i] - nx * PW, PZ[i] - nz * PW]);
+  }
+  rwSlab(b, 'rwPath', pl.concat(pr.reverse()), RW_GY + 0.004, RW_GY + 0.024);
+
+  /* 路边石：歪的、缺的、半埋的，别排成等距的齿 */
+  for (let i = 0; i < 5; i++) {
+    const t = i / 4;
+    b.box('rwStone', 0.22 + rwR(i) * 0.10, 0.07, 0.26,
+      5.05 + t * 3.55, RW_GY + 0.032, -3.15 + t * 4.10,
+      0, rwR(i * 3.3) * 0.8, (rwR(i * 5.1) - 0.5) * 0.3);
+  }
+
+  /* 场地边缘的矮草带，压住底座硬边 */
+  for (let i = 0; i < 52; i++) {
+    const a = rwR(i * 3.1 + 1) * 6.283;
+    const rx = 9.9 + rwR(i * 5.3) * 0.5;
+    const rz = 7.6 + rwR(i * 7.1) * 0.5;
+    rwTuft(b, Math.cos(a) * rx, Math.sin(a) * rz, 0.20 + rwR(i * 9.7) * 0.16, i * 2.7 + 3);
+  }
+}
+
+/* ------------------------------------------------------------ 废墟本体 */
+function rwRuin(b) {
+  const ZB = R_Z0 + R_T * 0.5;
+  const XL = R_X0 + R_T * 0.5;
+  const XR = R_X1 - R_T * 0.5;
+  const ZF = R_Z1 - R_T * 0.5;
+
+  /* 背墙：两层，五个窗洞，只有顶部掉了一点 */
+  rwWall(b, 'rwCon', 'x', ZB, R_X0, R_X1, R_FL, R_H2, [
+    [-4.55, -3.05, 1.15, 2.35],
+    [-2.35, -1.05, 1.15, 2.35],
+    [0.05, 1.45, 1.15, 2.35],
+    [2.55, 3.70, 1.15, 2.35],
+    [-4.45, -3.05, 4.15, 5.42],
+    [-1.65, -0.25, 4.15, 5.42],
+    [1.95, 3.45, 4.15, 5.42]
+  ], { amp: 0.34, slope: 0.18, seed: 11 });
+
+  /* 顶上的烟囱：塌了一半，屋脊线才不是一条平滑的斜边 */
+  b.box('rwConD', 0.66, 1.55, 0.60, -0.35, R_H2 + 0.62, R_Z0 + 0.62);
+  b.box('rwCon', 0.78, 0.14, 0.72, -0.35, R_H2 + 1.42, R_Z0 + 0.62);
+  b.box('rwBrick', 0.30, 0.16, 0.26, -0.30, R_H2 + 1.52, R_Z0 + 0.55, 0, 0.4, 0.10);
+  for (let i = 0; i < 3; i++) {
+    rwRebar(b, -0.35 + (i - 1) * 0.20, R_H2 + 1.46, R_Z0 + 0.62,
+      (rwR(i * 3.7) - 0.5) * 0.4, 0.9, (rwR(i * 5.9) - 0.5) * 0.4, 0.26, 0.026);
+  }
+
+  /* 左墙：顶边一路向前塌成斜口 */
+  rwWall(b, 'rwCon', 'z', XL, R_Z0, R_Z1, R_FL, R_H2, [
+    [-2.95, -1.55, 1.15, 2.35],
+    [1.35, 2.75, 1.15, 2.35],
+    [-3.45, -2.05, 4.15, 5.40],
+    /* 前段的大窗：这面墙太长，少一个洞就是一整片光板 */
+    [3.15, 4.20, 1.30, 3.05]
+  ], { amp: 0.88, slope: 2.55, dir: 1, seed: 17 });
+
+  /* 右墙：只剩后半截，门洞一个 */
+  rwWall(b, 'rwCon', 'z', XR, R_Z0, -0.55, R_FL, 4.02, [
+    [-3.62, -2.28, R_FL, 2.55]
+  ], { amp: 0.85, slope: 1.35, dir: 1, seed: 23 });
+
+  /* 前墙：只剩左段矮墙，右段整片垮塌 */
+  rwWall(b, 'rwCon', 'x', ZF, R_X0, -2.55, R_FL, 1.95, [],
+    { amp: 0.60, slope: 0.55, dir: 1, seed: 29 });
+
+  /* 三处自由端补「破口块」：竖直切口太齐，一眼就是模型 */
+  const chunks = [
+    [XR + 0.05, 1.55, -0.62, 0.55, 0.90, 0.42, 0.30],
+    [XR - 0.10, 0.55, -0.72, 0.40, 0.62, 0.36, -0.22],
+    [-2.60, 1.35, ZF + 0.02, 0.62, 0.80, 0.46, 0.20],
+    [-3.15, 0.50, ZF - 0.06, 0.46, 0.55, 0.40, -0.26],
+    [-5.55, 4.35, -1.95, 0.42, 0.62, 0.38, 0.18],
+    [-4.95, 5.55, -1.92, 0.34, 0.48, 0.32, -0.20]
+  ];
+  for (let i = 0; i < chunks.length; i++) {
+    const q = chunks[i];
+    b.box(i % 2 ? 'rwConD' : 'rwCon', q[3], q[4], q[5], q[0], q[1], q[2],
+      q[6], rwR(i * 3.7) * 1.2, q[6] * 0.7);
+  }
+
+  /* 窗洞里的旧木框：只留两樘，其余全空，空才像废墟 */
+  const frame = function (x, y, z, w, h) {
+    const g = new T.Group();
+    const fb = new Builder();
+    fb.box('rwWoodD', w, 0.09, 0.11, 0, h * 0.5, 0);
+    fb.box('rwWoodD', w, 0.09, 0.11, 0, -h * 0.5, 0);
+    fb.box('rwWood', 0.09, h, 0.11, -w * 0.5, 0, 0);
+    fb.box('rwWood', 0.09, h, 0.11, w * 0.5, 0, 0);
+    fb.box('rwWood', 0.06, h, 0.09, 0, 0, 0);
+    fb.box('rwWood', w, 0.06, 0.09, 0, h * 0.12, 0);
+    fb.build(g);
+    g.position.set(x, y, z);
+    scene.add(g);
+  };
+  frame(-3.80, 1.75, ZB + 0.10, 1.34, 1.10);
+  frame(-0.90, 4.78, ZB + 0.10, 1.24, 1.18);
+
+  /* 二层楼板：L 形，边缘参差，树从缺口里穿出去 */
+  rwSlab(b, 'rwConD', [
+    [R_X0, R_Z0], [1.95, R_Z0], [1.95, -3.28], [0.32, -3.20],
+    [0.36, -1.92], [-1.86, -1.98], [-1.90, -1.62], [-3.72, -1.70],
+    [-3.68, -2.02], [R_X0, -1.94]
+  ], R_SB, R_SL);
+
+  /* 板底一道深色梁，让厚度读得出来 */
+  b.box('rwConD', 7.4, 0.16, 0.22, -2.05, R_SB - 0.06, -1.86);
+
+  /* 斜插进瓦砾的大板：塌落的瞬间被冻住 */
+  b.box('rwConD', 3.95, 0.22, 2.85, 2.78, 2.34, -0.52, 0, 0.20, -0.62);
+  b.box('rwCon', 1.30, 0.22, 1.10, 3.86, 1.36, 0.72, 0, 0.55, -0.52);
+  b.box('rwCon', 1.05, 0.20, 0.90, 1.72, 2.96, -1.02, 0, -0.30, -0.40);
+
+  /* 断柱：柱头炸开，钢筋朝上 */
+  b.box('rwCon', 0.38, 2.62, 0.38, 2.42, R_FL + 1.31, -1.42);
+  b.box('rwCon', 0.42, 0.20, 0.34, 2.44, R_FL + 2.66, -1.42, 0, 0.30, 0.14);
+  for (let i = 0; i < 5; i++) {
+    rwRebar(b, 2.42 + (rwR(i * 3.1) - 0.5) * 0.24, R_FL + 2.70, -1.42 + (rwR(i * 5.7) - 0.5) * 0.24,
+      (rwR(i * 7.3) - 0.5) * 0.5, 1, (rwR(i * 9.1) - 0.5) * 0.5, 0.34 + rwR(i * 3.9) * 0.36, 0.036);
+  }
+
+  /* 断口钢筋：前墙、右墙、楼板缺口、斜板边缘 */
+  const rebarRun = function (x, y, z, n, dx, dz, seed) {
+    for (let i = 0; i < n; i++) {
+      const t = n > 1 ? i / (n - 1) - 0.5 : 0;
+      rwRebar(b, x + dz * t * 1.15, y, z + dx * t * 1.15,
+        (rwR(seed + i * 3.3) - 0.5) * 0.75, 0.85 + rwR(seed + i * 5.1) * 0.5,
+        (rwR(seed + i * 7.7) - 0.5) * 0.75, 0.30 + rwR(seed + i * 9.3) * 0.34, 0.034);
+    }
+  };
+  rebarRun(-3.05, 2.52, ZF, 5, 1, 0, 41);
+  rebarRun(XR, 3.95, -1.35, 4, 0, 1, 47);
+  rebarRun(1.95, R_SL, -2.60, 5, 0, 1, 53);
+  rebarRun(0.34, R_SL, -2.55, 4, 0, 1, 59);
+  rebarRun(3.55, 2.42, 0.20, 4, 1, 0, 61);
+
+  /* 墙面水痕：竖向深色条，长度不一，别做均匀分布。
+     ★ 要画在能看见的那一面（内表面），画在外墙上等于没画。 */
+  for (let i = 0; i < 11; i++) {
+    const x = R_X0 + 0.55 + rwR(i * 3.3 + 1) * (R_X1 - R_X0 - 1.1);
+    const y0 = R_FL + 0.55 + rwR(i * 5.1 + 2) * 2.9;
+    b.box(i % 3 ? 'rwMoss' : 'rwConD', 0.11 + rwR(i * 7.7) * 0.12,
+      0.55 + rwR(i * 9.1) * 1.5, 0.020, x, y0, R_Z0 + R_T + 0.008);
+  }
+  for (let i = 0; i < 6; i++) {
+    const z = R_Z0 + 0.55 + rwR(i * 4.1 + 3) * (R_Z1 - R_Z0 - 1.1);
+    b.box(i % 2 ? 'rwMoss' : 'rwConD', 0.020, 0.70 + rwR(i * 6.3) * 1.4,
+      0.10 + rwR(i * 8.1) * 0.10, R_X0 + R_T + 0.008,
+      R_FL + 0.70 + rwR(i * 9.7) * 2.2, z);
+  }
+
+  /* 瓦砾堆：前排与右前角最密，室内只留零散几块 */
+  const rub = [
+    [4.35, 3.55, 1.05, 0.62, 0.86], [3.35, 2.35, 0.78, 0.44, 0.66],
+    [2.15, 3.45, 0.92, 0.50, 0.74], [4.62, 2.05, 0.66, 0.38, 0.58],
+    [3.90, 1.20, 0.55, 0.30, 0.48], [1.55, 1.85, 0.64, 0.34, 0.52],
+    [0.65, 3.35, 0.72, 0.40, 0.60], [-1.35, 3.62, 0.58, 0.32, 0.50],
+    [-2.35, 3.10, 0.48, 0.26, 0.42], [-4.35, 3.85, 0.62, 0.36, 0.54],
+    [-3.15, 4.02, 0.44, 0.24, 0.38], [4.82, 4.05, 0.74, 0.42, 0.62],
+    [2.95, 0.45, 0.40, 0.24, 0.34], [1.20, -0.55, 0.36, 0.22, 0.30],
+    [-1.55, 0.95, 0.42, 0.24, 0.36], [-4.85, 1.35, 0.38, 0.22, 0.32],
+    [0.15, 2.65, 0.30, 0.18, 0.26], [3.65, -1.75, 0.34, 0.20, 0.30]
+  ];
+  for (let i = 0; i < rub.length; i++) {
+    const q = rub[i];
+    b.box(i % 6 === 3 ? 'rwBrick' : (i % 3 === 0 ? 'rwRubble' : 'rwRubbleD'),
+      q[2], q[3], q[4], q[0], R_FL + q[3] * 0.42, q[1],
+      rwR(i * 3.1) * 0.5, rwR(i * 5.3) * 3.14, rwR(i * 7.7) * 0.5);
+  }
+  for (let i = 0; i < 30; i++) {
+    const r = 0.10 + rwR(i * 3.3) * 0.16;
+    b.box(i % 7 === 0 ? 'rwBrick' : 'rwRubbleD', r * 1.6, r, r * 1.3,
+      3.15 + (rwR(i * 5.1) - 0.5) * 3.4, R_FL + r * 0.4,
+      1.35 + (rwR(i * 7.3) - 0.5) * 3.0,
+      0, rwR(i * 9.7) * 3.14, 0);
+  }
+
+  /* 挂在门框上的铁皮门：只剩一个合页 */
+  b.box('rwRust', 0.07, 2.26, 1.24, 4.66, R_FL + 1.16, -3.06, 0, 0.92, 0.06);
+  b.box('rwRust', 0.05, 0.07, 1.10, 4.62, R_FL + 1.78, -3.06, 0, 0.92, 0);
+  b.box('rwRust', 0.05, 0.07, 1.10, 4.62, R_FL + 0.58, -3.06, 0, 0.92, 0);
+
+  /* 靠左墙的楼梯：走到一半就断了，是这栋房子最刺眼的一处。
+     ★ 台阶不能一级用一个 box 拼——每块盒子都有自己的外壳，
+       十几次叠加就是满梯子砖缝。整段做成一个锯齿挤出，只留一圈轮廓。 */
+  const ST0 = 1.78, STD = 0.285, STH = 0.255, STN = 11, STW = 1.12;
+  const st = new T.Shape();
+  st.moveTo(ST0, R_FL);
+  let sz = ST0, sy = R_FL;
+  for (let i = 0; i < STN; i++) {
+    sz -= STD;
+    st.lineTo(sz, sy);
+    sy += STH;
+    st.lineTo(sz, sy);
+  }
+  /* 断口：顶上一级碎掉，边线不再是干净的台阶 */
+  st.lineTo(sz + 0.10, sy - 0.16);
+  st.lineTo(sz - 0.06, sy - 0.05);
+  st.lineTo(sz - 0.02, sy - 0.34);
+  st.lineTo(sz - 0.14, R_FL);
+  st.closePath();
+  const stg = new T.ExtrudeGeometry(st, {
+    depth: STW, bevelEnabled: false, curveSegments: 1, steps: 1
+  });
+  stg.rotateY(-Math.PI * 0.5);
+  /* ★ rotateY(-90°) 会把挤出方向翻到 -x，只平移一个墙厚会整段跑到墙外面去 */
+  stg.translate(R_X0 + R_T + STW, 0, 0);
+  b.add('rwCon', stg);
+
+  /* 梯段斜梁：藏在踏步下面的那道混凝土板，让楼梯不是贴墙的积木 */
+  b.box('rwConD', 0.20, 0.24, 3.60, R_X0 + R_T + 0.16, R_FL + 1.30, 0.10,
+    -0.72, 0, 0);
+
+  /* 断口钢筋：三级没了，钢筋还伸在原处 */
+  for (let i = 0; i < 4; i++) {
+    rwRebar(b, R_X0 + R_T + 0.18 + i * 0.26, R_FL + 2.92, -1.10,
+      0.10, 0.92, -0.16, 0.30 + rwR(i * 3.1) * 0.26, 0.030);
+  }
+
+  /* 内墙残留的抹灰：不规则多边形，边缘是崩开的，不是四个角一刀切 */
+  rwPlaster(b, 'rwPatchL', -3.25, 2.62, R_Z0 + R_T + 0.014, 2.15, 1.75, 3.3, 'z');
+  rwPlaster(b, 'rwPatchL', -1.02, 1.42, R_Z0 + R_T + 0.014, 1.20, 1.00, 7.9, 'z');
+  rwPlaster(b, 'rwPatchD', -4.50, 4.72, R_Z0 + R_T + 0.014, 1.00, 0.92, 11.1, 'z');
+  rwPlaster(b, 'rwPatchL', 0.72, 3.02, R_Z0 + R_T + 0.014, 0.86, 1.30, 15.7, 'z');
+  rwPlaster(b, 'rwPatchD', R_X0 + R_T + 0.014, 2.35, 0.55, 1.45, 1.60, 19.3, 'x');
+  rwPlaster(b, 'rwPatchL', R_X0 + R_T + 0.014, 1.02, 2.32, 0.90, 1.05, 23.1, 'x');
+
+  /* 屋里那把没搬走的椅子 */
+  const CH = { x: -3.35, z: 1.42, ry: 0.62 };
+  const cos = Math.cos(CH.ry), sin = Math.sin(CH.ry);
+  const cp = function (lx, lz) { return [CH.x + lx * cos + lz * sin, CH.z - lx * sin + lz * cos]; };
+  let p;
+  for (let i = 0; i < 4; i++) {
+    p = cp(i < 2 ? -0.22 : 0.22, i % 2 ? -0.20 : 0.20);
+    b.box('rwWoodD', 0.055, 0.68, 0.055, p[0], R_FL + 0.34, p[1], 0, CH.ry, 0);
+  }
+  p = cp(0, 0);
+  b.box('rwWood', 0.52, 0.06, 0.46, p[0], R_FL + 0.70, p[1], 0, CH.ry, 0);
+  p = cp(0, -0.22);
+  b.box('rwWood', 0.50, 0.42, 0.055, p[0], R_FL + 0.98, p[1], 0, CH.ry, 0);
+  b.box('rwWood', 0.46, 0.05, 0.05, p[0], R_FL + 1.16, p[1], 0, CH.ry, 0);
+}
+
+/* ------------------------------------------------------------ 树冠工具 */
+/* 三维正弦噪声：只依赖坐标，所以非索引几何的重复顶点会得到同样位移，不会裂开 */
+function rwNoise(x, y, z, seed) {
+  return Math.sin(x * 2.9 + seed) * 0.34
+    + Math.cos(y * 3.4 + seed * 1.7) * 0.33
+    + Math.sin(z * 3.1 + seed * 2.3) * 0.33;
+}
+
+/* 一整团被噪声撑开的叶体：一个球，一圈轮廓，不会变成「一堆绿球」 */
+function rwBlob(b, key, c, r, seed, wob) {
+  const g = new T.IcosahedronGeometry(1, 2);
+  const pos = g.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+    const k = 1 + wob * rwNoise(x, y, z, seed);
+    pos.setXYZ(i, x * r[0] * k, y * r[1] * k, z * r[2] * k);
+  }
+  g.computeVertexNormals();
+  g.translate(c[0], c[1], c[2]);
+  b.add(key, g);
+}
+
+/* 一片压扁的叶簇：法线贴着球面走。
+   ★ 叶簇如果一律水平摆放，俯视下全是同样亮度的椭圆，就像贴上去的荷叶；
+     让它的法线沿球面径向，顶面被正面看到、侧面近乎侧视，明暗才有变化。 */
+function rwPad(b, key, r, x, y, z, sy, nx, ny, nz, tw) {
+  const g = new T.SphereGeometry(r, 10, 7);
+  g.scale(1.42, sy, 1.22);
+  const n = new T.Vector3(nx, ny, nz).normalize();
+  const q = new T.Quaternion().setFromUnitVectors(new T.Vector3(0, 1, 0), n);
+  if (tw) q.multiply(new T.Quaternion().setFromAxisAngle(n, tw));
+  const m = new T.Matrix4().makeRotationFromQuaternion(q);
+  m.setPosition(x, y, z);
+  g.applyMatrix4(m);
+  b.add(key, g);
+}
+
+/* 墙上一块崩开的抹灰：不规则多边形挤出，贴在内墙面上。
+   axis 'z' = 朝 +z 的墙面（shape 用 x/y）；axis 'x' = 朝 +x 的墙面（shape 用 z/y） */
+function rwPlaster(b, key, cx, cy, cz, w, h, seed, axis) {
+  const sh = new T.Shape();
+  const n = 15;
+  for (let i = 0; i < n; i++) {
+    const t = i / n * 6.283;
+    const k = 0.70 + rwR(seed + i * 2.71) * 0.38;
+    const u = Math.cos(t) * w * 0.5 * k;
+    const v = Math.sin(t) * h * 0.5 * k;
+    const a = axis === 'x' ? cz + u : cx + u;
+    if (i === 0) sh.moveTo(a, cy + v); else sh.lineTo(a, cy + v);
+  }
+  sh.closePath();
+  const g = new T.ExtrudeGeometry(sh, {
+    depth: 0.022, bevelEnabled: false, curveSegments: 1, steps: 1
+  });
+  if (axis === 'x') {
+    g.rotateY(-Math.PI * 0.5);
+    g.translate(cx + 0.022, 0, 0);
+  } else {
+    g.translate(0, 0, cz);
+  }
+  b.add(key, g);
+}
+
+/* ------------------------------------------------------------ 树与藤 */
+function rwTree(b) {
+  const TX = 1.14, TZ = -2.62;
+
+  /* 主干：三段，带一点弯；根部放大做出板根 */
+  b.to('rwBark', 0.72, TX, R_FL - 0.05, TZ, TX - 0.12, R_FL + 1.55, TZ - 0.06, 10);
+  b.to('rwBark', 0.50, TX - 0.14, R_FL + 1.48, TZ - 0.07, TX + 0.02, R_FL + 3.15, TZ + 0.02, 9);
+  b.to('rwBark', 0.37, TX + 0.02, R_FL + 3.08, TZ + 0.02, TX + 0.16, R_FL + 4.85, TZ - 0.14, 8);
+  b.to('rwBarkD', 0.28, TX + 0.14, R_FL + 4.80, TZ - 0.13, TX + 0.24, R_FL + 5.95, TZ - 0.28, 7);
+
+  /* 主枝：从 5 米处分叉，朝四周撑开 */
+  const fork = [TX + 0.22, R_FL + 5.80, TZ - 0.24];
+  const tips = [
+    [-2.90, 7.85, -2.10, 0.25], [2.95, 8.10, -0.30, 0.27],
+    [0.55, 8.65, -3.30, 0.23], [-1.10, 7.55, 1.85, 0.21],
+    [3.55, 7.15, -2.35, 0.19], [-3.45, 7.05, 0.55, 0.18]
+  ];
+  for (let i = 0; i < tips.length; i++) {
+    const t = tips[i];
+    const mx = (fork[0] + t[0]) * 0.5 + (rwR(i * 3.1) - 0.5) * 0.4;
+    const my = (fork[1] + t[1]) * 0.5 + 0.35;
+    const mz = (fork[2] + t[2]) * 0.5 + (rwR(i * 5.3) - 0.5) * 0.4;
+    b.to('rwBark', t[3], fork[0], fork[1], fork[2], mx, my, mz, 7);
+    b.to('rwBarkD', t[3] * 0.62, mx, my, mz, t[0], t[1], t[2], 6);
+  }
+
+  /* 树冠：一整块被噪声撑开的叶团，而不是几十个球。
+     ★ toon 材质会给每个球描一圈黑边，几十个球叠起来就是「一堆绿球」。
+       这里只留 4 个位移球做体积（轮廓只有 4 圈），表面再撒扁平叶簇打碎明暗。 */
+  const CC = [0.18, 8.32, -1.22], CR = [3.80, 1.62, 3.00];
+  rwBlob(b, 'rwLeaf1', CC, CR, 2.7, 0.185);
+
+  /* 三块副团：让树冠不是一颗对称的蛋 */
+  rwBlob(b, 'rwLeaf1', [CC[0] - 2.75, CC[1] - 0.72, CC[2] - 0.28], [1.42, 1.04, 1.32], 5.3, 0.24);
+  rwBlob(b, 'rwLeaf1', [CC[0] + 2.92, CC[1] - 0.58, CC[2] + 0.26], [1.30, 0.98, 1.22], 9.1, 0.24);
+  rwBlob(b, 'rwLeaf1', [CC[0] - 0.55, CC[1] - 0.95, CC[2] - 1.82], [1.48, 0.88, 1.08], 13.7, 0.22);
+
+  /* 叶簇：贴在球面上，扁平、随机朝向，把整块的明暗切碎 */
+  const clumps = [];
+  for (let i = 0; i < 86; i++) {
+    const a = rwR(i * 1.73 + 3) * 6.283;
+    const v = Math.acos(2 * rwR(i * 2.91 + 5) - 1);
+    const nx = Math.sin(v) * Math.cos(a), ny = Math.cos(v), nz = Math.sin(v) * Math.sin(a);
+    const k = 1 + 0.185 * rwNoise(nx, ny, nz, 2.7);
+    const rr = k * (1.00 + rwR(i * 5.31 + 1) * 0.05);
+    const x = CC[0] + nx * CR[0] * rr;
+    const y = CC[1] + ny * CR[1] * rr;
+    const z = CC[2] + nz * CR[2] * rr;
+    const up = (y - CC[1]) / CR[1];
+    const key = up > 0.36 ? 'rwLeaf3' : (up > -0.24 ? 'rwLeaf1T' : 'rwLeaf2');
+    const r = 0.175 + rwR(i * 7.71 + 2) * 0.185;
+    rwPad(b, key, r, x, y, z, 0.30,
+      nx + (rwR(i * 11.1) - 0.5) * 1.0,
+      ny + (rwR(i * 13.3) - 0.5) * 1.0,
+      nz + (rwR(i * 17.7) - 0.5) * 1.0, rwR(i * 3.9) * 3.14);
+    clumps.push([x, y, z, r]);
+  }
+
+  /* 冠底一圈下垂的小团：树冠下沿不能是干净的球面 */
+  for (let i = 0; i < 26; i++) {
+    const a = rwR(i * 3.37 + 7) * 6.283;
+    const rr = 0.80 + rwR(i * 5.11 + 3) * 0.30;
+    const x = CC[0] + Math.cos(a) * CR[0] * rr;
+    const z = CC[2] + Math.sin(a) * CR[2] * rr;
+    const r = 0.18 + rwR(i * 9.13) * 0.20;
+    rwPad(b, i % 2 ? 'rwLeaf2' : 'rwLeaf1T', r, x, 7.06 + rwR(i * 7.7) * 0.56, z,
+      0.40, Math.cos(a), -0.55, Math.sin(a), rwR(i * 5.5) * 3.14);
+    clumps.push([x, 7.42, z, r]);
+  }
+
+  /* 露出冠外的枝梢：让树不是「一根杆顶一团菜」 */
+  const tips2 = [
+    [-4.95, 8.35, -1.25, 0.13], [4.75, 8.45, -0.65, 0.12],
+    [-1.55, 7.15, 2.25, 0.11], [2.65, 7.20, 1.45, 0.10],
+    [1.35, 10.15, -3.05, 0.10]
+  ];
+  for (let i = 0; i < tips2.length; i++) {
+    const q = tips2[i];
+    b.to('rwBarkD', q[3], 0.4, 8.55, -1.2,
+      (0.4 + q[0]) * 0.55, 8.45 + (q[1] - 8.45) * 0.45, (-1.2 + q[2]) * 0.55, 5);
+    b.to('rwBarkD', q[3] * 0.8, (0.4 + q[0]) * 0.55, 8.45 + (q[1] - 8.45) * 0.45, (-1.2 + q[2]) * 0.55,
+      q[0], q[1], q[2], 4);
+    b.sph('rwLeaf3', 0.40 + rwR(i * 3.7) * 0.18, q[0], q[1] + 0.10, q[2], 1.3, 0.55, 1.2);
+  }
+
+  /* 花：成簇挂在树冠外缘，别撒成波点 */
+  for (let i = 0; i < 24; i++) {
+    const q = clumps[Math.floor(rwR(i * 2.3 + 1) * clumps.length) % clumps.length];
+    for (let k = 0; k < 4; k++) {
+      const a = rwR(i * 5.1 + k * 2.7) * 6.283;
+      const e = (rwR(i * 7.3 + k * 3.1) - 0.25) * 1.4;
+      b.sph(k % 2 ? 'rwBlossom' : 'rwBlossomD', 0.075 + rwR(i * 9.7 + k) * 0.065,
+        q[0] + Math.cos(a) * Math.cos(e) * q[3] * 1.25,
+        q[1] + Math.sin(e) * q[3] * 0.62,
+        q[2] + Math.sin(a) * Math.cos(e) * q[3] * 1.15, 1.25, 0.70, 1.10);
+    }
+  }
+
+  /* 气生根 / 板根：从树脚爬上瓦砾与楼板 */
+  const roots = [
+    [-2.55, 0.20, -1.60], [-3.85, 0.16, -3.25], [0.10, 0.22, -0.75],
+    [3.05, 0.18, -3.45], [2.75, 0.20, -0.05], [-0.35, 0.18, 1.85],
+    [3.45, 0.16, -1.95]
+  ];
+  for (let i = 0; i < roots.length; i++) {
+    const q = roots[i];
+    b.to('rwBark', 0.155, TX, R_FL + 0.18, TZ,
+      (TX + q[0]) * 0.5, R_FL + 0.10, (TZ + q[1]) * 0.5, 6);
+    b.to('rwBarkD', 0.075, (TX + q[0]) * 0.5, R_FL + 0.10, (TZ + q[1]) * 0.5,
+      q[0], q[1], q[2], 5);
+  }
+  b.to('rwBark', 0.14, TX, R_FL + 3.20, TZ, -0.90, R_SL + 0.06, -2.30, 6);
+  b.to('rwBarkD', 0.07, -0.90, R_SL + 0.06, -2.30, -3.55, R_SL + 0.05, -2.55, 5);
+
+  /* 楼板上长起来的小树：生命不止一棵 */
+  b.to('rwBarkD', 0.10, -4.35, R_SL, -3.85, -4.55, R_SL + 1.55, -3.75, 5);
+  b.to('rwBarkD', 0.06, -4.55, R_SL + 1.48, -3.75, -4.72, R_SL + 2.35, -3.55, 5);
+  b.sph('rwLeaf1', 0.72, -4.62, R_SL + 2.45, -3.62, 1.15, 0.90, 1.05);
+  b.sph('rwLeaf3', 0.52, -4.28, R_SL + 2.72, -3.82, 1.10, 0.85, 1.00);
+  b.sph('rwLeaf2', 0.44, -4.85, R_SL + 2.25, -3.42, 1.10, 0.80, 1.00);
+
+  /* 背墙上的爬山虎：两列，一列爬到窗洞边 */
+  const ivy = function (x0, z0, top, seed, dr) {
+    let px = x0, py = R_FL + 0.10, pz = z0;
+    for (let i = 1; i <= 9; i++) {
+      const t = i / 9;
+      const nx = x0 + Math.sin(seed + t * 5.2) * 0.30 + dr * t * 0.55;
+      const ny = R_FL + 0.10 + top * t;
+      const nz = z0 + Math.cos(seed + t * 4.1) * 0.06;
+      b.to('rwVine', 0.030, px, py, pz, nx, ny, nz, 4);
+      for (let k = 0; k < 2; k++) {
+        b.sph(k ? 'rwLeaf2' : 'rwLeaf3', 0.13 + rwR(seed + i + k) * 0.06,
+          nx + (rwR(seed + i * 2.1 + k) - 0.5) * 0.46,
+          ny + (rwR(seed + i * 4.3 + k) - 0.5) * 0.24,
+          nz + 0.08, 1.5, 0.55, 1.0);
+      }
+      px = nx; py = ny; pz = nz;
+    }
+  };
+  ivy(-2.15, R_Z0 + 0.06, 4.55, 2.3, 1);
+  ivy(3.30, R_Z0 + 0.06, 3.60, 5.1, -1);
+
+  /* 楼板边缘垂下来的藤帘 */
+  for (let i = 0; i < 11; i++) {
+    const x = -5.35 + i * 0.68;
+    rwVine(b, x, R_SL - 0.04, -1.95 + (rwR(i * 3.3) - 0.5) * 0.16,
+      1.10 + rwR(i * 5.7) * 1.55, i * 2.1 + 7, i % 2 ? 1 : -1);
+  }
+  /* 斜板上也挂两条，把「塌」和「生」缝在一起 */
+  rwVine(b, 2.55, 2.72, -0.12, 1.35, 13.7, 1);
+  rwVine(b, 3.35, 1.48, 0.62, 1.05, 19.3, -1);
+}
+
+/* ------------------------------------------------------------ 草花 */
+function rwFlora(b) {
+  /* 草：废墟里比草地上更密，裂缝里全是 */
+  for (let i = 0; i < 210; i++) {
+    const inside = i < 110;
+    let x, z;
+    if (inside) {
+      x = R_X0 + 0.25 + rwR(i * 3.1 + 2) * (R_X1 - R_X0 - 0.5);
+      z = R_Z0 + 0.25 + rwR(i * 5.3 + 4) * (R_Z1 - R_Z0 - 0.5);
+    } else {
+      x = -9.9 + rwR(i * 7.1 + 1) * 19.8;
+      z = -7.9 + rwR(i * 9.3 + 5) * 15.6;
+    }
+    if (x > 1.0 && x < 4.6 && z > 0.9 && z < 3.6) continue;   // 让开积水
+    rwTuft(b, x, z, 0.20 + rwR(i * 11.3) * 0.34, i * 1.7 + 11);
+  }
+
+  /* 墙根的荒草：更高更密，压住墙与地的硬交线 */
+  for (let i = 0; i < 40; i++) {
+    const back = i < 22;
+    const t = rwR(i * 3.9 + 1);
+    const x = back ? R_X0 + 0.3 + t * (R_X1 - R_X0 - 0.6) : R_X0 + 0.25;
+    const z = back ? (R_Z0 + 0.22) : R_Z0 + 0.3 + t * (R_Z1 - R_Z0 - 0.6);
+    rwTuft(b, x + (rwR(i * 5.1) - 0.5) * 0.34, z + (rwR(i * 7.3) - 0.5) * 0.30,
+      0.32 + rwR(i * 9.7) * 0.28, i * 2.3 + 31);
+  }
+
+  /* 野花：白 / 黄 / 粉 / 紫，四色就够，再多就成花毯。
+     成簇长，三到六朵一窝，比均匀撒点自然。 */
+  const fk = ['rwFlowerW', 'rwFlowerY', 'rwFlowerP', 'rwFlowerV'];
+  for (let i = 0; i < 30; i++) {
+    const q = i % 4;
+    let cx, cz;
+    if (i < 20) {
+      cx = R_X0 + 0.6 + rwR(i * 3.7 + 3) * (R_X1 - R_X0 - 1.2);
+      cz = R_Z0 + 0.6 + rwR(i * 5.9 + 6) * (R_Z1 - R_Z0 - 1.2);
+    } else {
+      cx = -8.7 + rwR(i * 7.9 + 2) * 17.4;
+      cz = -6.9 + rwR(i * 9.7 + 8) * 13.4;
+    }
+    if (cx > 0.9 && cx < 4.7 && cz > 0.8 && cz < 3.7) continue;
+    const n = 3 + Math.floor(rwR(i * 11.1) * 4);
+    for (let k = 0; k < n; k++) {
+      const a = rwR(i * 13.3 + k * 2.7) * 6.283;
+      const r = 0.18 + rwR(i * 15.1 + k * 4.1) * 0.46;
+      rwFlower(b, cx + Math.cos(a) * r, cz + Math.sin(a) * r,
+        0.16 + rwR(i * 17.3 + k) * 0.20, fk[(q + k) % 4], i * 2.3 + k * 5.7 + 3);
+    }
+  }
+
+  /* 枯草斑：草地不能是一种绿到底，几块被晒黄的补丁就有了季节 */
+  for (let i = 0; i < 9; i++) {
+    const cx = -7.0 + rwR(i * 3.1 + 6) * 14.0;
+    const cz = -5.4 + rwR(i * 5.7 + 2) * 10.8;
+    const rx = 0.85 + rwR(i * 7.3) * 1.25, rz = 0.62 + rwR(i * 9.1) * 0.85;
+    const pts = [];
+    for (let k = 0; k < 8; k++) {
+      const a = k / 8 * 6.283;
+      const j = 0.68 + rwR(i * 11.7 + k * 3.1) * 0.52;
+      pts.push([cx + Math.cos(a) * rx * j, cz + Math.sin(a) * rz * j]);
+    }
+    rwSlab(b, i % 4 === 3 ? 'rwGrassD' : 'rwGrassY', pts, RW_GY, RW_GY + 0.010);
+  }
+
+  /* 落叶：树底下最密，往外越稀，一片片小扁片，不描边 */
+  for (let i = 0; i < 110; i++) {
+    const a = rwR(i * 1.7 + 2) * 6.283;
+    const rr = Math.pow(rwR(i * 2.9 + 5), 0.55) * 7.6;
+    const x = 0.3 + Math.cos(a) * rr;
+    const z = -1.4 + Math.sin(a) * rr * 0.9;
+    if (x > R_X0 && x < R_X1 && z > R_Z0 && z < R_Z1) continue;
+    b.box(i % 5 === 0 ? 'rwBrick' : (i % 3 ? 'rwLitter' : 'rwLitterD'),
+      0.10 + rwR(i * 3.3) * 0.10, 0.012, 0.06 + rwR(i * 5.1) * 0.07,
+      x, RW_GY + 0.006, z, 0, rwR(i * 7.7) * 3.14, 0);
+  }
+
+  /* 碎石：被脚步带到草地里的混凝土渣 */
+  for (let i = 0; i < 54; i++) {
+    const a = rwR(i * 2.3 + 7) * 6.283;
+    const rr = 3.2 + rwR(i * 4.1 + 3) * 6.2;
+    const r = 0.05 + rwR(i * 6.7) * 0.12;
+    b.box(i % 4 ? 'rwRubbleD' : 'rwStone', r * 1.7, r, r * 1.4,
+      Math.cos(a) * rr, RW_GY + r * 0.4, Math.sin(a) * rr * 0.82,
+      0, rwR(i * 8.9) * 3.14, 0);
+  }
+
+  /* 倒木：横在后景草地上，给左半边一点重量 */
+  b.to('rwBarkD', 0.19, -7.60, RW_GY + 0.16, -5.55, -4.55, RW_GY + 0.13, -6.75, 7);
+  b.to('rwBarkD', 0.14, -4.75, RW_GY + 0.13, -6.70, -3.75, RW_GY + 0.10, -6.20, 6);
+  b.box('rwMoss', 1.30, 0.04, 0.34, -6.20, RW_GY + 0.30, -6.02, 0, 0.32, 0);
+  b.box('rwMoss', 0.70, 0.035, 0.28, -4.95, RW_GY + 0.26, -6.45, 0, 0.12, 0);
+
+  /* 高草墩：成簇，不撒点 */
+  const drift = [[-8.30, 5.40], [-6.60, 6.85], [-3.10, 6.95], [0.60, 7.30],
+    [3.30, 6.55], [7.60, 5.90], [8.55, 0.35], [7.95, -3.20],
+    [-8.60, -0.90], [-5.30, -6.90], [1.90, -7.20], [5.80, -6.60]];
+  for (let i = 0; i < drift.length; i++) {
+    for (let k = 0; k < 7; k++) {
+      const a = rwR(i * 3.7 + k * 2.3) * 6.283;
+      const rr = 0.20 + rwR(i * 5.1 + k * 4.1) * 0.85;
+      rwTuft(b, drift[i][0] + Math.cos(a) * rr, drift[i][1] + Math.sin(a) * rr,
+        0.34 + rwR(i * 9.7 + k) * 0.30, i * 3.3 + k * 7.1 + 5);
+    }
+  }
+
+  /* 地坪上的泥斑：从门口与塌口带进来的土，把整片灰地打散 */
+  for (let i = 0; i < 10; i++) {
+    const cx = R_X0 + 0.6 + rwR(i * 3.7 + 1) * (R_X1 - R_X0 - 1.2);
+    const cz = R_Z0 + 0.6 + rwR(i * 5.3 + 2) * (R_Z1 - R_Z0 - 1.2);
+    const rx = 0.45 + rwR(i * 7.1) * 0.95, rz = 0.32 + rwR(i * 9.3) * 0.62;
+    const pts = [];
+    for (let k = 0; k < 8; k++) {
+      const a = k / 8 * 6.283;
+      const j = 0.66 + rwR(i * 11.1 + k * 2.9) * 0.54;
+      pts.push([cx + Math.cos(a) * rx * j, cz + Math.sin(a) * rz * j]);
+    }
+    rwSlab(b, i % 3 ? 'rwEarthD' : 'rwEarth', pts, R_FL + 0.040, R_FL + 0.052);
+  }
+
+  /* 地坪裂缝：细长折线，只画几道，多了就像地砖缝 */
+  for (let i = 0; i < 7; i++) {
+    let px = R_X0 + 0.8 + rwR(i * 3.1 + 4) * (R_X1 - R_X0 - 1.6);
+    let pz = R_Z0 + 0.8 + rwR(i * 5.7 + 5) * (R_Z1 - R_Z0 - 1.6);
+    for (let k = 0; k < 5; k++) {
+      const nx = px + (rwR(i * 7.3 + k * 3.1) - 0.5) * 1.15;
+      const nz = pz + (rwR(i * 9.1 + k * 5.3) - 0.5) * 1.15;
+      b.box('rwConD', Math.abs(nx - px) + 0.035, 0.012, Math.abs(nz - pz) + 0.035,
+        (px + nx) * 0.5, R_FL + 0.046, (pz + nz) * 0.5, 0, 0, 0);
+      px = nx; pz = nz;
+    }
+  }
+
+  /* 苔藓：墙根、断口、背阴面 */
+  for (let i = 0; i < 26; i++) {
+    const onWall = i < 14;
+    if (onWall) {
+      const x = R_X0 + 0.4 + rwR(i * 3.3) * (R_X1 - R_X0 - 0.8);
+      const y = R_FL + 0.25 + rwR(i * 5.1) * 1.9;
+      b.box(i % 3 ? 'rwMoss' : 'rwMossL', 0.36 + rwR(i * 7.7) * 0.62,
+        0.24 + rwR(i * 9.1) * 0.36, 0.03, x, y, R_Z0 + R_T + 0.012);
+    } else {
+      /* 地面苔藓：不规则斑片，方片贴在土上像一块绿胶带 */
+      const x = R_X0 + 0.5 + rwR(i * 3.9) * (R_X1 - R_X0 - 1.0);
+      const z = -1.6 + rwR(i * 6.1) * (R_Z1 + 1.2);
+      const r = 0.26 + rwR(i * 8.3) * 0.44;
+      const pts = [];
+      const m = 7;
+      for (let k = 0; k < m; k++) {
+        const a = k / m * 6.283;
+        const j = 0.62 + rwR(i * 12.7 + k * 3.3) * 0.58;
+        pts.push([x + Math.cos(a) * r * j, z + Math.sin(a) * r * 0.78 * j]);
+      }
+      rwSlab(b, i % 4 ? 'rwMoss' : 'rwMossL', pts, R_FL + 0.036, R_FL + 0.050);
+    }
+  }
+
+  /* 院外的灌木：两丛压两侧，别挡主体 */
+  /* 灌木：也用刻面叶团，几个光球叠在一起太像贴图里的绿化带 */
+  const bush = function (x, z, s, seed) {
+    rwBlob(b, 'rwBush', [x, RW_GY + s * 0.66, z], [s * 1.00, s * 0.78, s * 0.92], seed, 0.26);
+    rwBlob(b, 'rwBushD', [x + s * 0.52, RW_GY + s * 0.44, z + s * 0.26],
+      [s * 0.62, s * 0.55, s * 0.58], seed + 3.7, 0.30);
+    rwBlob(b, 'rwBush', [x - s * 0.46, RW_GY + s * 0.40, z - s * 0.28],
+      [s * 0.55, s * 0.50, s * 0.50], seed + 7.1, 0.30);
+  };
+  bush(-7.55, -3.35, 1.30, 3.3);
+  bush(7.85, 4.45, 1.10, 7.7);
+  bush(-8.30, 4.95, 0.85, 9.1);
+  bush(6.20, -6.30, 0.95, 13.9);
+
+  /* 远处两棵小树，给背景一点纵深 */
+  const sapling = function (x, z, h, s, seed) {
+    b.to('rwBark', 0.13 * s, x, RW_GY, z, x + 0.10, RW_GY + h, z - 0.08, 6);
+    for (let i = 0; i < 4; i++) {
+      const a = rwR(seed + i * 2.7) * 6.283;
+      b.sph(i % 2 ? 'rwLeaf1' : 'rwLeaf2', (0.75 + rwR(seed + i * 3.9) * 0.5) * s,
+        x + Math.cos(a) * 0.75 * s, RW_GY + h + (rwR(seed + i * 5.1) - 0.2) * 0.9 * s,
+        z + Math.sin(a) * 0.75 * s, 1.1, 0.85, 1.05);
+    }
+  };
+  sapling(-8.55, -5.75, 2.6, 1.0, 15.1);
+  sapling(8.85, 1.35, 2.2, 0.86, 21.7);
+}
+
+/* ------------------------------------------------------------ 背景山 */
+function rwHills(b) {
+  const ridge = function (key, z, base, amp, ph, dep) {
+    const sh = new T.Shape();
+    sh.moveTo(-78, -8);
+    for (let x = -78; x <= 78; x += 1.2) {
+      const h = base + Math.sin(x * 0.046 + ph) * amp
+        + Math.sin(x * 0.102 + ph * 1.7) * amp * 0.30
+        + Math.sin(x * 0.027 + ph * 0.6) * amp * 0.55;
+      sh.lineTo(x, h);
+    }
+    sh.lineTo(78, -8);
+    sh.closePath();
+    const g = new T.ExtrudeGeometry(sh, { depth: dep, bevelEnabled: false, curveSegments: 1, steps: 1 });
+    g.translate(0, 0, z);
+    b.add(key, g);
+  };
+  /* ★ 山要退得够远才像远景，但也不能远到被雾吃掉。
+     60~104 米、山脚沉到 -8 米，只留一层淡青色的地平线在房子背后。 */
+  ridge('rwHill3', -104, 7.4, 2.1, 1.3, 0.5);
+  ridge('rwHill2', -80, 5.6, 1.7, 3.1, 0.42);
+  ridge('rwHill1', -60, 3.4, 1.2, 5.2, 0.36);
+}
+
+/* ------------------------------------------------------------ 墙根污渍 */
+/* 一条从地面往上爬的潮气带：苔藓团、泥点、竖向流痕。
+   直接给墙做整体污渍会把窗洞也糊住（洞是几何洞，贴图不认），
+   所以只做窗台以下这一条，正好是潮气最重的位置。 */
+const rwGrimeTex = canvasTex(512, 128, function (c, w, h) {
+  c.clearRect(0, 0, w, h);
+  /* 底部整体压深 */
+  const g = c.createLinearGradient(0, h, 0, 0);
+  g.addColorStop(0, 'rgba(58,66,50,0.60)');
+  g.addColorStop(0.34, 'rgba(74,82,62,0.30)');
+  g.addColorStop(0.66, 'rgba(92,100,78,0.10)');
+  g.addColorStop(1, 'rgba(92,100,78,0)');
+  c.fillStyle = g; c.fillRect(0, 0, w, h);
+  /* 苔藓团：底部密、越往上越稀 */
+  for (let i = 0; i < 190; i++) {
+    const x = rwR(i * 1.73 + 1) * w;
+    const t = Math.pow(rwR(i * 2.91 + 5), 1.9);
+    const y = h - t * h * 0.92;
+    const r = 1.6 + rwR(i * 3.77 + 2) * 5.2;
+    c.fillStyle = 'rgba(' + (44 + Math.floor(rwR(i * 5.1) * 34)) + ','
+      + (62 + Math.floor(rwR(i * 7.3) * 40)) + ','
+      + (40 + Math.floor(rwR(i * 9.7) * 26)) + ','
+      + (0.30 + rwR(i * 11.3) * 0.45).toFixed(2) + ')';
+    c.beginPath(); c.arc(x, y, r, 0, 6.283); c.fill();
+  }
+  /* 竖向流痕 */
+  for (let i = 0; i < 34; i++) {
+    const x = rwR(i * 13.1 + 3) * w;
+    const hh = 20 + rwR(i * 15.7 + 4) * 70;
+    c.fillStyle = 'rgba(62,64,52,' + (0.10 + rwR(i * 17.3) * 0.20).toFixed(2) + ')';
+    c.fillRect(x, h - hh, 0.8 + rwR(i * 19.1) * 1.6, hh);
+  }
+});
+
+function rwGrimeBand(x, y, z, w, h, ry) {
+  const m = new T.Mesh(new T.PlaneGeometry(w, h), new T.MeshToonMaterial({
+    map: rwGrimeTex, gradientMap: GRAD, transparent: true, opacity: 0.95,
+    depthWrite: false, side: T.DoubleSide, color: 0xffffff
+  }));
+  m.position.set(x, y, z);
+  m.rotation.y = ry || 0;
+  m.renderOrder = 1;
+  scene.add(m);
+}
+
+/* ------------------------------------------------------------ 室内明暗 */
+/* ★ 混凝土墙如果整面一个亮度，无论加多少窗都还是「一块光板」。
+   室内真正缺的是明暗关系：越靠近楼板越暗，墙角最暗，楼板下有一道投影。
+   这里用两张带 alpha 的黑片补上，比再加一百个小盒子有效。 */
+const rwShadeTex = canvasTex(8, 128, function (c, w, h) {
+  const g = c.createLinearGradient(0, 0, 0, h);
+  g.addColorStop(0, 'rgba(24,30,26,0.52)');
+  g.addColorStop(0.45, 'rgba(28,34,30,0.24)');
+  g.addColorStop(1, 'rgba(30,36,32,0)');
+  c.fillStyle = g; c.fillRect(0, 0, w, h);
+});
+
+function rwShade(x, y, z, w, h, ry, op) {
+  const m = new T.Mesh(new T.PlaneGeometry(w, h), new T.MeshBasicMaterial({
+    map: rwShadeTex, transparent: true, opacity: op === undefined ? 1 : op,
+    depthWrite: false, fog: false, side: T.DoubleSide
+  }));
+  m.position.set(x, y, z);
+  m.rotation.y = ry || 0;
+  m.renderOrder = 1;
+  scene.add(m);
+}
+
+/* ------------------------------------------------------------ 积水 */
+const rwWaterTex = canvasTex(128, 128, function (c, w, h) {
+  const g = c.createRadialGradient(w * 0.38, h * 0.32, 3, w * 0.50, h * 0.52, w * 0.64);
+  g.addColorStop(0, 'rgba(226,243,236,1)');
+  g.addColorStop(0.40, 'rgba(178,208,199,1)');
+  g.addColorStop(0.76, 'rgba(128,162,155,1)');
+  g.addColorStop(1, 'rgba(92,122,117,1)');
+  c.fillStyle = g; c.fillRect(0, 0, w, h);
+});
+
+function rwPuddle(cx, cz, rx, rz, seed, op) {
+  const pts = [];
+  const n = 12;
+  for (let i = 0; i < n; i++) {
+    const a = i / n * 6.283;
+    const k = 0.74 + rwR(seed + i * 2.7) * 0.40;
+    pts.push([cx + Math.cos(a) * rx * k, cz + Math.sin(a) * rz * k]);
+  }
+  const mk = function (scale) {
+    const sh = new T.Shape();
+    const p0 = pts[0];
+    sh.moveTo(cx + (p0[0] - cx) * scale, -(cz + (p0[1] - cz) * scale));
+    for (let i = 1; i < n; i++) {
+      const p = pts[i];
+      sh.lineTo(cx + (p[0] - cx) * scale, -(cz + (p[1] - cz) * scale));
+    }
+    sh.closePath();
+    return new T.ExtrudeGeometry(sh, { depth: 0.02, bevelEnabled: false, curveSegments: 1, steps: 1 });
+  };
+
+  /* 泥边：比水面大 7%，深褐一圈，水才不是「贴在地上的色块」 */
+  const edge = new T.Mesh(mk(1.07), new T.MeshBasicMaterial({ color: 0x554c3a }));
+  edge.geometry.rotateX(-Math.PI / 2);
+  edge.position.y = R_FL + 0.030;
+  scene.add(edge);
+
+  /* 水面用带渐变的贴图：Shape 的 UV 按世界坐标走，这里直接把 UV 归一化 */
+  const wg = mk(1.0);
+  wg.computeBoundingBox();
+  const bb = wg.boundingBox;
+  const uv = wg.attributes.uv;
+  const pos = wg.attributes.position;
+  for (let i = 0; i < uv.count; i++) {
+    uv.setXY(i,
+      (pos.getX(i) - bb.min.x) / Math.max(0.001, bb.max.x - bb.min.x),
+      (pos.getZ(i) - bb.min.z) / Math.max(0.001, bb.max.z - bb.min.z));
+  }
+  const water = new T.Mesh(wg, new T.MeshBasicMaterial({
+    map: rwWaterTex, transparent: true, opacity: op, depthWrite: false
+  }));
+  water.geometry.rotateX(-Math.PI / 2);
+  water.position.y = R_FL + 0.046;
+  water.renderOrder = 2;
+  scene.add(water);
+
+  /* 树影：水里的深色倒影，没有它水就是一摊浅色油漆 */
+  const sh2 = new T.Mesh(new T.PlaneGeometry(rx * 1.20, rz * 1.05), new T.MeshBasicMaterial({
+    map: lnSoftTex, color: 0x33443a, transparent: true, opacity: 0.34,
+    depthWrite: false, fog: false, side: T.DoubleSide
+  }));
+  sh2.rotation.x = -Math.PI / 2;
+  sh2.position.set(cx + rx * 0.24, R_FL + 0.052, cz + rz * 0.18);
+  sh2.renderOrder = 3;
+  scene.add(sh2);
+
+  /* 天光拉丝：两道细长的高光，水面才有「反光」而不只是「浅色」 */
+  for (let i = 0; i < 2; i++) {
+    const st = new T.Mesh(new T.PlaneGeometry(rx * 1.15, 0.10 + i * 0.06), new T.MeshBasicMaterial({
+      map: lnSoftTex, color: 0xf8fffb, transparent: true, opacity: 0.34 - i * 0.10,
+      blending: T.AdditiveBlending, depthWrite: false, fog: false, side: T.DoubleSide
+    }));
+    st.rotation.x = -Math.PI / 2;
+    st.rotation.z = -0.42;
+    st.position.set(cx - rx * 0.22 + i * 0.30, R_FL + 0.058 + i * 0.002, cz - rz * 0.26 - i * 0.22);
+    st.renderOrder = 3;
+    scene.add(st);
+  }
+
+  /* 天光：两片加色柔光压在水面上 */
+  const gl = new T.Mesh(new T.PlaneGeometry(rx * 1.5, rz * 1.2), new T.MeshBasicMaterial({
+    map: lnSoftTex, color: 0xf4fbf6, transparent: true, opacity: 0.24,
+    blending: T.AdditiveBlending, depthWrite: false, fog: false, side: T.DoubleSide
+  }));
+  gl.rotation.x = -Math.PI / 2;
+  gl.position.set(cx - rx * 0.22, R_FL + 0.056, cz - rz * 0.18);
+  gl.renderOrder = 3;
+  scene.add(gl);
+
+  /* 两圈涟漪：静止的，春日废墟只需一点，别做成喷泉 */
+  for (let i = 0; i < 3; i++) {
+    const ring = new T.Mesh(new T.TorusGeometry(0.30 + i * 0.26, 0.010, 4, 22),
+      new T.MeshBasicMaterial({
+        color: 0xffffff, transparent: true, opacity: 0.26 - i * 0.07,
+        blending: T.AdditiveBlending, depthWrite: false, fog: false
+      }));
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.set(cx + 0.35 - i * 0.22, R_FL + 0.054, cz + 0.18 + i * 0.16);
+    ring.renderOrder = 3;
+    scene.add(ring);
+  }
+}
+
+/* ------------------------------------------------------------ 光柱 */
+const rwShaftTex = canvasTex(128, 256, function (c, w, h) {
+  const g = c.createLinearGradient(0, 0, 0, h);
+  g.addColorStop(0, 'rgba(255,255,255,0.95)');
+  g.addColorStop(0.30, 'rgba(255,255,255,0.55)');
+  g.addColorStop(0.72, 'rgba(255,255,255,0.18)');
+  g.addColorStop(1, 'rgba(255,255,255,0)');
+  c.fillStyle = g; c.fillRect(0, 0, w, h);
+  const hg = c.createLinearGradient(0, 0, w, 0);
+  hg.addColorStop(0, 'rgba(0,0,0,0)');
+  hg.addColorStop(0.30, 'rgba(255,255,255,1)');
+  hg.addColorStop(0.70, 'rgba(255,255,255,1)');
+  hg.addColorStop(1, 'rgba(0,0,0,0)');
+  c.globalCompositeOperation = 'destination-in';
+  c.fillStyle = hg; c.fillRect(0, 0, w, h);
+});
+
+function rwShaft(p0, p1, w, op, col) {
+  const a = new T.Vector3(p0[0], p0[1], p0[2]);
+  const b2 = new T.Vector3(p1[0], p1[1], p1[2]);
+  const dir = b2.clone().sub(a);
+  const len = dir.length();
+  dir.normalize();
+  const q = new T.Quaternion().setFromUnitVectors(new T.Vector3(0, 1, 0), dir);
+  for (let k = 0; k < 2; k++) {
+    const m = new T.Mesh(new T.PlaneGeometry(w, len), new T.MeshBasicMaterial({
+      map: rwShaftTex, color: col || 0xfff1cc, transparent: true, opacity: op,
+      blending: T.AdditiveBlending, depthWrite: false, fog: false, side: T.DoubleSide
+    }));
+    m.position.copy(a).add(b2).multiplyScalar(0.5);
+    m.quaternion.copy(q);
+    if (k) m.rotateY(Math.PI / 2);
+    m.renderOrder = 4;
+    scene.add(m);
+  }
+}
+
+/* ------------------------------------------------------------ 花瓣 */
+function rwPetals() {
+  const N = cfg(PS.rwPetalN, 150);
+  const pos = new Float32Array(N * 3);
+  const base = new Float32Array(N);
+  const ph = new Float32Array(N);
+  const sp = new Float32Array(N);
+  const sz = new Float32Array(N);
+  const col = new Float32Array(N * 3);
+  const C1 = new T.Color(0xf6cdd8), C2 = new T.Color(0xfff3ef), C3 = new T.Color(0xe9aec2);
+  for (let i = 0; i < N; i++) {
+    pos[i * 3] = -10.0 + rwR(i * 1.7 + 2) * 20.0;
+    pos[i * 3 + 1] = rwR(i * 2.3 + 7) * 12.0 + 1.0;
+    pos[i * 3 + 2] = -7.6 + rwR(i * 3.1 + 5) * 15.2;
+    base[i] = pos[i * 3 + 1];
+    ph[i] = rwR(i * 5.3 + 3) * 6.283;
+    sp[i] = 0.26 + rwR(i * 7.1 + 9) * 0.30;
+    sz[i] = 0.9 + Math.pow(rwR(i * 9.7 + 1), 1.7) * 2.4;
+    const c = i % 3 === 0 ? C2 : (i % 3 === 1 ? C1 : C3);
+    col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b;
+  }
+  const g = new T.BufferGeometry();
+  g.setAttribute('position', new T.BufferAttribute(pos, 3));
+  g.setAttribute('aBase', new T.BufferAttribute(base, 1));
+  g.setAttribute('aPh', new T.BufferAttribute(ph, 1));
+  g.setAttribute('aSpd', new T.BufferAttribute(sp, 1));
+  g.setAttribute('aSize', new T.BufferAttribute(sz, 1));
+  g.setAttribute('aCol', new T.BufferAttribute(col, 3));
+
+  const m = new T.ShaderMaterial({
+    uniforms: { uTime: { value: 0 }, uH: { value: 12.0 } },
+    vertexShader:
+      'attribute float aBase,aPh,aSpd,aSize; attribute vec3 aCol;\n' +
+      'uniform float uTime,uH; varying vec3 vC; varying float vA;\n' +
+      'void main(){\n' +
+      '  vec3 p=position;\n' +
+      '  p.y=mod(aBase-uTime*aSpd,uH)+1.0;\n' +
+      '  p.x=mod(p.x+sin(uTime*0.55+aPh)*1.55+uTime*0.28+12.0,24.0)-12.0;\n' +
+      '  p.z+=cos(uTime*0.42+aPh*1.4)*1.05;\n' +
+      '  vec4 mv=modelViewMatrix*vec4(p,1.0);\n' +
+      '  gl_Position=projectionMatrix*mv;\n' +
+      '  float d=max(-mv.z,1.0);\n' +
+      '  gl_PointSize=clamp(aSize*150.0/d,0.8,5.0);\n' +
+      '  vC=aCol; vA=clamp(1.0-(d-30.0)/150.0,0.12,1.0);\n' +
+      '}',
+    fragmentShader:
+      'varying vec3 vC; varying float vA;\n' +
+      'void main(){\n' +
+      '  vec2 q=gl_PointCoord-vec2(0.5);\n' +
+      '  float r=length(q*vec2(1.0,1.5));\n' +
+      '  if(r>0.5) discard;\n' +
+      '  float a=smoothstep(0.5,0.10,r)*vA*0.92;\n' +
+      '  gl_FragColor=vec4(vC,a);\n' +
+      '}',
+    transparent: true, depthWrite: false
+  });
+  const p = new T.Points(g, m);
+  p.frustumCulled = false;
+  p.renderOrder = 6;
+  scene.add(p);
+  CT_ANIM.push(function (t) { m.uniforms.uTime.value = t; });
+}
+
+/* ------------------------------------------------------------ 尘埃 */
+function rwDust() {
+  const N = 100;
+  const pos = new Float32Array(N * 3);
+  const ph = new Float32Array(N);
+  const sz = new Float32Array(N);
+  for (let i = 0; i < N; i++) {
+    pos[i * 3] = -5.6 + rwR(i * 1.9 + 3) * 10.6;
+    pos[i * 3 + 1] = 0.4 + rwR(i * 2.7 + 6) * 6.4;
+    pos[i * 3 + 2] = -4.4 + rwR(i * 3.3 + 8) * 8.4;
+    ph[i] = rwR(i * 5.1 + 4) * 6.283;
+    sz[i] = 0.8 + rwR(i * 7.3 + 2) * 1.8;
+  }
+  const g = new T.BufferGeometry();
+  g.setAttribute('position', new T.BufferAttribute(pos, 3));
+  g.setAttribute('aPh', new T.BufferAttribute(ph, 1));
+  g.setAttribute('aSize', new T.BufferAttribute(sz, 1));
+  const m = new T.ShaderMaterial({
+    uniforms: { uTime: { value: 0 } },
+    vertexShader:
+      'attribute float aPh,aSize; uniform float uTime; varying float vA;\n' +
+      'void main(){\n' +
+      '  vec3 p=position;\n' +
+      '  p.y+=sin(uTime*0.22+aPh)*0.55+mod(uTime*0.035,0.9);\n' +
+      '  p.x+=sin(uTime*0.17+aPh*1.7)*0.42;\n' +
+      '  p.z+=cos(uTime*0.14+aPh*1.3)*0.36;\n' +
+      '  vec4 mv=modelViewMatrix*vec4(p,1.0);\n' +
+      '  gl_Position=projectionMatrix*mv;\n' +
+      '  float d=max(-mv.z,1.0);\n' +
+      '  gl_PointSize=clamp(aSize*56.0/d,0.8,3.2);\n' +
+      '  vA=clamp(1.0-(d-14.0)/60.0,0.06,1.0)*0.55;\n' +
+      '}',
+    fragmentShader:
+      'varying float vA;\n' +
+      'void main(){\n' +
+      '  float r=length(gl_PointCoord-vec2(0.5));\n' +
+      '  if(r>0.5) discard;\n' +
+      '  gl_FragColor=vec4(1.0,0.96,0.86,smoothstep(0.5,0.05,r)*vA);\n' +
+      '}',
+    transparent: true, depthWrite: false
+  });
+  const p = new T.Points(g, m);
+  p.frustumCulled = false;
+  p.renderOrder = 6;
+  scene.add(p);
+  CT_ANIM.push(function (t) { m.uniforms.uTime.value = t; });
+}
+
+/* ------------------------------------------------------------ 蝴蝶 */
+function rwButterflies() {
+  const specs = [
+    [2.55, 1.55, 2.35, 2.4, 2.0, 0xfff0c0],
+    [-1.55, 2.15, 1.15, 2.0, 1.6, 0xffe1a8],
+    [0.65, 2.85, -1.85, 2.8, 2.2, 0xfff6e6],
+    [-3.55, 1.85, 2.55, 2.2, 1.8, 0xffd6c2]
+  ];
+  for (let i = 0; i < specs.length; i++) {
+    const s = specs[i];
+    const g = new T.Group();
+    const wg = new T.PlaneGeometry(0.30, 0.22);
+    wg.rotateX(-Math.PI / 2);
+    wg.translate(0.15, 0, 0);
+    const wl = new T.Mesh(wg, new T.MeshBasicMaterial({
+      color: s[5], side: T.DoubleSide, transparent: true, opacity: 0.94
+    }));
+    const wgr = new T.PlaneGeometry(0.30, 0.22);
+    wgr.rotateX(-Math.PI / 2);
+    wgr.translate(-0.15, 0, 0);
+    const wr = new T.Mesh(wgr, new T.MeshBasicMaterial({
+      color: s[5], side: T.DoubleSide, transparent: true, opacity: 0.94
+    }));
+    const body = new T.Mesh(new T.BoxGeometry(0.055, 0.045, 0.20),
+      new T.MeshBasicMaterial({ color: 0x4a4038 }));
+    g.add(wl); g.add(wr); g.add(body);
+    g.position.set(s[0], s[1], s[2]);
+    scene.add(g);
+    const ph = i * 1.73;
+    CT_ANIM.push(function (t) {
+      const u = t * 0.42 + ph;
+      g.position.set(
+        s[0] + Math.cos(u) * s[3],
+        s[1] + Math.sin(u * 1.9 + ph) * 0.55,
+        s[2] + Math.sin(u * 0.83 + ph) * s[4]
+      );
+      g.rotation.y = -u * 1.2;
+      const f = 0.45 + Math.sin(t * 11.0 + ph) * 0.55;
+      wl.rotation.z = f;
+      wr.rotation.z = -f;
+    });
+  }
+}
+
+/* ------------------------------------------------------------ 组装 */
+function buildRwAll() {
+  const g = new T.Group();
+  const b = new Builder();
+  rwBase(b);
+  rwRuin(b);
+  rwTree(b);
+  rwFlora(b);
+  /* 这个俯角下远景落不进画面，山只会露出一条楔形边，所以不做山，
+     靠展台土层剖面 + 大雾来交代「这是一块被端起来的土地」。 */
+  b.build(g, {
+    noOutline: ['rwGrass', 'rwGrassL', 'rwGrassD', 'rwVine', 'rwVineD',
+      'rwRebar', 'rwRust', 'rwBlossom', 'rwBlossomD', 'rwFlowerW',
+      'rwFlowerY', 'rwFlowerP', 'rwFlowerV', 'rwFlowerC',
+      'rwLeaf1T', 'rwLeaf2', 'rwLeaf3', 'rwMoss', 'rwMossL',
+      'rwHill1', 'rwHill2', 'rwHill3', 'rwPath', 'rwBush', 'rwBushD',
+      'rwEarth', 'rwStone', 'rwPatchL', 'rwPatchD', 'rwLitter', 'rwLitterD']
+  });
+  scene.add(g);
+
+  /* 室内上部的压深：靠近楼板与墙角最暗 */
+  /* ★ 遮罩片必须完全落在墙体轮廓以内，否则会从屋顶上沿露出来，
+     变成一块浮在天上的灰板。顶边压到最低墙顶之下。 */
+  rwShade(-0.30, 4.90, R_Z0 + R_T + 0.020, 10.7, 2.10, 0, 0.85);
+  /* 左墙前段是塌下来的斜口，遮罩只能盖后半截，否则会从矮墙上方露出来 */
+  rwShade(R_X0 + R_T + 0.020, 4.90, -2.30, 4.70, 2.10, Math.PI * 0.5, 0.70);
+
+  /* 楼板底下的投影：一道横着的软黑，墙与板才咬得住 */
+  const slabShadow = new T.Mesh(new T.PlaneGeometry(7.4, 1.10), new T.MeshBasicMaterial({
+    map: lnSoftTex, color: 0x1e2622, transparent: true, opacity: 0.42,
+    depthWrite: false, fog: false, side: T.DoubleSide
+  }));
+  slabShadow.position.set(-2.10, R_SB - 0.28, R_Z0 + R_T + 0.018);
+  slabShadow.renderOrder = 1;
+  scene.add(slabShadow);
+
+  /* 墙角竖着的一道暗：两面墙相交处最深 */
+  const cnr = new T.Mesh(new T.PlaneGeometry(1.35, 5.40), new T.MeshBasicMaterial({
+    map: lnSoftTex, color: 0x1c231f, transparent: true, opacity: 0.40,
+    depthWrite: false, fog: false, side: T.DoubleSide
+  }));
+  cnr.position.set(R_X0 + R_T + 0.024, 2.95, R_Z0 + R_T + 0.75);
+  cnr.rotation.y = Math.PI * 0.5;
+  cnr.renderOrder = 1;
+  scene.add(cnr);
+
+  /* 墙根潮气带：窗台以下一条，室内两面墙各一条 */
+  rwGrimeBand(-0.30, R_FL + 0.60, R_Z0 + R_T + 0.022, 10.9, 1.05, 0);
+  rwGrimeBand(R_X0 + R_T + 0.022, R_FL + 0.60, -0.20, 9.0, 1.05, Math.PI * 0.5);
+
+  rwPuddle(2.75, 2.10, 1.85, 1.20, 4.7, 0.92);
+  rwPuddle(-2.55, 2.70, 0.90, 0.62, 9.3, 0.86);
+
+  /* 三道光：从楼板缺口与断墙顶斜插到地面 */
+  rwShaft([1.35, 6.05, -2.45], [-0.35, R_FL + 0.10, -0.35], 2.35, 0.30, 0xfff2d2);
+  rwShaft([0.55, 6.35, -3.10], [-1.55, R_FL + 0.10, -1.30], 1.80, 0.20, 0xfff6de);
+  rwShaft([-2.35, 4.95, 3.95], [-3.35, R_FL + 0.10, 1.95], 1.65, 0.18, 0xfff7e2);
+
+  /* 光柱落地的那一小片亮斑 */
+  const patch = new T.Mesh(new T.PlaneGeometry(3.2, 2.6), new T.MeshBasicMaterial({
+    map: lnSoftTex, color: 0xfff4d6, transparent: true, opacity: 0.09,
+    blending: T.AdditiveBlending, depthWrite: false, fog: false, side: T.DoubleSide
+  }));
+  patch.rotation.x = -Math.PI / 2;
+  patch.position.set(-0.35, R_FL + 0.06, -0.35);
+  patch.renderOrder = 3;
+  scene.add(patch);
+
+  rwPetals();
+  rwDust();
+  rwButterflies();
+
+  if (window.__expose) {
+    window.__rw = { tree: [1.14, -2.62], petals: cfg(PS.rwPetalN, 150) };
+  }
+}
+
   /* ================= 组装 ================= */
   const TOWER = !!PS.tower;
   const STORE = !!PS.store;
   const CLUB = !!PS.club;
   const WRH = !!PS.wh;
-  if (LN) {
+  if (RW) {
+    buildRwAll();
+  } else if (LN) {
     buildLnAll();
   } else if (RL) {
     buildRlAll();
@@ -12211,7 +13630,9 @@ function buildRlAll() {
 
   /* 室内暖光 */
   const LAMPK = cfg(PS.lampK, 1);
-  if (LN) {
+  if (RW) {
+    /* 春日上午的散射光已经够亮，不设点光；一放暖灯就变成傍晚了 */
+  } else if (LN) {
     /* 灯街的 6 盏暖点光已在 buildLnAll() 内按灯位布置 */
   } else if (RL) {
     /* 寒江雪不设任何点光：暖光会毁掉「寒」，全靠天光 + 低饱和材质 */
@@ -12391,23 +13812,23 @@ function buildRlAll() {
   }
 
   const VEG = PS.veg || {};
-  const willowPos = cfg(VEG.willows, (STORE || CLUB || JD || CYB || KFC || RL || LN) ? [] : [[4.0, -4.35, 0.95], [-6.5, 1.95, 0.72]]);
+  const willowPos = cfg(VEG.willows, (STORE || CLUB || JD || CYB || KFC || RL || LN || RW) ? [] : [[4.0, -4.35, 0.95], [-6.5, 1.95, 0.72]]);
   for (let i = 0; i < willowPos.length; i++) {
     scene.add(willow(willowPos[i][0], willowPos[i][1], willowPos[i][2]));
   }
 
-  if (!STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN) {
+  if (!STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW) {
     boatGroup = buildBoat(5.9, 1.15, Math.PI / 2 + 0.05);
     scene.add(boatGroup);
   }
 
-  const bamPos = cfg(VEG.bamboo, (STORE || CLUB || WRH || JD || CYB || KFC || RL || LN) ? [] : [[-7.0, -4.6, 1.0], [-6.9, 6.9, 0.75]]);
+  const bamPos = cfg(VEG.bamboo, (STORE || CLUB || WRH || JD || CYB || KFC || RL || LN || RW) ? [] : [[-7.0, -4.6, 1.0], [-6.9, 6.9, 0.75]]);
   for (let i = 0; i < bamPos.length; i++) scene.add(bamboo(bamPos[i][0], bamPos[i][1], bamPos[i][2]));
-  const potPos = cfg(VEG.pots, (STORE || CLUB || WRH || JD || CYB || KFC || RL || LN) ? [] : [[1.85, 2.35], [2.1, -2.55]]);
+  const potPos = cfg(VEG.pots, (STORE || CLUB || WRH || JD || CYB || KFC || RL || LN || RW) ? [] : [[1.85, 2.35], [2.1, -2.55]]);
   for (let i = 0; i < potPos.length; i++) scene.add(pot(potPos[i][0], potPos[i][1]));
 
   /* ================= 招牌 / 布幡 / 晾布 ================= */
-  if (!STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN) {
+  if (!STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW) {
   const plaqueMat = new T.MeshBasicMaterial({ map: TEX.plaque });
   const psz = cfg(PS.plaqueSize, [1.55, 0.46]);
   const plaque = new T.Mesh(new T.PlaneGeometry(psz[0], psz[1]), plaqueMat);
@@ -12431,7 +13852,7 @@ function buildRlAll() {
     'uniform sampler2D map; varying vec2 vUv;\n' +
     'void main(){ gl_FragColor = texture2D(map, vUv); }';
 
-  if (!TOWER && !STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN) {
+  if (!TOWER && !STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW) {
   const bannerMat = new T.ShaderMaterial({
     uniforms: { uTime: bannerUni.uTime, uAmp: { value: 0.11 }, map: { value: TEX.banner } },
     vertexShader: clothVert, fragmentShader: clothFrag, side: T.DoubleSide
@@ -12459,14 +13880,14 @@ function buildRlAll() {
     vertexShader: clothVert, fragmentShader: clothFrag, side: T.DoubleSide
   });
   const cloths = [];
-  if (!TOWER && !STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN) for (let i = 0; i < 2; i++) {
+  if (!TOWER && !STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW) for (let i = 0; i < 2; i++) {
     const c = new T.Mesh(new T.PlaneGeometry(0.7, 1.05, 4, 6), clothMat);
     c.position.set(2.62 + i * 0.86, 1.5 - i * 0.05, -1.95);
     c.rotation.y = -0.04 + i * 0.08;
     scene.add(c);
     cloths.push(c);
   }
-  if (!TOWER && !STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN) (function () {
+  if (!TOWER && !STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW) (function () {
     const b = new Builder();
     const g = new T.Group();
     b.cyl('woodDark', 0.055, 0.065, 2.15, 6, 2.24, 1.07, -1.95);
@@ -12487,7 +13908,7 @@ function buildRlAll() {
   /* ================= 屋檐铜铃 ================= */
   const bells = [];
   (function () {
-    const pos = (STORE || CLUB || JD || CYB || KFC || RL || LN) ? [] : cfg(PS.bellPos, [[2.78, 5.86, 3.08], [2.78, 5.86, -3.86], [-5.98, 5.86, 3.08], [-5.98, 5.86, -3.86]]);
+    const pos = (STORE || CLUB || JD || CYB || KFC || RL || LN || RW) ? [] : cfg(PS.bellPos, [[2.78, 5.86, 3.08], [2.78, 5.86, -3.86], [-5.98, 5.86, 3.08], [-5.98, 5.86, -3.86]]);
     for (let i = 0; i < pos.length; i++) {
       const g = new T.Group();
       g.position.set(pos[i][0], pos[i][1], pos[i][2]);
@@ -12518,7 +13939,7 @@ function buildRlAll() {
     patches.push({ m: p, base: op, x0: x, z0: z });
     return p;
   }
-  if (STORE || CLUB || KFC || RL || LN) {
+  if (STORE || CLUB || KFC || RL || LN || RW) {
     // 玻璃幕面，不做木格窗光斑
   } else if (TOWER) {
     addPatch(4.4, 4.4, -2.05 + 3.2, 1.24, -0.2, 0.1, 0.18);
@@ -12582,7 +14003,7 @@ function buildRlAll() {
     smokes.push(new Smoke(-3.10, 2.20, 6.10, 0.70, 5));
   } else if (JD) {
     smokes.push(new Smoke(DHCX + 0.30, DH_RG + 0.92, DW1 - 0.62, 1.15, 7));
-  } else if (!TOWER && !STORE && !CLUB && !WRH && !CYB && !KFC && !RL && !LN) {
+  } else if (!TOWER && !STORE && !CLUB && !WRH && !CYB && !KFC && !RL && !LN && !RW) {
     smokes.push(new Smoke(-1.62, FL + 0.88, 0.73, 1.0, 6));
     smokes.push(new Smoke(-3.55, FL + 0.66, -2.3, 1.2, 7));
     smokes.push(new Smoke(2.3, F2 + 0.8, -0.5, 0.9, 5));

@@ -912,6 +912,71 @@
          让天—街—河三段都进画框。theta=0 会把横贯的街拧成右侧斜带。 */
       cam: { theta: 1.50, phi: 1.24, dist: 62.0, target: [0.0, 4.8, -1.0] }
     }
-
+,
+    /* ---------------------------------------------------------
+       废墟 · 春回（第 14 套）
+       半塌的两层水泥小屋，树从楼板缺口里长出来。
+       冷灰混凝土 / 新绿 / 一点粉花，春日侧逆光 + 花瓣与尘埃。
+       主角不是房子，是「没有人之后，春天照样来了」。
+       --------------------------------------------------------- */
+    ruin: {
+      id: 'ruin',
+      title: '废墟 · 春回',
+      ruin: true,
+      emis: 1.0,
+      lampK: 1.0,
+      /* 春日清晨：天光偏青绿，地平线一层暖白 */
+      sky: ['#f8f9ee', '#e8f0e1', '#cfe0d7', '#b4cbc5'],
+      vig: 'rgba(40,52,44,0.20)',
+      distMax: 160,
+      targetR: 44,
+      shadowSpan: 32,
+      shadowFar: 140,
+      camFar: 620,
+      fog: { color: 0xc9dcd3, near: 44.0, far: 190.0 },
+      rwPetalN: 150,
+      palette: {
+        /* 展台与土：冷灰的混凝土，暖褐的土，别调成同一色 */
+        rwBase: 0x70766c, rwBaseD: 0x555b52, rwBaseL: 0x878d81,
+        rwEarth: 0x6f5f49, rwEarthD: 0x4e4436,
+        /* 草地三阶：嫩绿 / 深绿 / 受光 */
+        rwGrass: 0x7f9b56, rwGrassD: 0x607a41, rwGrassL: 0x9cb972,
+        rwGrassY: 0x9b9a5c,
+        /* 混凝土四阶：废墟的主色，必须冷、必须脏 */
+        rwCon: 0xadae9f, rwConD: 0x8b8d80, rwConL: 0xc5c5b4, rwConW: 0xd8d6c4,
+        rwPath: 0xb5ae97, rwStone: 0x9b9c8e,
+        rwRubble: 0x9fa093, rwRubbleD: 0x7e8074, rwBrick: 0xa26b50,
+        /* 墙上残存的抹灰：比混凝土更白，和脏墙形成两块面 */
+        rwPatchL: 0xd2cfba, rwPatchD: 0x8f9184,
+        /* 苔藓与藤：整场最暗的绿，压住画面下缘 */
+        rwMoss: 0x5c7a43, rwMossL: 0x78975a,
+        rwVine: 0x557b41, rwVineD: 0x3f6030,
+        /* 锈：唯一偏暖的暗色，用来点断口 */
+        rwRebar: 0x8c5a3e, rwRust: 0x7d4a34,
+        /* 树与花 */
+        rwBark: 0x6a5540, rwBarkD: 0x4c3d2e,
+        /* 叶体偏中间调，叶簇一深一亮，树冠才有层次 */
+        rwLeaf1: 0x6a8e4c, rwLeaf1T: 0x7ba05a, rwLeaf2: 0x4d7337, rwLeaf3: 0x93b56b,
+        rwBlossom: 0xf4c8d4, rwBlossomD: 0xe3a6b8,
+        rwFlowerW: 0xf7f2e2, rwFlowerY: 0xf2cf5c, rwFlowerP: 0xe2a8c6,
+        rwFlowerV: 0xa9a2d8, rwFlowerC: 0xe6b64a,
+        rwBush: 0x64884a, rwBushD: 0x4a6a37,
+        /* 落叶：两种旧了的黄褐，铺在树底下 */
+        rwLitter: 0x8e7a48, rwLitterD: 0x6b5b38,
+        /* 旧木与铁：椅子和门 */
+        rwWood: 0x8a6a4a, rwWoodD: 0x5d4733, rwMetal: 0x6f766f,
+        /* 远景丘陵：越远越淡，最后融进雾 */
+        rwHill1: 0x86a086, rwHill2: 0xa3b8a2, rwHill3: 0xbfcfc2
+      },
+      light: {
+        /* 侧逆光：太阳在相机右后上方，光柱从楼板缺口斜插进屋里 */
+        sun:  { color: 0xffecc4, i: 2.20, pos: [17.0, 25.0, 15.0] },
+        fill: { color: 0x9dc6dc, i: 0.58, pos: [-16.0, 10.0, -14.0] },
+        hemi: { sky: 0xe4f0e8, ground: 0x93a06e, i: 1.05 },
+        amb:  { color: 0x9db2ab, i: 0.24 }
+      },
+      veg: { willows: [], bamboo: [], pots: [] },
+      cam: { theta: 0.80, phi: 1.11, dist: 28.0, target: [0.4, 3.90, -0.3] }
+    }
   };
 });
