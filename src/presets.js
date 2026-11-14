@@ -1227,7 +1227,7 @@
         amb:  { color: 0x9c8c86, i: 0.26 }
       },
       veg: { willows: [], bamboo: [], pots: [] },
-      cam: { theta: 0.72, phi: 1.17, dist: 34, target: [0.0, 5.40, 0.0] }
+      cam: { theta: 0.95, phi: 1.19, dist: 34, target: [0.0, 5.40, 0.0] }
     }
   };
 });
