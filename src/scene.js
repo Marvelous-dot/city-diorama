@@ -330,6 +330,137 @@
     return parent;
   };
 
+/* ==========================================================================
+   积木小人：统一人物工厂（第 18 轮改版）
+   旧版是「球头 + 锥台 + 分段圆柱四肢」的拟真路线 —— 做不像就只剩丑。
+   现在改成刻意几何化的玩具人，棱角是风格而不是缺陷：
+     voxel —— 全轴对齐方块 + 像素方点眼 + 古风幞头/发髻，国风体素积木
+     lego  —— 圆柱头 + 头顶圆形凸粒 + 圆柱马蹄手，乐高 minifig
+   所有部件只绕 Y 整体旋转、局部绝不倾斜：这样每个块面都干净，
+   同材质合批后反向外壳只描一圈外轮廓，内部接缝不会露黑线。
+   风格由 preset 的 figStyle 决定，也可用 window.FIG_STYLE 运行时覆盖。
+   ========================================================================== */
+function figStyleGlobal() {
+  return (typeof window !== 'undefined' && window.FIG_STYLE) || PS.figStyle || 'voxel';
+}
+
+/* o: { b, x, y, z, ry, s, pose:'stand'|'sit'|'walk', style, mono, face,
+        coat, pants, skin, hair, ink, belt, shoe, apron, hatKey, apronKey,
+        hat:'none'|'fang'|'bun'|'cap', armFront, bag, bagKey } */
+function buildFig(o) {
+  const b = o.b, x = o.x || 0, y = o.y || 0, z = o.z || 0;
+  const ry = o.ry || 0, s = o.s || 1;
+  const sit = o.pose === 'sit', walk = o.pose === 'walk';
+  const lego = (o.style || figStyleGlobal()) === 'lego';
+  const mono = !!o.mono;
+  const hat = o.hat || 'none';
+
+  const coat = o.coat;
+  const pants = mono ? coat : (o.pants || coat);
+  const skin = mono ? coat : (o.skin || coat);
+  const hair = mono ? coat : (o.hair || coat);
+  const ink = mono ? coat : (o.ink || hair);
+  const belt = mono ? coat : (o.belt || pants);
+  const shoe = mono ? coat : (o.shoe || pants);
+  const apronK = o.apronKey || skin;
+  const hatK = o.hatKey || hair;
+
+  const c = Math.cos(ry), sn = Math.sin(ry);
+  function V(lx, ly, lz) {
+    return [x + (lx * c + lz * sn) * s, y + ly * s, z + (-lx * sn + lz * c) * s];
+  }
+  function B(k, w, h, d, lx, ly, lz) {
+    const p = V(lx, ly, lz);
+    b.box(k, w * s, h * s, d * s, p[0], p[1], p[2], 0, ry, 0);
+  }
+  function CY(k, r, h, lx, ly, lz, seg) {
+    const p = V(lx, ly, lz);
+    b.cyl(k, r * s, r * s, h * s, seg || 12, p[0], p[1], p[2]);
+  }
+  /* 站 / 坐两套 y 常量。总高 1.70 米，和旧版人物持平，
+     这样桌椅、门窗、楼板全都不用重新校准。 */
+  const DY = sit ? -0.34 : 0;
+  const torsoY = 0.99 + DY, armY = 0.98 + DY, handY = 0.73 + DY;
+  const beltY = 0.755 + DY, headY = 1.42 + DY;
+
+  /* ---- 腿与鞋：坐姿大腿水平前伸、小腿垂直下落；走姿前后错开 ---- */
+  if (sit) {
+    [-1, 1].forEach(function (sg) {
+      B(pants, 0.16, 0.17, 0.42, sg * 0.105, 0.44, 0.20);
+      B(pants, 0.16, 0.34, 0.18, sg * 0.105, 0.23, 0.40);
+      B(shoe, 0.18, 0.11, 0.27, sg * 0.105, 0.055, 0.46);
+    });
+  } else {
+    const sw = walk ? 0.085 : 0;
+    [-1, 1].forEach(function (sg) {
+      const f = sg < 0 ? sw : -sw;
+      B(pants, 0.16, 0.42, 0.19, sg * 0.105, 0.52, f);
+      B(shoe, 0.18, 0.11, 0.27, sg * 0.105, 0.055, f + 0.05);
+    });
+  }
+
+  /* ---- 躯干：窄身 + 一道宽肩线 + 两条「留真缝」的手臂。
+         手臂贴着躯干时，同色合批后反向外壳并成一整块方柱，剪影只剩一根棍；
+         留出 5cm 真空隙，两臂各自描一圈边，积木人的三竖块才读得出来。
+         领口与腰带用对比色横条，衣服层次不靠面数靠色块。 ---- */
+  if (!mono) {
+    B(belt, 0.44, 0.10, 0.28, 0, beltY - 0.01, 0);
+    B(belt, 0.44, 0.05, 0.27, 0, torsoY + 0.215, 0);
+  }
+  B(coat, 0.40, 0.46, 0.26, 0, torsoY, 0);
+  B(coat, 0.56, 0.09, 0.26, 0, torsoY + 0.16, 0);
+
+  /* ---- 手臂：体素手是方块，乐高手是 C 形马蹄的圆柱近似 ---- */
+  const az = sit ? 0.17 : (o.armFront ? 0.13 : 0);
+  [-1, 1].forEach(function (sg) {
+    const f = walk ? (sg < 0 ? 0.10 : -0.10) : az;
+    const ax = sg * 0.30;
+    B(coat, 0.10, 0.34, 0.15, ax, armY - 0.02, f * 0.55);
+    if (lego) CY(skin, 0.062, 0.11, ax, handY, f, 8);
+    else B(skin, 0.125, 0.13, 0.16, ax, handY - 0.01, f);
+  });
+
+  /* ---- 头：体素是立方体，乐高是圆柱 + 头顶那颗签名凸粒 ---- */
+  if (lego) {
+    CY(skin, 0.185, 0.34, 0, headY, 0, 16);
+    CY(hair, 0.190, 0.085, 0, headY + 0.205, 0, 14);
+    if (hat === 'none') CY(hair, 0.058, 0.045, 0, headY + 0.270, 0, 12);
+  } else {
+    B(skin, 0.38, 0.36, 0.36, 0, headY, 0);
+    B(hair, 0.40, 0.095, 0.38, 0, headY + 0.215, -0.01);
+  }
+
+  /* ---- 头饰：古风幞头 / 发髻 / 店小二头巾 ---- */
+  if (hat === 'fang') {
+    B(hatK, 0.44, 0.14, 0.42, 0, headY + 0.245, -0.015);
+    B(hatK, 0.17, 0.05, 0.085, -0.285, headY + 0.245, -0.02);
+    B(hatK, 0.17, 0.05, 0.085, 0.285, headY + 0.245, -0.02);
+  } else if (hat === 'bun') {
+    B(hatK, 0.17, 0.15, 0.17, 0, headY + 0.260, -0.025);
+    B(belt, 0.27, 0.032, 0.032, 0, headY + 0.280, -0.025);
+  } else if (hat === 'cap') {
+    B(hatK, 0.39, 0.10, 0.37, 0, headY + 0.225, -0.01);
+    B(hatK, 0.41, 0.030, 0.12, 0, headY + 0.175, 0.155);
+  }
+
+  /* ---- 像素五官：两个方点眼 + 一条横线嘴，比球眼球嘴干净得多。
+         圆柱头的脸是弧面，眼要按 x 处半径内收，否则会悬空。 ---- */
+  if (!mono && o.face !== false) {
+    const ez = lego ? 0.180 : 0.196;
+    const ex = lego ? 0.072 : 0.088;
+    B(ink, lego ? 0.048 : 0.058, 0.060, 0.022, -ex, headY + 0.012, ez);
+    B(ink, lego ? 0.048 : 0.058, 0.060, 0.022, ex, headY + 0.012, ez);
+    B(ink, 0.075, 0.018, 0.020, 0, headY - 0.078, lego ? 0.187 : 0.196);
+  }
+
+  /* ---- 身份物：围裙 / 手提袋 ---- */
+  if (o.apron && !mono) {
+    B(apronK, 0.30, 0.34, 0.03, 0, torsoY - 0.02, 0.145);
+    B(apronK, 0.10, 0.05, 0.03, 0, torsoY + 0.16, 0.145);
+  }
+  if (o.bag && !mono) B(o.bagKey || belt, 0.17, 0.21, 0.09, 0.34, 0.62, 0.02);
+}
+
   /* ================= 画布纹理 ================= */
   function canvasTex(w, h, draw) {
     const c = document.createElement('canvas');
@@ -9198,26 +9329,18 @@
   /* 城市行人：远处只有十来个像素，细节没意义，但「方盒身 + 肩膀横杠」
      的剪影太生硬。改成锥台躯干 + 两条分开的腿 + 圆肩 + 细手臂，
      材质仍严格保持 3 桶（衣 / 裤 / 肤），不增加动画 Group 的 draw call。 */
+  /* 城市行人：远景只有十来像素，严格保持 3 个材质桶（衣 / 裤 / 肤），
+     不画面部，一个人一个动画 Group 才不会把 draw call 翻上去。 */
   function ctPed(b, x, z, ry, o) {
     o = o || {};
     const s = o.s || 1;
     const y0 = o.y === undefined ? CT_GY : o.y;
     const ck = o.coat || 'ctPedA';
-    const r = ry || 0, c = Math.cos(r), sn = Math.sin(r);
-    function P(lx, lz) { return [x + (lx * c + lz * sn) * s, z + (-lx * sn + lz * c) * s]; }
-    const t = P(0, 0);
-    [-1, 1].forEach(function (sg) {
-      const p = P(sg * 0.085, 0);
-      b.cyl('ctPedP', 0.052 * s, 0.060 * s, 0.66 * s, 7, p[0], y0 + 0.33 * s, p[1], 0, r, 0);
+    buildFig({
+      b: b, x: x, y: y0, z: z, ry: ry, s: s, face: false,
+      coat: ck, pants: 'ctPedP', skin: 'ctPedS', hair: ck,
+      ink: ck, belt: 'ctPedP', shoe: 'ctPedP'
     });
-    b.cyl(ck, 0.190 * s, 0.145 * s, 0.58 * s, 9, t[0], y0 + 0.95 * s, t[1], 0, r, 0);
-    b.sph(ck, 0.125 * s, t[0], y0 + 1.22 * s, t[1], 1.55, 0.52, 0.86);
-    [-1, 1].forEach(function (sg) {
-      const a = P(sg * 0.19, 0), d = P(sg * 0.235, 0.02);
-      b.to(ck, 0.045 * s, a[0], y0 + 1.20 * s, a[1], d[0], y0 + 0.86 * s, d[1], 6);
-    });
-    b.cyl('ctPedS', 0.048 * s, 0.048 * s, 0.10 * s, 7, t[0], y0 + 1.30 * s, t[1]);
-    b.sph('ctPedS', 0.118 * s, t[0], y0 + 1.44 * s, t[1], 1.0, 1.10, 0.94);
   }
 
   /* ================= 车流与行人：让城市动起来 =================
@@ -10098,111 +10221,29 @@
     b.cyl('kfTrimD', 0.24 * sc, 0.24 * sc, 0.06 * sc, 10, x, 0.03 * sc, z);
   }
 
-  /* ── 人物 v2 ─────────────────────────────────────────────────────
-     旧版「方盒身 + 球头 + 头顶一块方板」在近景里像积木：没脖子、没腰、
-     手臂贴身、腿是两根方柱。这里全部换成锥台 + 球 + 两点连线圆柱，
-     四肢可摆姿势，店员有围裙和帽子，顾客有肤色 / 发型 / 手提袋差异。
-     所有部件先按「面朝 +z」的局部坐标算，再整体绕 y 轴旋转到 ry。 */
+  /* ── 人物 v3 ─────────────────────────────────────────────────────
+     拟真路线（锥台 + 球 + 分段圆柱四肢）做不像就只剩丑，已整体废弃。
+     现在全部委托给统一积木人工厂 buildFig()：乐高圆头 + 头顶凸粒 +
+     圆柱马蹄手，身份靠红帽白围裙 / 手提袋这些色块区分，不靠面数。 */
   const KF_PEDK = ['kfPedA', 'kfPedB', 'kfPedC', 'kfPedD'];
   const KF_SKIN = ['kfSkin1', 'kfSkin2', 'kfSkin3'];
   const KF_HAIR = ['kfHair1', 'kfHair2', 'kfHair3', 'kfHair4'];
 
+  /* 店员顾客：乐高小人 + 红帽白围裙 / 顾客手提袋，身份靠色块不靠面数。 */
   function kfPed(b, x, z, y, coat, s, ry, opt) {
     s = s || 1; ry = ry || 0; opt = opt || {};
-    const Y = y || 0;
-    const sit = opt.pose === 'sit';
-    const walk = opt.pose === 'walk';
+    const sit = opt.pose === 'sit', walk = opt.pose === 'walk';
     const staff = opt.role === 'staff';
     const sk = KF_SKIN[(opt.skin || 0) % 3];
     const hk = KF_HAIR[(opt.hair || 0) % 4];
-    const pants = opt.pants || 'kfPedP';
-    const c = Math.cos(ry), sn = Math.sin(ry);
-
-    const HY = sit ? 0.36 : 0.84;   // 髋
-    const TY = sit ? 0.62 : 1.06;   // 躯干中心
-    const SY = sit ? 0.84 : 1.28;   // 肩
-    const NY = sit ? 0.92 : 1.36;   // 颈
-    const HD = sit ? 1.07 : 1.51;   // 头中心
-
-    function V(lx, ly, lz) {
-      return [x + (lx * c + lz * sn) * s, Y + ly * s, z + (-lx * sn + lz * c) * s];
-    }
-    function L(k, r, a, d, seg) {
-      const p = V(a[0], a[1], a[2]), q = V(d[0], d[1], d[2]);
-      b.to(k, r * s, p[0], p[1], p[2], q[0], q[1], q[2], seg || 7);
-    }
-    function S(k, r, lx, ly, lz, sx, sy, sz) {
-      const p = V(lx, ly, lz);
-      b.sph(k, r * s, p[0], p[1], p[2], sx || 1, sy || 1, sz || 1);
-    }
-    function B(k, w, h, d, lx, ly, lz) {
-      const p = V(lx, ly, lz);
-      b.box(k, w * s, h * s, d * s, p[0], p[1], p[2], 0, ry, 0);
-    }
-    function C(k, rt, rb, h, lx, ly, lz, seg) {
-      const p = V(lx, ly, lz);
-      b.cyl(k, rt * s, rb * s, h * s, seg || 9, p[0], p[1], p[2], 0, ry, 0);
-    }
-
-    /* 腿与鞋：坐姿大腿水平前伸、小腿垂直下落；走姿前后错开 */
-    if (sit) {
-      [-1, 1].forEach(function (sg) {
-        L(pants, 0.076, [sg * 0.095, HY, 0.02], [sg * 0.095, HY - 0.02, 0.34]);
-        L(pants, 0.058, [sg * 0.095, HY - 0.02, 0.34], [sg * 0.095, 0.10, 0.34]);
-        S(pants, 0.066, sg * 0.095, HY - 0.02, 0.34);
-        B('kfShoe', 0.13, 0.09, 0.24, sg * 0.095, 0.05, 0.40);
-      });
-    } else {
-      const sw = walk ? 0.15 : 0.015;
-      [-1, 1].forEach(function (sg) {
-        const f = sg < 0 ? sw : -sw;
-        L(pants, 0.076, [sg * 0.095, HY, 0], [sg * 0.095, 0.46, f]);
-        L(pants, 0.058, [sg * 0.095, 0.46, f], [sg * 0.095, 0.10, f * 1.15]);
-        S(pants, 0.062, sg * 0.095, 0.46, f);
-        B('kfShoe', 0.13, 0.09, 0.24, sg * 0.095, 0.05, f * 1.15 + 0.05);
-      });
-    }
-    S(pants, 0.088, 0, HY, 0, 1.55, 0.72, 0.95);
-
-    /* 躯干：上宽下窄锥台 + 肩部椭球 + 脖子 */
-    C(coat, 0.205, 0.150, 0.46, 0, TY, 0, 10);
-    S(coat, 0.135, 0, SY, 0, 1.55, 0.55, 0.86);
-    C(sk, 0.052, 0.052, 0.12, 0, NY, 0, 8);
-
-    /* 手臂：上臂衣袖、前臂露肤色、球形手；走姿反相摆臂 */
-    const aw = walk ? 0.13 : (sit ? 0.14 : 0.06);
-    [-1, 1].forEach(function (sg) {
-      const f = sg < 0 ? aw : -aw;
-      const wy = sit ? 0.66 : 0.76;
-      const wz = sit ? 0.26 : f * 1.7 + 0.03;
-      L(coat, 0.062, [sg * 0.205, SY - 0.02, 0], [sg * 0.245, SY - 0.27, f * 0.5]);
-      L(sk, 0.050, [sg * 0.245, SY - 0.27, f * 0.5], [sg * 0.255, wy, wz]);
-      S(sk, 0.052, sg * 0.255, wy - 0.015, wz + 0.01);
+    buildFig({
+      b: b, x: x, y: y || 0, z: z, ry: ry, s: s,
+      pose: sit ? 'sit' : (walk ? 'walk' : 'stand'),
+      coat: coat, pants: opt.pants || 'kfPedP', skin: sk, hair: hk,
+      ink: 'kfEye', belt: 'kfPedP', shoe: 'kfShoe',
+      hat: staff ? 'cap' : 'none', hatKey: 'kfRed',
+      apron: staff, apronKey: 'kfApron', bag: opt.bag, bagKey: 'kfBag'
     });
-
-    /* 头、发型、五官 */
-    S(sk, 0.135, 0, HD, 0, 1.0, 1.10, 0.94);
-    if (!staff) {
-      /* 顶发必须偏后：盖到 z=+0.12 就会把眼睛糊掉，脸就白做了 */
-      S(hk, 0.138, 0, HD + 0.095, -0.045, 1.02, 0.44, 0.90);
-      S(hk, 0.120, 0, HD + 0.005, -0.080, 1.0, 0.95, 0.70);
-    }
-    S('kfEye', 0.019, -0.048, HD + 0.005, 0.130);
-    S('kfEye', 0.019, 0.048, HD + 0.005, 0.130);
-    S('kfRedD', 0.019, 0, HD - 0.060, 0.130, 1.5, 0.55, 0.4);
-
-    /* 店员：白围裙 + 红帽（帽檐朝脸） */
-    if (staff) {
-      B('kfApron', 0.30, 0.40, 0.035, 0, TY - 0.02, 0.147);
-      B('kfRed', 0.30, 0.045, 0.042, 0, TY + 0.17, 0.152);
-      C('kfRed', 0.132, 0.136, 0.10, 0, HD + 0.13, -0.012, 12);
-      B('kfRed', 0.21, 0.026, 0.17, 0, HD + 0.085, 0.115);
-      S(hk, 0.118, 0, HD + 0.015, -0.075, 1.0, 0.85, 0.7);
-    }
-    if (opt.bag) {
-      B('kfBag', 0.16, 0.20, 0.09, 0.30, 0.66, 0.03);
-      L('kfBag', 0.011, [0.24, 0.76, 0.03], [0.36, 0.76, 0.03], 5);
-    }
   }
 
   /* 球形行道树：低模三团叶 + 一根干，不用 willow/竹（那是水乡形制的） */
@@ -11133,15 +11174,13 @@ function lnGate(b) {
 /* --------------------------------------------------------- 石拱桥 */
 /* 人只做单色剪影：锥台身 + 球头，不画脸、不画四肢。
    远景里 1 米高只有十几像素，剪影比细节更有效，也避开「人物太丑」。 */
+/* 灯会人潮：单色方块剪影。s 乘 0.58 是让新积木人维持原来约 1.0 米的
+    crowd 身高 —— 不缩放会突然长高七成，把桥和灯摊全挡掉。 */
 function lnFigure(b, x, y, z, s, key) {
-  const k = key || 'lnFigure';
-  /* 剪影不像人的根因是「锥台太粗 + 球头太大」，远看就是一排瓶子。
-     收窄躯干、缩小头、补一道肩线，再靠提灯的光点证明这是人。 */
-  b.cyl(k, 0.100 * s, 0.152 * s, 0.76 * s, 6, x, y + 0.42 * s, z);
-  b.box(k, 0.285 * s, 0.062 * s, 0.105 * s, x, y + 0.735 * s, z);
-  b.sph(k, 0.116 * s, x, y + 0.905 * s, z, 1, 1.08, 1);
-  b.box(k, 0.058 * s, 0.30 * s, 0.085 * s, x - 0.072 * s, y + 0.15 * s, z);
-  b.box(k, 0.058 * s, 0.30 * s, 0.085 * s, x + 0.072 * s, y + 0.15 * s, z);
+  buildFig({
+    b: b, x: x, y: y, z: z, s: (s || 1) * 0.58,
+    mono: true, coat: key || 'lnFigure', pose: 'stand'
+  });
 }
 
 function lnBridge(b) {
@@ -11595,7 +11634,7 @@ function lnWalkers() {
       const bb = new Builder();
       lnFigure(bb, 0, 0, 0, 0.84, 'lnFigureD');
       /* 手里一盏提灯：移动的光比移动的形体更能证明「有人在走」 */
-      bb.sph('lnLanternY', 0.105, 0.26, 0.44, 0.10, 1, 1.1, 1);
+      bb.sph('lnLanternY', 0.105, 0.18, 0.38, 0.10, 1, 1.1, 1);
       bb.build(g2, { noOutline: ['lnFigureD', 'lnLanternY'] });
       const y = q[4] === 15.0 ? LN_LY + 1.0 : LN_LY;
       g2.position.set(q[0], y, q[1]);
@@ -14025,33 +14064,14 @@ function scCore(b) {
 }
 
 /* ------------------------------------------------------------ 人物 */
+/* 城市剖面居民：体素方块小人，站在切面附近才看得见。 */
 function scPed(b, x, y, z, ry, key, skin, pose) {
-  const c = Math.cos(ry), s = Math.sin(ry);
-  const P = function (lx, lz) { return [x + lx * c + lz * s, z - lx * s + lz * c]; };
-  const H = pose === 'sit' ? 0.86 : 1.0;
-  b.cyl(key, 0.115, 0.155, 0.44 * H, 7, x, y + (pose === 'sit' ? 0.56 : 1.24), z);
-  b.sph(key, 0.145, x, y + (pose === 'sit' ? 0.80 : 1.50), z, 1, 0.72, 0.86);
-  b.sph(skin, 0.093, x, y + (pose === 'sit' ? 0.93 : 1.62), z, 1, 1.10, 1);
-  b.sph('scHair', 0.096, x, y + (pose === 'sit' ? 0.99 : 1.68), z - 0.02, 1, 0.60, 1);
-  b.box('scHair', 0.06, 0.07, 0.06, x, y + (pose === 'sit' ? 0.86 : 1.55), z);
-  if (pose === 'sit') {
-    let p = P(-0.055, 0.20);
-    b.cyl('scClothB', 0.048, 0.048, 0.42, 6, p[0], y + 0.56, p[1], 0, 0, Math.PI * 0.5);
-    p = P(0.055, 0.20);
-    b.cyl('scClothB', 0.048, 0.048, 0.42, 6, p[0], y + 0.56, p[1], 0, 0, Math.PI * 0.5);
-    p = P(-0.055, 0.42);
-    b.cyl('scHair', 0.044, 0.044, 0.46, 6, p[0], y + 0.24, p[1]);
-    p = P(0.055, 0.42);
-    b.cyl('scHair', 0.044, 0.044, 0.46, 6, p[0], y + 0.24, p[1]);
-  } else {
-    for (let i = 0; i < 2; i++) {
-      const p = P(i ? 0.075 : -0.075, 0);
-      b.to('scClothB', 0.05, p[0], y + 0.86, p[1],
-        p[0] + (i ? 0.02 : -0.02), y + 0.04, p[1] + 0.06, 5);
-      const q = P(i ? 0.135 : -0.135, 0.02);
-      b.to(key, 0.042, q[0], y + 1.44, q[1], q[0], y + 0.92, q[1] + 0.05, 5);
-    }
-  }
+  buildFig({
+    b: b, x: x, y: y, z: z, ry: ry,
+    pose: pose === 'sit' ? 'sit' : 'stand',
+    coat: key, pants: 'scClothB', skin: skin, hair: 'scHair',
+    ink: 'scHair', belt: 'scClothB', shoe: 'scHair'
+  });
 }
 
 /* ------------------------------------------------------------ 室内：每层一种生活 */
@@ -15290,33 +15310,19 @@ function tvBlob(b, key, x, y, z, rx, ry, rz, seed) {
 }
 
 /* 人：锥台袍身 + 球头 + 分段四肢，剪影先像人，再谈细节 */
+/* 人：统一积木小人。帽型按坐标散列，三层几十号人不会全戴同一顶。 */
 function tvPed(b, x, y, z, ry, mode, robe) {
   const K = robe || 'tvRobeA';
-  const sit = mode === 'sit';
-  const hip = sit ? 0.44 : 0.88;
-  const headY = sit ? 1.10 : 1.52;
-  tvAdd(b, K, new T.CylinderGeometry(0.185, 0.265, sit ? 0.52 : 0.68, 9),
-    x, y, z, ry, 0, hip + 0.28, 0);
-  tvAdd(b, 'tvSkin', new T.SphereGeometry(0.132, 12, 9), x, y, z, ry, 0, headY, 0.01);
-  tvAdd(b, 'tvHair', new T.SphereGeometry(0.108, 10, 8), x, y, z, ry, 0, headY + 0.085, -0.045);
-  tvAdd(b, 'tvHair', new T.SphereGeometry(0.062, 8, 6), x, y, z, ry, 0, headY + 0.175, -0.055);
-  tvAdd(b, K, new T.SphereGeometry(0.075, 8, 6), x, y, z, ry, -0.22, hip + 0.46, 0);
-  tvAdd(b, K, new T.SphereGeometry(0.075, 8, 6), x, y, z, ry, 0.22, hip + 0.46, 0);
-  const armY = sit ? 0.82 : 1.16;
-  [-1, 1].forEach(function (sgn) {
-    const a = new T.CylinderGeometry(0.062, 0.075, 0.46, 7);
-    a.rotateZ(sgn * 0.30);
-    tvAdd(b, K, a, x, y, z, ry, sgn * 0.255, armY - 0.12, 0.055);
+  const h = Math.abs(Math.round((x * 7.3 + z * 13.7 + y * 3.1) * 10)) % 3;
+  const hats = ['fang', 'bun', 'cap'];
+  buildFig({
+    b: b, x: x, y: y, z: z, ry: ry,
+    pose: mode === 'sit' ? 'sit' : (mode === 'walk' ? 'walk' : 'stand'),
+    coat: K, pants: 'tvRobeC', skin: 'tvSkin', hair: 'tvHair',
+    ink: 'tvHair', belt: 'tvRobeC', shoe: 'tvShoe',
+    hat: hats[h], hatKey: h === 2 ? 'tvApron' : 'tvHair',
+    apron: h === 2, apronKey: 'tvApron', armFront: h === 2
   });
-  if (sit) {
-    tvAdd(b, 'tvRobeC', new T.BoxGeometry(0.15, 0.14, 0.44), x, y, z, ry, -0.10, 0.47, 0.29);
-    tvAdd(b, 'tvRobeC', new T.BoxGeometry(0.15, 0.14, 0.44), x, y, z, ry, 0.10, 0.47, 0.29);
-    tvAdd(b, 'tvShoe', new T.BoxGeometry(0.13, 0.30, 0.14), x, y, z, ry, -0.10, 0.22, 0.47);
-    tvAdd(b, 'tvShoe', new T.BoxGeometry(0.13, 0.30, 0.14), x, y, z, ry, 0.10, 0.22, 0.47);
-  } else {
-    tvAdd(b, 'tvRobeC', new T.CylinderGeometry(0.075, 0.088, 0.72, 7), x, y, z, ry, -0.10, 0.42, 0);
-    tvAdd(b, 'tvRobeC', new T.CylinderGeometry(0.075, 0.088, 0.72, 7), x, y, z, ry, 0.10, 0.42, 0);
-  }
 }
 function tvCylAt(b, key, rt, rb, h, seg, x, y, z, ry, lx, ly, lz) {
   return tvAdd(b, key, new T.CylinderGeometry(rt, rb, h, seg || 9), x, y, z, ry, lx, ly, lz);

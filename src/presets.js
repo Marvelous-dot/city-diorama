@@ -539,6 +539,7 @@
       id: 'city',
       title: '霓虹 · 日本街',
       city: true,
+      figStyle: 'lego',
       sky: ['#2a2350', '#1b1736', '#0c0a1c', '#04030a'],
       vig: 'rgba(2,1,8,0.70)',
       distMax: 340,
@@ -675,6 +676,7 @@
       id: 'kfc',
       title: '肯德基 · 得来速店',
       kfc: true,
+      figStyle: 'lego',
       kfcName: 'KFC',
       asset: 'src/kfc_assets.js',
       emis: 1.0,
@@ -843,6 +845,7 @@
       id: 'lantern',
       title: '千灯 · 上元灯会',
       lantern: true,
+      figStyle: 'voxel',
       emis: 1.15,
       lampK: 1.0,
       /* 暮色四段：中心暖橙落日，外缘靛蓝夜幕 */
@@ -880,7 +883,7 @@
         /* 牌楼 / 桥 / 人 / 树 / 船 */
         lnGate: 0x9b3a2c, lnGateD: 0x6d2a20,
         lnBridge: 0x8b7d70, lnBridgeD: 0x5f564f,
-        lnFigure: 0x413343, lnFigureD: 0x5b4552,
+        lnFigure: 0x6b4a52, lnFigureD: 0x8c6159,
         lnTree: 0x3b4438, lnTreeD: 0x2f3830, lnBark: 0x4a3830,
         lnBoat: 0x6a4433, lnBoatD: 0x452c24,
         /* 灯市棚布：暖红 / 赭橙 / 米白，只此三色，第四色整条街就散了 */
@@ -988,6 +991,7 @@
       id: 'section',
       title: '城市剖面',
       section: true,
+      figStyle: 'voxel',
       emis: 1.0,
       lampK: 1.0,
       sky: ['#e6eff7', '#cfe0ee', '#b0c8dd', '#94b0c6'],
@@ -1163,6 +1167,7 @@
       id: 'tavern',
       title: '醉仙楼 · 三层酒肆',
       tavern: true,
+      figStyle: 'voxel',
       emis: 1.0,
       lampK: 1.0,
       sky: ['#fbe9c8', '#f2cd9e', '#d99a7a', '#7e5f68'],
@@ -1204,10 +1209,10 @@
         /* 灯火 */
         tvLantern: 0xd94a2c, tvTassel: 0xd8a63c, tvCandle: 0xffe6b0,
         tvRope: 0x6a5438,
-        /* 人物：衣袍三色 + 肤色发色 */
+        /* 人物：衣袍三色 + 肤色发色 + 店小二白巾白围裙 */
         tvSkin: 0xe8bd9a, tvHair: 0x2e2823,
         tvRobeA: 0x4a6b78, tvRobeB: 0x9a4638, tvRobeC: 0x6f6a8c,
-        tvShoe: 0x3a312a,
+        tvShoe: 0x3a312a, tvApron: 0xe2d7bd,
         /* 室外陈设 */
         tvLion: 0xb9b2a2, tvLionD: 0x8c8678,
         tvBark: 0x6b5540, tvLeaf1: 0x6f8f4a, tvLeaf2: 0x517038,

@@ -29,6 +29,7 @@ window.PRESET = {
   "id": "section",
   "title": "城市剖面",
   "section": true,
+  "figStyle": "voxel",
   "emis": 1,
   "lampK": 1,
   "sky": [
@@ -583,6 +584,137 @@ window.PRESET = {
     this.parts.clear();
     return parent;
   };
+
+/* ==========================================================================
+   积木小人：统一人物工厂（第 18 轮改版）
+   旧版是「球头 + 锥台 + 分段圆柱四肢」的拟真路线 —— 做不像就只剩丑。
+   现在改成刻意几何化的玩具人，棱角是风格而不是缺陷：
+     voxel —— 全轴对齐方块 + 像素方点眼 + 古风幞头/发髻，国风体素积木
+     lego  —— 圆柱头 + 头顶圆形凸粒 + 圆柱马蹄手，乐高 minifig
+   所有部件只绕 Y 整体旋转、局部绝不倾斜：这样每个块面都干净，
+   同材质合批后反向外壳只描一圈外轮廓，内部接缝不会露黑线。
+   风格由 preset 的 figStyle 决定，也可用 window.FIG_STYLE 运行时覆盖。
+   ========================================================================== */
+function figStyleGlobal() {
+  return (typeof window !== 'undefined' && window.FIG_STYLE) || PS.figStyle || 'voxel';
+}
+
+/* o: { b, x, y, z, ry, s, pose:'stand'|'sit'|'walk', style, mono, face,
+        coat, pants, skin, hair, ink, belt, shoe, apron, hatKey, apronKey,
+        hat:'none'|'fang'|'bun'|'cap', armFront, bag, bagKey } */
+function buildFig(o) {
+  const b = o.b, x = o.x || 0, y = o.y || 0, z = o.z || 0;
+  const ry = o.ry || 0, s = o.s || 1;
+  const sit = o.pose === 'sit', walk = o.pose === 'walk';
+  const lego = (o.style || figStyleGlobal()) === 'lego';
+  const mono = !!o.mono;
+  const hat = o.hat || 'none';
+
+  const coat = o.coat;
+  const pants = mono ? coat : (o.pants || coat);
+  const skin = mono ? coat : (o.skin || coat);
+  const hair = mono ? coat : (o.hair || coat);
+  const ink = mono ? coat : (o.ink || hair);
+  const belt = mono ? coat : (o.belt || pants);
+  const shoe = mono ? coat : (o.shoe || pants);
+  const apronK = o.apronKey || skin;
+  const hatK = o.hatKey || hair;
+
+  const c = Math.cos(ry), sn = Math.sin(ry);
+  function V(lx, ly, lz) {
+    return [x + (lx * c + lz * sn) * s, y + ly * s, z + (-lx * sn + lz * c) * s];
+  }
+  function B(k, w, h, d, lx, ly, lz) {
+    const p = V(lx, ly, lz);
+    b.box(k, w * s, h * s, d * s, p[0], p[1], p[2], 0, ry, 0);
+  }
+  function CY(k, r, h, lx, ly, lz, seg) {
+    const p = V(lx, ly, lz);
+    b.cyl(k, r * s, r * s, h * s, seg || 12, p[0], p[1], p[2]);
+  }
+  /* 站 / 坐两套 y 常量。总高 1.70 米，和旧版人物持平，
+     这样桌椅、门窗、楼板全都不用重新校准。 */
+  const DY = sit ? -0.34 : 0;
+  const torsoY = 0.99 + DY, armY = 0.98 + DY, handY = 0.73 + DY;
+  const beltY = 0.755 + DY, headY = 1.42 + DY;
+
+  /* ---- 腿与鞋：坐姿大腿水平前伸、小腿垂直下落；走姿前后错开 ---- */
+  if (sit) {
+    [-1, 1].forEach(function (sg) {
+      B(pants, 0.16, 0.17, 0.42, sg * 0.105, 0.44, 0.20);
+      B(pants, 0.16, 0.34, 0.18, sg * 0.105, 0.23, 0.40);
+      B(shoe, 0.18, 0.11, 0.27, sg * 0.105, 0.055, 0.46);
+    });
+  } else {
+    const sw = walk ? 0.085 : 0;
+    [-1, 1].forEach(function (sg) {
+      const f = sg < 0 ? sw : -sw;
+      B(pants, 0.16, 0.42, 0.19, sg * 0.105, 0.52, f);
+      B(shoe, 0.18, 0.11, 0.27, sg * 0.105, 0.055, f + 0.05);
+    });
+  }
+
+  /* ---- 躯干：窄身 + 一道宽肩线 + 两条「留真缝」的手臂。
+         手臂贴着躯干时，同色合批后反向外壳并成一整块方柱，剪影只剩一根棍；
+         留出 5cm 真空隙，两臂各自描一圈边，积木人的三竖块才读得出来。
+         领口与腰带用对比色横条，衣服层次不靠面数靠色块。 ---- */
+  if (!mono) {
+    B(belt, 0.44, 0.10, 0.28, 0, beltY - 0.01, 0);
+    B(belt, 0.44, 0.05, 0.27, 0, torsoY + 0.215, 0);
+  }
+  B(coat, 0.40, 0.46, 0.26, 0, torsoY, 0);
+  B(coat, 0.56, 0.09, 0.26, 0, torsoY + 0.16, 0);
+
+  /* ---- 手臂：体素手是方块，乐高手是 C 形马蹄的圆柱近似 ---- */
+  const az = sit ? 0.17 : (o.armFront ? 0.13 : 0);
+  [-1, 1].forEach(function (sg) {
+    const f = walk ? (sg < 0 ? 0.10 : -0.10) : az;
+    const ax = sg * 0.30;
+    B(coat, 0.10, 0.34, 0.15, ax, armY - 0.02, f * 0.55);
+    if (lego) CY(skin, 0.062, 0.11, ax, handY, f, 8);
+    else B(skin, 0.125, 0.13, 0.16, ax, handY - 0.01, f);
+  });
+
+  /* ---- 头：体素是立方体，乐高是圆柱 + 头顶那颗签名凸粒 ---- */
+  if (lego) {
+    CY(skin, 0.185, 0.34, 0, headY, 0, 16);
+    CY(hair, 0.190, 0.085, 0, headY + 0.205, 0, 14);
+    if (hat === 'none') CY(hair, 0.058, 0.045, 0, headY + 0.270, 0, 12);
+  } else {
+    B(skin, 0.38, 0.36, 0.36, 0, headY, 0);
+    B(hair, 0.40, 0.095, 0.38, 0, headY + 0.215, -0.01);
+  }
+
+  /* ---- 头饰：古风幞头 / 发髻 / 店小二头巾 ---- */
+  if (hat === 'fang') {
+    B(hatK, 0.44, 0.14, 0.42, 0, headY + 0.245, -0.015);
+    B(hatK, 0.17, 0.05, 0.085, -0.285, headY + 0.245, -0.02);
+    B(hatK, 0.17, 0.05, 0.085, 0.285, headY + 0.245, -0.02);
+  } else if (hat === 'bun') {
+    B(hatK, 0.17, 0.15, 0.17, 0, headY + 0.260, -0.025);
+    B(belt, 0.27, 0.032, 0.032, 0, headY + 0.280, -0.025);
+  } else if (hat === 'cap') {
+    B(hatK, 0.39, 0.10, 0.37, 0, headY + 0.225, -0.01);
+    B(hatK, 0.41, 0.030, 0.12, 0, headY + 0.175, 0.155);
+  }
+
+  /* ---- 像素五官：两个方点眼 + 一条横线嘴，比球眼球嘴干净得多。
+         圆柱头的脸是弧面，眼要按 x 处半径内收，否则会悬空。 ---- */
+  if (!mono && o.face !== false) {
+    const ez = lego ? 0.180 : 0.196;
+    const ex = lego ? 0.072 : 0.088;
+    B(ink, lego ? 0.048 : 0.058, 0.060, 0.022, -ex, headY + 0.012, ez);
+    B(ink, lego ? 0.048 : 0.058, 0.060, 0.022, ex, headY + 0.012, ez);
+    B(ink, 0.075, 0.018, 0.020, 0, headY - 0.078, lego ? 0.187 : 0.196);
+  }
+
+  /* ---- 身份物：围裙 / 手提袋 ---- */
+  if (o.apron && !mono) {
+    B(apronK, 0.30, 0.34, 0.03, 0, torsoY - 0.02, 0.145);
+    B(apronK, 0.10, 0.05, 0.03, 0, torsoY + 0.16, 0.145);
+  }
+  if (o.bag && !mono) B(o.bagKey || belt, 0.17, 0.21, 0.09, 0.34, 0.62, 0.02);
+}
 
   /* ================= 画布纹理 ================= */
   function canvasTex(w, h, draw) {
@@ -9452,26 +9584,18 @@ window.PRESET = {
   /* 城市行人：远处只有十来个像素，细节没意义，但「方盒身 + 肩膀横杠」
      的剪影太生硬。改成锥台躯干 + 两条分开的腿 + 圆肩 + 细手臂，
      材质仍严格保持 3 桶（衣 / 裤 / 肤），不增加动画 Group 的 draw call。 */
+  /* 城市行人：远景只有十来像素，严格保持 3 个材质桶（衣 / 裤 / 肤），
+     不画面部，一个人一个动画 Group 才不会把 draw call 翻上去。 */
   function ctPed(b, x, z, ry, o) {
     o = o || {};
     const s = o.s || 1;
     const y0 = o.y === undefined ? CT_GY : o.y;
     const ck = o.coat || 'ctPedA';
-    const r = ry || 0, c = Math.cos(r), sn = Math.sin(r);
-    function P(lx, lz) { return [x + (lx * c + lz * sn) * s, z + (-lx * sn + lz * c) * s]; }
-    const t = P(0, 0);
-    [-1, 1].forEach(function (sg) {
-      const p = P(sg * 0.085, 0);
-      b.cyl('ctPedP', 0.052 * s, 0.060 * s, 0.66 * s, 7, p[0], y0 + 0.33 * s, p[1], 0, r, 0);
+    buildFig({
+      b: b, x: x, y: y0, z: z, ry: ry, s: s, face: false,
+      coat: ck, pants: 'ctPedP', skin: 'ctPedS', hair: ck,
+      ink: ck, belt: 'ctPedP', shoe: 'ctPedP'
     });
-    b.cyl(ck, 0.190 * s, 0.145 * s, 0.58 * s, 9, t[0], y0 + 0.95 * s, t[1], 0, r, 0);
-    b.sph(ck, 0.125 * s, t[0], y0 + 1.22 * s, t[1], 1.55, 0.52, 0.86);
-    [-1, 1].forEach(function (sg) {
-      const a = P(sg * 0.19, 0), d = P(sg * 0.235, 0.02);
-      b.to(ck, 0.045 * s, a[0], y0 + 1.20 * s, a[1], d[0], y0 + 0.86 * s, d[1], 6);
-    });
-    b.cyl('ctPedS', 0.048 * s, 0.048 * s, 0.10 * s, 7, t[0], y0 + 1.30 * s, t[1]);
-    b.sph('ctPedS', 0.118 * s, t[0], y0 + 1.44 * s, t[1], 1.0, 1.10, 0.94);
   }
 
   /* ================= 车流与行人：让城市动起来 =================
@@ -10352,111 +10476,29 @@ window.PRESET = {
     b.cyl('kfTrimD', 0.24 * sc, 0.24 * sc, 0.06 * sc, 10, x, 0.03 * sc, z);
   }
 
-  /* ── 人物 v2 ─────────────────────────────────────────────────────
-     旧版「方盒身 + 球头 + 头顶一块方板」在近景里像积木：没脖子、没腰、
-     手臂贴身、腿是两根方柱。这里全部换成锥台 + 球 + 两点连线圆柱，
-     四肢可摆姿势，店员有围裙和帽子，顾客有肤色 / 发型 / 手提袋差异。
-     所有部件先按「面朝 +z」的局部坐标算，再整体绕 y 轴旋转到 ry。 */
+  /* ── 人物 v3 ─────────────────────────────────────────────────────
+     拟真路线（锥台 + 球 + 分段圆柱四肢）做不像就只剩丑，已整体废弃。
+     现在全部委托给统一积木人工厂 buildFig()：乐高圆头 + 头顶凸粒 +
+     圆柱马蹄手，身份靠红帽白围裙 / 手提袋这些色块区分，不靠面数。 */
   const KF_PEDK = ['kfPedA', 'kfPedB', 'kfPedC', 'kfPedD'];
   const KF_SKIN = ['kfSkin1', 'kfSkin2', 'kfSkin3'];
   const KF_HAIR = ['kfHair1', 'kfHair2', 'kfHair3', 'kfHair4'];
 
+  /* 店员顾客：乐高小人 + 红帽白围裙 / 顾客手提袋，身份靠色块不靠面数。 */
   function kfPed(b, x, z, y, coat, s, ry, opt) {
     s = s || 1; ry = ry || 0; opt = opt || {};
-    const Y = y || 0;
-    const sit = opt.pose === 'sit';
-    const walk = opt.pose === 'walk';
+    const sit = opt.pose === 'sit', walk = opt.pose === 'walk';
     const staff = opt.role === 'staff';
     const sk = KF_SKIN[(opt.skin || 0) % 3];
     const hk = KF_HAIR[(opt.hair || 0) % 4];
-    const pants = opt.pants || 'kfPedP';
-    const c = Math.cos(ry), sn = Math.sin(ry);
-
-    const HY = sit ? 0.36 : 0.84;   // 髋
-    const TY = sit ? 0.62 : 1.06;   // 躯干中心
-    const SY = sit ? 0.84 : 1.28;   // 肩
-    const NY = sit ? 0.92 : 1.36;   // 颈
-    const HD = sit ? 1.07 : 1.51;   // 头中心
-
-    function V(lx, ly, lz) {
-      return [x + (lx * c + lz * sn) * s, Y + ly * s, z + (-lx * sn + lz * c) * s];
-    }
-    function L(k, r, a, d, seg) {
-      const p = V(a[0], a[1], a[2]), q = V(d[0], d[1], d[2]);
-      b.to(k, r * s, p[0], p[1], p[2], q[0], q[1], q[2], seg || 7);
-    }
-    function S(k, r, lx, ly, lz, sx, sy, sz) {
-      const p = V(lx, ly, lz);
-      b.sph(k, r * s, p[0], p[1], p[2], sx || 1, sy || 1, sz || 1);
-    }
-    function B(k, w, h, d, lx, ly, lz) {
-      const p = V(lx, ly, lz);
-      b.box(k, w * s, h * s, d * s, p[0], p[1], p[2], 0, ry, 0);
-    }
-    function C(k, rt, rb, h, lx, ly, lz, seg) {
-      const p = V(lx, ly, lz);
-      b.cyl(k, rt * s, rb * s, h * s, seg || 9, p[0], p[1], p[2], 0, ry, 0);
-    }
-
-    /* 腿与鞋：坐姿大腿水平前伸、小腿垂直下落；走姿前后错开 */
-    if (sit) {
-      [-1, 1].forEach(function (sg) {
-        L(pants, 0.076, [sg * 0.095, HY, 0.02], [sg * 0.095, HY - 0.02, 0.34]);
-        L(pants, 0.058, [sg * 0.095, HY - 0.02, 0.34], [sg * 0.095, 0.10, 0.34]);
-        S(pants, 0.066, sg * 0.095, HY - 0.02, 0.34);
-        B('kfShoe', 0.13, 0.09, 0.24, sg * 0.095, 0.05, 0.40);
-      });
-    } else {
-      const sw = walk ? 0.15 : 0.015;
-      [-1, 1].forEach(function (sg) {
-        const f = sg < 0 ? sw : -sw;
-        L(pants, 0.076, [sg * 0.095, HY, 0], [sg * 0.095, 0.46, f]);
-        L(pants, 0.058, [sg * 0.095, 0.46, f], [sg * 0.095, 0.10, f * 1.15]);
-        S(pants, 0.062, sg * 0.095, 0.46, f);
-        B('kfShoe', 0.13, 0.09, 0.24, sg * 0.095, 0.05, f * 1.15 + 0.05);
-      });
-    }
-    S(pants, 0.088, 0, HY, 0, 1.55, 0.72, 0.95);
-
-    /* 躯干：上宽下窄锥台 + 肩部椭球 + 脖子 */
-    C(coat, 0.205, 0.150, 0.46, 0, TY, 0, 10);
-    S(coat, 0.135, 0, SY, 0, 1.55, 0.55, 0.86);
-    C(sk, 0.052, 0.052, 0.12, 0, NY, 0, 8);
-
-    /* 手臂：上臂衣袖、前臂露肤色、球形手；走姿反相摆臂 */
-    const aw = walk ? 0.13 : (sit ? 0.14 : 0.06);
-    [-1, 1].forEach(function (sg) {
-      const f = sg < 0 ? aw : -aw;
-      const wy = sit ? 0.66 : 0.76;
-      const wz = sit ? 0.26 : f * 1.7 + 0.03;
-      L(coat, 0.062, [sg * 0.205, SY - 0.02, 0], [sg * 0.245, SY - 0.27, f * 0.5]);
-      L(sk, 0.050, [sg * 0.245, SY - 0.27, f * 0.5], [sg * 0.255, wy, wz]);
-      S(sk, 0.052, sg * 0.255, wy - 0.015, wz + 0.01);
+    buildFig({
+      b: b, x: x, y: y || 0, z: z, ry: ry, s: s,
+      pose: sit ? 'sit' : (walk ? 'walk' : 'stand'),
+      coat: coat, pants: opt.pants || 'kfPedP', skin: sk, hair: hk,
+      ink: 'kfEye', belt: 'kfPedP', shoe: 'kfShoe',
+      hat: staff ? 'cap' : 'none', hatKey: 'kfRed',
+      apron: staff, apronKey: 'kfApron', bag: opt.bag, bagKey: 'kfBag'
     });
-
-    /* 头、发型、五官 */
-    S(sk, 0.135, 0, HD, 0, 1.0, 1.10, 0.94);
-    if (!staff) {
-      /* 顶发必须偏后：盖到 z=+0.12 就会把眼睛糊掉，脸就白做了 */
-      S(hk, 0.138, 0, HD + 0.095, -0.045, 1.02, 0.44, 0.90);
-      S(hk, 0.120, 0, HD + 0.005, -0.080, 1.0, 0.95, 0.70);
-    }
-    S('kfEye', 0.019, -0.048, HD + 0.005, 0.130);
-    S('kfEye', 0.019, 0.048, HD + 0.005, 0.130);
-    S('kfRedD', 0.019, 0, HD - 0.060, 0.130, 1.5, 0.55, 0.4);
-
-    /* 店员：白围裙 + 红帽（帽檐朝脸） */
-    if (staff) {
-      B('kfApron', 0.30, 0.40, 0.035, 0, TY - 0.02, 0.147);
-      B('kfRed', 0.30, 0.045, 0.042, 0, TY + 0.17, 0.152);
-      C('kfRed', 0.132, 0.136, 0.10, 0, HD + 0.13, -0.012, 12);
-      B('kfRed', 0.21, 0.026, 0.17, 0, HD + 0.085, 0.115);
-      S(hk, 0.118, 0, HD + 0.015, -0.075, 1.0, 0.85, 0.7);
-    }
-    if (opt.bag) {
-      B('kfBag', 0.16, 0.20, 0.09, 0.30, 0.66, 0.03);
-      L('kfBag', 0.011, [0.24, 0.76, 0.03], [0.36, 0.76, 0.03], 5);
-    }
   }
 
   /* 球形行道树：低模三团叶 + 一根干，不用 willow/竹（那是水乡形制的） */
@@ -11387,15 +11429,13 @@ function lnGate(b) {
 /* --------------------------------------------------------- 石拱桥 */
 /* 人只做单色剪影：锥台身 + 球头，不画脸、不画四肢。
    远景里 1 米高只有十几像素，剪影比细节更有效，也避开「人物太丑」。 */
+/* 灯会人潮：单色方块剪影。s 乘 0.58 是让新积木人维持原来约 1.0 米的
+    crowd 身高 —— 不缩放会突然长高七成，把桥和灯摊全挡掉。 */
 function lnFigure(b, x, y, z, s, key) {
-  const k = key || 'lnFigure';
-  /* 剪影不像人的根因是「锥台太粗 + 球头太大」，远看就是一排瓶子。
-     收窄躯干、缩小头、补一道肩线，再靠提灯的光点证明这是人。 */
-  b.cyl(k, 0.100 * s, 0.152 * s, 0.76 * s, 6, x, y + 0.42 * s, z);
-  b.box(k, 0.285 * s, 0.062 * s, 0.105 * s, x, y + 0.735 * s, z);
-  b.sph(k, 0.116 * s, x, y + 0.905 * s, z, 1, 1.08, 1);
-  b.box(k, 0.058 * s, 0.30 * s, 0.085 * s, x - 0.072 * s, y + 0.15 * s, z);
-  b.box(k, 0.058 * s, 0.30 * s, 0.085 * s, x + 0.072 * s, y + 0.15 * s, z);
+  buildFig({
+    b: b, x: x, y: y, z: z, s: (s || 1) * 0.58,
+    mono: true, coat: key || 'lnFigure', pose: 'stand'
+  });
 }
 
 function lnBridge(b) {
@@ -11849,7 +11889,7 @@ function lnWalkers() {
       const bb = new Builder();
       lnFigure(bb, 0, 0, 0, 0.84, 'lnFigureD');
       /* 手里一盏提灯：移动的光比移动的形体更能证明「有人在走」 */
-      bb.sph('lnLanternY', 0.105, 0.26, 0.44, 0.10, 1, 1.1, 1);
+      bb.sph('lnLanternY', 0.105, 0.18, 0.38, 0.10, 1, 1.1, 1);
       bb.build(g2, { noOutline: ['lnFigureD', 'lnLanternY'] });
       const y = q[4] === 15.0 ? LN_LY + 1.0 : LN_LY;
       g2.position.set(q[0], y, q[1]);
@@ -14279,33 +14319,14 @@ function scCore(b) {
 }
 
 /* ------------------------------------------------------------ 人物 */
+/* 城市剖面居民：体素方块小人，站在切面附近才看得见。 */
 function scPed(b, x, y, z, ry, key, skin, pose) {
-  const c = Math.cos(ry), s = Math.sin(ry);
-  const P = function (lx, lz) { return [x + lx * c + lz * s, z - lx * s + lz * c]; };
-  const H = pose === 'sit' ? 0.86 : 1.0;
-  b.cyl(key, 0.115, 0.155, 0.44 * H, 7, x, y + (pose === 'sit' ? 0.56 : 1.24), z);
-  b.sph(key, 0.145, x, y + (pose === 'sit' ? 0.80 : 1.50), z, 1, 0.72, 0.86);
-  b.sph(skin, 0.093, x, y + (pose === 'sit' ? 0.93 : 1.62), z, 1, 1.10, 1);
-  b.sph('scHair', 0.096, x, y + (pose === 'sit' ? 0.99 : 1.68), z - 0.02, 1, 0.60, 1);
-  b.box('scHair', 0.06, 0.07, 0.06, x, y + (pose === 'sit' ? 0.86 : 1.55), z);
-  if (pose === 'sit') {
-    let p = P(-0.055, 0.20);
-    b.cyl('scClothB', 0.048, 0.048, 0.42, 6, p[0], y + 0.56, p[1], 0, 0, Math.PI * 0.5);
-    p = P(0.055, 0.20);
-    b.cyl('scClothB', 0.048, 0.048, 0.42, 6, p[0], y + 0.56, p[1], 0, 0, Math.PI * 0.5);
-    p = P(-0.055, 0.42);
-    b.cyl('scHair', 0.044, 0.044, 0.46, 6, p[0], y + 0.24, p[1]);
-    p = P(0.055, 0.42);
-    b.cyl('scHair', 0.044, 0.044, 0.46, 6, p[0], y + 0.24, p[1]);
-  } else {
-    for (let i = 0; i < 2; i++) {
-      const p = P(i ? 0.075 : -0.075, 0);
-      b.to('scClothB', 0.05, p[0], y + 0.86, p[1],
-        p[0] + (i ? 0.02 : -0.02), y + 0.04, p[1] + 0.06, 5);
-      const q = P(i ? 0.135 : -0.135, 0.02);
-      b.to(key, 0.042, q[0], y + 1.44, q[1], q[0], y + 0.92, q[1] + 0.05, 5);
-    }
-  }
+  buildFig({
+    b: b, x: x, y: y, z: z, ry: ry,
+    pose: pose === 'sit' ? 'sit' : 'stand',
+    coat: key, pants: 'scClothB', skin: skin, hair: 'scHair',
+    ink: 'scHair', belt: 'scClothB', shoe: 'scHair'
+  });
 }
 
 /* ------------------------------------------------------------ 室内：每层一种生活 */
@@ -14946,12 +14967,1352 @@ function buildSecAll() {
   }
 }
 
+/* ============================================================
+   桌面上的世界（desk / DK）—— 第 16 套形制
+   深夜的书桌。只有一盏台灯亮着，光圈里是一本摊开的书，
+   书页上是一座城：一小片咖啡渍是它的湖，回形针是它的环线，
+   笔筒里那几支笔，是它的摩天楼。
+
+   比例：桌面 2.0×1.4 米，杯子 8.5 厘米，城里最高的一栋 3.5 厘米。
+   光只有一个来源 —— 台灯下的 SpotLight。光圈之外不是「暗」，是黑。
+   ============================================================ */
+const DK = !!PS.desk;
+
+const DK_W = 1.00, DK_D = 0.72;      // 桌面半宽 / 半深
+const DK_Y = 0;                       // 桌面上表面
+const BK_X = -0.05, BK_Z = 0.02;      // 书心
+const BK_A = 0.20;                    // 书绕 y 的转角
+
+/* 确定性伪随机 */
+function dkR(seed) {
+  const x = Math.sin(seed * 97.3 + 211.7) * 43758.5453;
+  return x - Math.floor(x);
+}
+
+/* 描边压成暖黑 */
+if (DK) OUTLINE.uniforms.uColor.value.set(0x2a211c);
+
+/* 任意多边形棱柱 */
+function dkSlab(b, key, pts, y0, y1) {
+  const sh = new T.Shape();
+  sh.moveTo(pts[0][0], -pts[0][1]);
+  for (let i = 1; i < pts.length; i++) sh.lineTo(pts[i][0], -pts[i][1]);
+  sh.closePath();
+  const g = new T.ExtrudeGeometry(sh, {
+    depth: Math.max(0.0004, y1 - y0), bevelEnabled: false, curveSegments: 1, steps: 1
+  });
+  g.rotateX(-Math.PI / 2);
+  g.translate(0, y0, 0);
+  b.add(key, g);
+  return g;
+}
+
+function dkBox(b, key, x0, x1, z0, z1, y0, y1) {
+  return dkSlab(b, key, [[x0, z0], [x1, z0], [x1, z1], [x0, z1]], y0, y1);
+}
+
+/* 书的局部坐标：绕书心转 BK_A */
+function bk(cx, cz) {
+  const c = Math.cos(BK_A), s = Math.sin(BK_A);
+  return [BK_X + cx * c - cz * s, BK_Z + cx * s + cz * c];
+}
+
+/* 光锥的竖向渐隐：靠近灯罩亮，落到桌面就化开 */
+const dkConeTex = canvasTex(8, 64, function (c, w, h) {
+  const g = c.createLinearGradient(0, 0, 0, h);
+  g.addColorStop(0, 'rgba(255,255,255,0)');
+  g.addColorStop(0.55, 'rgba(255,255,255,0.45)');
+  g.addColorStop(1, 'rgba(255,255,255,1)');
+  c.fillStyle = g; c.fillRect(0, 0, w, h);
+});
+
+/* ------------------------------------------------------------ 桌面 */
+function dkDesk(b) {
+  /* 一整块实木。桌沿要超出画幅，不然会看见「一块浮着的板」 */
+  dkBox(b, 'dkDesk', -DK_W, DK_W, -DK_D, DK_D, DK_Y - 0.045, DK_Y);
+  /* 木纹：几道很浅的长条，色差极小，只在光里透出来 */
+  for (let i = 0; i < 16; i++) {
+    const z = -DK_D + 0.06 + i * (DK_D * 2 - 0.12) / 15 + (dkR(i * 9.1) - 0.5) * 0.03;
+    const w = 0.004 + dkR(i * 3.1) * 0.026;
+    b.box(i % 3 ? 'dkDeskD' : 'dkDeskL', DK_W * 2, 0.0010, w,
+      0, DK_Y + 0.0005, z);
+  }
+}
+
+/* ------------------------------------------------------------ 书 */
+function dkBook(b) {
+  const PW = 0.118, PD = 0.300;      // 单页宽 / 页深
+  const TH = 0.014;                  // 页厚（整本书的厚度）
+
+  /* 书脊方向的页块：两页各一块，微微向上翘 1.2° */
+  for (let s = -1; s <= 1; s += 2) {
+    const cx = s * PW * 0.5;
+    const p = bk(cx, 0);
+    b.box('dkPaper', PW * 0.94, TH, PD, p[0], DK_Y + TH * 0.5 + 0.001, p[1],
+      0, BK_A, s * 0.021);
+    /* 页边的层叠：三条很薄的深色缝，书才有厚度 */
+    for (let i = 0; i < 3; i++) {
+      const pp = bk(cx, 0);
+      b.box('dkPaperD', PW * 0.94, 0.0012, PD * 0.998,
+        pp[0], DK_Y + 0.0035 + i * 0.0038, pp[1], 0, BK_A, s * 0.021);
+    }
+    /* 封面在下面露一圈 */
+    const pc = bk(cx, 0);
+    b.box('dkCover', PW * 1.02, 0.0035, PD * 1.04,
+      pc[0], DK_Y - 0.0003, pc[1], 0, BK_A, s * 0.021);
+  }
+  /* 书底的一层软阴影：没有它，书是「贴」在桌上而不是「放」在桌上 */
+  const ao = new T.Mesh(new T.PlaneGeometry(0.30, 0.36), new T.MeshBasicMaterial({
+    map: lnSoftTex, color: 0x120c08, transparent: true, opacity: 0.55,
+    depthWrite: false, fog: false, side: T.DoubleSide
+  }));
+  ao.rotation.x = -Math.PI / 2;
+  ao.rotation.z = BK_A;
+  ao.position.set(BK_X, DK_Y + 0.0002, BK_Z);
+  ao.renderOrder = 2;
+  scene.add(ao);
+
+  /* 书脊 */
+  const ps = bk(0, 0);
+  b.box('dkCover', 0.010, TH + 0.004, PD * 1.04, ps[0], DK_Y + TH * 0.5, ps[1], 0, BK_A, 0);
+
+  /* 文字：每页 16 行，行高 0.0035；只有光里的那几行看得见 */
+  for (let s = -1; s <= 1; s += 2) {
+    for (let i = 0; i < 34; i++) {
+      const cz = -PD * 0.44 + i * 0.0076;
+      if (dkR(i * 3.7 + s) < 0.12) continue;
+      const w = PW * (0.42 + dkR(i * 5.1 + s) * 0.44);
+      const p = bk(s * PW * 0.5, cz);
+      b.box('dkInk', w, 0.0006, 0.0016, p[0], DK_Y + 0.0151, p[1], 0, BK_A, s * 0.021);
+    }
+  }
+}
+
+/* ------------------------------------------------------------ 咖啡杯 */
+function dkCup(b) {
+  const cx = 0.335, cz = -0.145;
+  /* 杯垫 */
+  b.cyl('dkSaucer', 0.062, 0.058, 0.006, 18, cx, DK_Y + 0.003, cz);
+  b.cyl('dkSaucerD', 0.063, 0.063, 0.0016, 18, cx, DK_Y + 0.0062, cz);
+  /* 杯身：下窄上宽 */
+  b.cyl('dkCup', 0.043, 0.033, 0.082, 18, cx, DK_Y + 0.047, cz);
+  b.cyl('dkCupD', 0.0445, 0.0445, 0.004, 18, cx, DK_Y + 0.088, cz);
+  /* 咖啡液面 */
+  b.cyl('dkCoffee', 0.0395, 0.0395, 0.002, 16, cx, DK_Y + 0.081, cz);
+  /* 把手：一个竖立的圆环，套在杯身外侧 */
+  b.torus('dkCup', 0.021, 0.0046, cx + 0.040, DK_Y + 0.050, cz, 0, Math.PI * 0.5, 0);
+  /* 杯口的一缕热气：三片极淡的加色片 */
+  for (let i = 0; i < 3; i++) {
+    const m = new T.Mesh(new T.PlaneGeometry(0.03, 0.10), new T.MeshBasicMaterial({
+      map: lnSoftTex, color: 0xfff0d8, transparent: true, opacity: 0.10 - i * 0.02,
+      blending: T.AdditiveBlending, depthWrite: false, fog: false, side: T.DoubleSide
+    }));
+    m.position.set(cx + (i - 1) * 0.012, DK_Y + 0.135 + i * 0.008, cz);
+    m.rotation.y = 0.4 + i * 0.5;
+    scene.add(m);
+  }
+}
+
+/* ------------------------------------------------------------ 笔筒 */
+function dkHold(b) {
+  const cx = -0.475, cz = -0.235;
+  b.cyl('dkSteel', 0.047, 0.041, 0.105, 14, cx, DK_Y + 0.0525, cz);
+  b.cyl('dkSteelD', 0.048, 0.048, 0.004, 14, cx, DK_Y + 0.103, cz);
+  b.cyl('dkSteelD', 0.042, 0.042, 0.004, 14, cx, DK_Y + 0.002, cz);
+  /* 里面插的几支笔 —— 从远处看，它们就是这座城的摩天楼 */
+  const pens = [
+    [-0.020, 0.008, 0.075, 0.10, 'dkPenA', 0.03],
+    [0.014, -0.010, 0.205, 0.00, 'dkPenB', 0.00],
+    [-0.006, 0.018, 0.150, -0.05, 'dkPenC', 0.00],
+    [0.020, 0.014, 0.180, 0.04, 'dkPenD', 0.00],
+    [-0.018, -0.014, 0.120, 0.02, 'dkPenB', 0.00],
+    [0.004, 0.004, 0.235, -0.02, 'dkPenA', 0.00]
+  ];
+  for (let i = 0; i < pens.length; i++) {
+    const p = pens[i];
+    const x = cx + p[0], z = cz + p[1];
+    b.cyl(p[4], 0.0042, 0.0042, p[2], 6, x + p[3] * 0.02, DK_Y + 0.10 + p[2] * 0.5, z,
+      p[3], 0, i * 0.4);
+    /* 笔尖/笔帽 */
+    b.cyl(i % 2 ? 'dkPenTip' : 'dkPenCap', 0.0044, 0.0044, 0.016, 6,
+      x + p[3] * 0.024, DK_Y + 0.10 + p[2] + 0.006, z, p[3], 0, i * 0.4);
+  }
+}
+
+/* ------------------------------------------------------------ 文具 */
+function dkTools(b) {
+  /* 橡皮：粉白块，带一截纸套 */
+  b.box('dkEraser', 0.056, 0.021, 0.028, 0.415, DK_Y + 0.0105, 0.255, 0, 0.22, 0);
+  b.box('dkEraserS', 0.036, 0.0215, 0.0285, 0.404, DK_Y + 0.011, 0.252, 0, 0.22, 0);
+
+  /* 铅笔：横躺在便利贴旁，笔杆六棱用六段薄板近似 */
+  const py = DK_Y + 0.0074, pz = 0.335;
+  b.cyl('dkPencil', 0.0072, 0.0072, 0.165, 6, -0.075, py, pz, 0, 0, Math.PI * 0.5);
+  /* 笔尖 */
+  b.cyl('dkPencilTip', 0.0072, 0.0008, 0.022, 6, -0.169, py, pz, 0, 0, Math.PI * 0.5);
+  b.cyl('dkPencilLead', 0.0022, 0.0004, 0.006, 6, -0.183, py, pz, 0, 0, Math.PI * 0.5);
+  /* 笔尾金属箍 + 橡皮头 */
+  b.cyl('dkSteel', 0.0076, 0.0076, 0.012, 8, 0.014, py, pz, 0, 0, Math.PI * 0.5);
+  b.cyl('dkEraser', 0.0068, 0.0068, 0.010, 8, 0.025, py, pz, 0, 0, Math.PI * 0.5);
+
+  /* 便利贴：微微翘起的一角 */
+  b.box('dkNote', 0.078, 0.0016, 0.078, -0.305, DK_Y + 0.0009, 0.310, 0, -0.16, 0);
+  b.box('dkNoteD', 0.078, 0.0017, 0.012, -0.305, DK_Y + 0.0010, 0.271, 0, -0.16, 0);
+  /* 翘起的那一角：一块小三角板 */
+  const cn = bk;
+  b.box('dkNote', 0.030, 0.0016, 0.030, -0.268, DK_Y + 0.0086, 0.344, 0.42, -0.16, 0.30);
+
+  /* 尺子：半透明塑料，带刻度 */
+  b.box('dkRuler', 0.310, 0.0026, 0.034, 0.115, DK_Y + 0.0014, -0.375, 0, 0.03, 0);
+  for (let i = 0; i < 26; i++) {
+    b.box('dkRulerM', 0.0012, 0.0006, (i % 5 ? 0.008 : 0.014),
+      0.115 - 0.145 + i * 0.0118, DK_Y + 0.0028, -0.375 + 0.010, 0, 0.03, 0);
+  }
+
+  /* 回形针：三段弯折的细钢丝，斜放在桌角 —— 它是这座城的环线 */
+  const cxc = -0.545, czc = 0.145;
+  for (let i = 0; i < 3; i++) {
+    const off = i * 0.0025;
+    b.to('dkClip', 0.0016, cxc - 0.022 + off * 2, DK_Y + 0.0017, czc + off,
+      cxc + 0.024 + off * 2, DK_Y + 0.0017, czc + off, 4);
+    b.to('dkClip', 0.0016, cxc + 0.024 + off * 2, DK_Y + 0.0017, czc + off,
+      cxc + 0.024 + off * 2, DK_Y + 0.0017, czc + 0.020 + off, 4);
+    b.to('dkClip', 0.0016, cxc + 0.024 + off * 2, DK_Y + 0.0017, czc + 0.020 + off,
+      cxc - 0.014 + off * 2, DK_Y + 0.0017, czc + 0.020 + off, 4);
+  }
+}
+
+/* ------------------------------------------------------------ 台灯 */
+function dkLamp(b) {
+  const bx = 0.640, bz = -0.360;
+  /* 底盘 */
+  b.cyl('dkLampBase', 0.098, 0.106, 0.016, 20, bx, DK_Y + 0.008, bz);
+  b.cyl('dkLampBaseD', 0.100, 0.100, 0.003, 20, bx, DK_Y + 0.0175, bz);
+  /* 灯杆：两节，中间一个关节 */
+  b.to('dkLampArm', 0.011, bx, DK_Y + 0.016, bz, bx - 0.045, DK_Y + 0.300, bz + 0.035, 8);
+  b.sph('dkLampJoint', 0.016, bx - 0.045, DK_Y + 0.300, bz + 0.035);
+  b.to('dkLampArm', 0.010, bx - 0.045, DK_Y + 0.300, bz + 0.035,
+    bx - 0.255, DK_Y + 0.372, bz + 0.235, 8);
+  b.sph('dkLampJoint', 0.014, bx - 0.255, DK_Y + 0.372, bz + 0.235);
+
+  /* 灯罩：一个上窄下阔的锥台，内壁自发光 */
+  const sx = bx - 0.255, sy = DK_Y + 0.360, sz = bz + 0.235;
+  /* 灯罩：一条车削轮廓。
+     ★ 不要用几个圆柱叠出弧度 —— 每段圆柱各带一圈描边，叠起来就是三层绿饼。 */
+  const prof = [];
+  for (let i = 0; i <= 7; i++) {
+    const t = i / 7;
+    prof.push(new T.Vector2(0.048 + 0.052 * Math.pow(t, 0.82), 0.046 - t * 0.094));
+  }
+  const shg = new T.LatheGeometry(prof, 22);
+  shg.translate(sx, sy, sz);
+  b.add('dkShade', shg);
+  b.cyl('dkShadeIn', 0.046, 0.093, 0.004, 20, sx, sy - 0.047, sz);
+  b.cyl('dkShadeD', 0.050, 0.050, 0.006, 20, sx, sy + 0.048, sz);
+  b.sph('dkBulb', 0.020, sx, sy - 0.032, sz);
+
+  /* 光锥：从灯罩口到桌面的一截空气。★ 必须上下渐隐，
+     否则它就是一个硬边的三角形贴在桌面上，一眼假 */
+  const cone = new T.Mesh(
+    new T.CylinderGeometry(0.098, 0.42, sy - DK_Y - 0.02, 26, 1, true),
+    new T.MeshBasicMaterial({
+      map: dkConeTex, color: 0xffd9a0, transparent: true, opacity: 0.065,
+      blending: T.AdditiveBlending, depthWrite: false, side: T.DoubleSide, fog: false
+    }));
+  cone.position.set(sx, DK_Y + (sy - DK_Y) * 0.5, sz);
+  cone.renderOrder = 4;
+  scene.add(cone);
+
+  /* 灯下的光圈：一圈暖色加色片，压出「桌面被照亮的一块」 */
+  const pool = new T.Mesh(new T.PlaneGeometry(0.78, 0.78), new T.MeshBasicMaterial({
+    map: lnSoftTex, color: 0xffcf92, transparent: true, opacity: 0.07,
+    blending: T.AdditiveBlending, depthWrite: false, fog: false, side: T.DoubleSide
+  }));
+  pool.rotation.x = -Math.PI / 2;
+  pool.position.set(sx - 0.16, DK_Y + 0.0016, sz + 0.12);
+  pool.renderOrder = 3;
+  scene.add(pool);
+
+  return { x: sx, y: sy, z: sz };
+}
+
+/* ------------------------------------------------------------ 书页上的城 */
+function dkCity(b) {
+  const PW = 0.118, PD = 0.300;
+  const GY = DK_Y + 0.0152;          // 城市地面 = 书页顶面（别浮起来）
+
+  /* 街道：先用格子定好街网，楼再往格子里坐。
+     ★ 不要手写一堆坐标去「摆」城市 —— 摆出来一定是散的。
+       格子决定街，街决定城；空格就是街，湖就是挖掉的几格。 */
+  const CX0 = -0.090, CX1 = 0.106, CZ0 = -0.136, CZ1 = 0.136;
+  const NX = 7, NZ = 9;
+  const DXX = (CX1 - CX0) / NX, DZZ = (CZ1 - CZ0) / NZ;
+  const LK = [0.082, 0.052];          // 湖心（书的局部坐标）
+
+  /* 街：沿格线铺细条，横竖各一套 */
+  for (let i = 1; i < NX; i++) {
+    const x = CX0 + DXX * i, p = bk(x, 0);
+    b.box('dkRoad', 0.0035, 0.0006, CZ1 - CZ0 - 0.006, p[0], GY + 0.0004, p[1], 0, BK_A, 0);
+  }
+  for (let i = 1; i < NZ; i++) {
+    const z = CZ0 + DZZ * i, p = bk(0, z);
+    b.box('dkRoad', CX1 - CX0 - 0.006, 0.0006, 0.0035, p[0], GY + 0.0004, p[1], 0, BK_A, 0);
+  }
+
+  const put = function (cx, cz, w, d, h, key) {
+    const p = bk(cx, cz);
+    b.box(key, w, h, d, p[0], GY + h * 0.5, p[1], 0, BK_A, 0);
+    /* 屋面压深一圈，楼顶才不是一块平顶 */
+    b.box('dkRoof', w * 0.88, 0.0007, d * 0.88, p[0], GY + h + 0.0003, p[1], 0, BK_A, 0);
+    if (h > 0.026) {
+      b.cyl('dkSteelD', 0.0005, 0.0005, 0.006, 4, p[0], GY + h + 0.003, p[1]);
+    }
+    /* 窗：只在朝向相机的那一面画几道，够读就行 */
+    const rows = Math.floor(h / 0.0055);
+    for (let i = 0; i < rows; i++) {
+      b.box('dkWin', w * 0.90, 0.0011, 0.0004,
+        p[0], GY + 0.0035 + i * 0.0055, p[1] + d * 0.5, 0, BK_A, 0);
+      b.box('dkWin', 0.0004, 0.0011, d * 0.90,
+        p[0] + w * 0.5, GY + 0.0035 + i * 0.0055, p[1], 0, BK_A, 0);
+    }
+  };
+
+  const keys = ['dkBld1', 'dkBld2', 'dkBld3', 'dkBld4', 'dkBld5', 'dkBld6'];
+
+  /* 逐格生成：一格一到两栋，剩下的格留给湖、广场、公园 */
+  for (let ix = 0; ix < NX; ix++) {
+    for (let iz = 0; iz < NZ; iz++) {
+      const cx = CX0 + DXX * (ix + 0.5);
+      const cz = CZ0 + DZZ * (iz + 0.5);
+      const seed = ix * 17.3 + iz * 5.7;
+      const r0 = dkR(seed + 1.0);
+
+      /* 湖：挖掉湖心周围的几格 */
+      const dl = Math.sqrt((cx - LK[0]) * (cx - LK[0]) + (cz - LK[1]) * (cz - LK[1]));
+      if (dl < DXX * 1.30) continue;
+
+      /* 留白：广场与街心公园 */
+      if (r0 < 0.17) {
+        if (r0 < 0.08) {
+          const p = bk(cx, cz);
+          b.box('dkPlaza', DXX * 0.62, 0.0005, DZZ * 0.62, p[0], GY + 0.0004, p[1], 0, BK_A, 0);
+        } else {
+          for (let t = 0; t < 3; t++) {
+            const p = bk(cx + (dkR(seed + t * 3.3) - 0.5) * DXX * 0.30,
+              cz + (dkR(seed + t * 7.1) - 0.5) * DZZ * 0.30);
+            const ts = 0.0026 + dkR(seed + t * 5.1) * 0.0012;
+            b.cyl('dkTreeD', 0.0004, 0.0005, ts * 1.3, 4, p[0], GY + ts * 0.65, p[1]);
+            b.sph(t % 2 ? 'dkTree' : 'dkTreeD', ts, p[0], GY + ts * 1.5, p[1], 1.1, 0.95, 1.05);
+          }
+        }
+        continue;
+      }
+
+      const w = DXX * (0.46 + dkR(seed + 2.3) * 0.22);
+      const d = DZZ * (0.46 + dkR(seed + 5.3) * 0.22);
+      /* 高度差别要够狠：绝大多数是矮房，少数几栋冒出来，才像城 */
+      let h = 0.009 + Math.pow(dkR(seed + 6.1), 3.1) * 0.034;
+      const dc = Math.sqrt((cx + 0.010) * (cx + 0.010) + (cz + 0.010) * (cz + 0.010));
+      if (dc < 0.055) h *= 1.45;              // 市中心一撮高楼
+      if (dkR(seed + 21.7) < 0.07) h *= 1.9;  // 偶尔冒出一栋塔
+      put(cx, cz, w, d, h, keys[Math.floor(dkR(seed + 8.9) * 6) % 6]);
+      /* 少数格子裂成两栋，城市才有密度差 */
+      if (dkR(seed + 11.3) < 0.26) {
+        const w2 = DXX * 0.26, d2 = DZZ * 0.26;
+        put(cx + (dkR(seed + 13.1) - 0.5) * DXX * 0.30,
+          cz + (dkR(seed + 14.7) - 0.5) * DZZ * 0.30,
+          w2, d2, 0.010 + dkR(seed + 16.3) * 0.012,
+          keys[Math.floor(dkR(seed + 18.5) * 6) % 6]);
+      }
+    }
+  }
+
+  /* 全城最高的地标，立在湖的西北岸 */
+  put(0.056, 0.014, 0.018, 0.018, 0.042, 'dkBld1');
+  put(0.056, 0.014, 0.011, 0.011, 0.010, 'dkBld6');
+
+  /* 湖：右页偏南的一片咖啡渍。★ 一定要放在「前排没有楼」的地方，
+     不然从机位看过去，湖被自己城里的房子挡得一点不剩。 */
+  const qy = bk(0.082, 0.052);
+  b.cyl('dkQuay', 0.0330, 0.0330, 0.0006, 20, qy[0], GY + 0.0004, qy[1]);
+  b.cyl('dkStainD', 0.0292, 0.0292, 0.0006, 20, qy[0], GY + 0.0006, qy[1]);
+  b.cyl('dkStain', 0.0262, 0.0262, 0.0006, 20, qy[0], GY + 0.0008, qy[1]);
+  b.cyl('dkShore', 0.0240, 0.0240, 0.0007, 20, qy[0], GY + 0.0009, qy[1]);
+  b.cyl('dkWater', 0.0226, 0.0226, 0.0007, 20, qy[0], GY + 0.0011, qy[1]);
+  /* 两条小船：一叶扁舟，比楼还小 */
+  for (let i = 0; i < 2; i++) {
+    const bx2 = qy[0] + (i ? 0.008 : -0.007), bz2 = qy[1] + (i ? -0.006 : 0.007);
+    b.box('dkBoat', 0.0090, 0.0014, 0.0034, bx2, GY + 0.0019, bz2, 0, BK_A + 0.5 * i, 0);
+    b.box('dkBoatD', 0.0030, 0.0018, 0.0026, bx2, GY + 0.0030, bz2, 0, BK_A + 0.5 * i, 0);
+  }
+
+  /* 跨湖的桥：一段极薄的板 + 两边栏杆 */
+  const pb = bk(0.082, 0.052);
+  b.box('dkDeck', 0.062, 0.0016, 0.010, pb[0], GY + 0.0086, pb[1], 0, BK_A, 0);
+  for (let i = 0; i < 2; i++) {
+    b.box('dkSteelD', 0.052, 0.0012, 0.0008,
+      pb[0], GY + 0.0092, pb[1] + (i ? 0.0052 : -0.0052), 0, BK_A, 0);
+  }
+
+  /* 树：小绿球，成排种在街边 */
+  const trees = [
+    [-0.062, -0.062], [-0.028, -0.058], [0.008, -0.064], [0.044, -0.060],
+    [-0.064, 0.056], [-0.020, 0.062], [0.006, -0.008], [0.078, 0.060],
+    [-0.056, 0.126], [-0.018, 0.128], [0.022, 0.124], [0.070, 0.126],
+    [-0.092, 0.004], [0.092, -0.044], [-0.036, -0.118], [0.048, -0.120]
+  ];
+  for (let i = 0; i < trees.length; i++) {
+    const p = bk(trees[i][0], trees[i][1]);
+    const s = 0.0026 + dkR(i * 3.3) * 0.0014;
+    b.cyl('dkTreeD', 0.0004, 0.0005, s * 1.3, 4, p[0], GY + s * 0.65, p[1]);
+    b.sph(i % 2 ? 'dkTree' : 'dkTreeD', s, p[0], GY + s * 1.5, p[1], 1.1, 0.95, 1.05);
+  }
+
+  /* 车：街上的小方盒，红白蓝三种 */
+  const cars = [
+    [-0.070, -0.115, 0.000, 'dkCarA'], [-0.020, -0.115, 0.000, 'dkCarB'],
+    [0.030, -0.115, 0.000, 'dkCarC'], [0.070, 0.075, 0.000, 'dkCarA'],
+    [-0.055, 0.030, 0.000, 'dkCarB'], [0.062, -0.060, 0.000, 'dkCarC']
+  ];
+  for (let i = 0; i < cars.length; i++) {
+    const q = cars[i];
+    const p = bk(q[0], q[1]);
+    b.box(q[3], 0.0052, 0.0018, 0.0026, p[0], GY + 0.0024, p[1], 0, BK_A + 0.02 * i, 0);
+    b.box('dkGlass', 0.0026, 0.0014, 0.0027, p[0], GY + 0.0036, p[1], 0, BK_A + 0.02 * i, 0);
+  }
+}
+
+/* ------------------------------------------------------------ 组装 */
+function buildDkAll() {
+  const g = new T.Group();
+  const b = new Builder();
+  dkDesk(b);
+  dkBook(b);
+  dkCity(b);
+  dkCup(b);
+  dkHold(b);
+  dkTools(b);
+  const lamp = dkLamp(b);
+  b.build(g, {
+    noOutline: ['dkDesk', 'dkDeskD', 'dkDeskL', 'dkPaper', 'dkPaperD', 'dkInk',
+      'dkField', 'dkRoad', 'dkWin', 'dkStain', 'dkStainD', 'dkWater',
+      'dkTree', 'dkTreeD', 'dkShadeIn', 'dkBulb', 'dkNote', 'dkCoffee',
+      'dkRulerM', 'dkGlass', 'dkField']
+  });
+  scene.add(g);
+
+  /* ★ 全场只有一个光源：灯罩里的那一盏。
+     其余位置不是「暗」，是黑 —— 所以面光只留一丝，够勾出轮廓就行。 */
+  /* ★ 光要落在书上，不是落在杯子上 —— 杯子只是配角 */
+  const spot = new T.SpotLight(0xffd9a0, 1.45, 3.0, 0.68, 0.72, 1.55);
+  spot.position.set(lamp.x, lamp.y - 0.035, lamp.z);
+  spot.target.position.set(BK_X, DK_Y, BK_Z + 0.02);
+  scene.add(spot);
+  scene.add(spot.target);
+
+  /* 灯罩自身的暖光：让灯是「亮着的」，不是一块黑铁 */
+  const glow = new T.PointLight(0xffc98a, 0.55, 0.5, 2);
+  glow.position.set(lamp.x, lamp.y - 0.06, lamp.z);
+  scene.add(glow);
+  /* 灯臂与底座的补光：没有它，灯罩就是浮在空中的一个绿锥体 */
+  const rim = new T.PointLight(0xffb877, 0.20, 0.62, 2);
+  rim.position.set(lamp.x + 0.08, lamp.y - 0.24, lamp.z + 0.10);
+  scene.add(rim);
+
+  if (window.__expose) {
+    window.__dk = { lamp: lamp, deskW: DK_W, deskD: DK_D };
+  }
+}
+
+/* ==================================================================
+   醉仙楼 · 三层古代酒楼（第 17 套 / TV）
+   正面朝 +X。三条「看得见里面」的通道：
+     ① 门与窗都是真洞口（整面墙一个带洞挤出多边形），不糊窗纸不贴亮板；
+     ② 右山墙（+Z）整面剖开，只留柱梁与槛墙，三层室内从侧面一览无余；
+     ③ 屋顶只留后坡 + 前檐一小段，前坡掀开，顶层不被瓦盖住。
+   ================================================================== */
+const TV = !!PS.tavern;
+
+const TV_X0 = -6.20, TV_X1 = 2.60;    // 进深 8.80（正面 +X）
+const TV_Z0 = -5.60, TV_Z1 = 5.60;    // 面阔 11.20
+const TV_T  = 0.26;                    // 墙厚
+const TV_GY = 0.34;                    // 台基顶 = 一层地坪
+const TV_Y1 = 3.94;                    // 二层楼面
+const TV_Y2 = 7.14;                    // 三层楼面
+const TV_Y3 = 10.04;                   // 顶层檐口
+const TV_RG = 12.62;                   // 屋脊
+const TV_XR = -1.80;                   // 脊的 x（偏后，前坡才掀得开）
+const TV_EF = 1.16;                    // 屋面出挑
+const TV_BX = 9.70, TV_BZ = 8.40;      // 展台半尺寸
+const TV_BT = -1.26, TV_GD = 0.02;     // 台底 / 场院地面
+
+/* 黄昏酒楼的描边压成暖褐墨，别用民居的纯黑 */
+if (TV) OUTLINE.uniforms.uColor.value.set(0x3b2a22);
+
+function tvR(seed) {
+  const x = Math.sin(seed * 127.1 + 311.7) * 43758.5453;
+  return x - Math.floor(x);
+}
+
+/* 局部坐标零件 → 整体绕 y 旋转再平移（人物、家具、斜置道具共用） */
+function tvAdd(b, key, geo, x, y, z, ry, lx, ly, lz) {
+  if (lx || ly || lz) geo.translate(lx, ly, lz);
+  if (ry) geo.rotateY(ry);
+  geo.translate(x, y, z);
+  return b.add(key, geo);
+}
+function tvB(b, key, w, h, d, x, y, z, ry, lx, ly, lz) {
+  return tvAdd(b, key, new T.BoxGeometry(w, h, d), x, y, z, ry, lx, ly, lz);
+}
+
+/* 带洞口的整面墙：一个挤出多边形，绝不用几十个小盒子拼。
+   axis 'x' = 法线沿 X（正面 / 后墙，a 轴是 z）；'z' = 法线沿 Z（山墙，a 轴是 x）。 */
+function tvWall(b, key, axis, at, a0, a1, y0, y1, holes, thick) {
+  const th = thick === undefined ? TV_T : thick;
+  const sh = new T.Shape();
+  sh.moveTo(a0, y0); sh.lineTo(a1, y0); sh.lineTo(a1, y1); sh.lineTo(a0, y1); sh.closePath();
+  (holes || []).forEach(function (q) {
+    const p = new T.Path();
+    p.moveTo(q[0], q[2]); p.lineTo(q[1], q[2]);
+    p.lineTo(q[1], q[3]); p.lineTo(q[0], q[3]); p.closePath();
+    sh.holes.push(p);
+  });
+  const g = new T.ExtrudeGeometry(sh, {
+    depth: th, bevelEnabled: false, curveSegments: 1, steps: 1
+  });
+  if (axis === 'x') {
+    g.rotateY(-Math.PI * 0.5);
+    g.translate(at + th * 0.5, 0, 0);
+  } else {
+    g.translate(0, 0, at - th * 0.5);
+  }
+  return b.add(key, g);
+}
+
+/* 稀疏格棂：只留竖棂 + 两道横档，透得进视线才是这套形制的目的 */
+function tvLattice(b, x, z0, z1, y0, y1, dense) {
+  const k = 'tvLattice', t = 0.055;
+  b.box(k, 0.075, y1 - y0, 0.075, x, (y0 + y1) / 2, z0);
+  b.box(k, 0.075, y1 - y0, 0.075, x, (y0 + y1) / 2, z1);
+  b.box(k, 0.075, 0.075, z1 - z0, x, y0, (z0 + z1) / 2);
+  b.box(k, 0.075, 0.075, z1 - z0, x, y1, (z0 + z1) / 2);
+  const n = Math.max(3, Math.round((z1 - z0) / (dense ? 0.28 : 0.36)));
+  for (let i = 1; i < n; i++) {
+    const z = z0 + (z1 - z0) * i / n;
+    b.box(k, 0.048, y1 - y0, 0.048, x, (y0 + y1) / 2, z);
+  }
+  for (let j = 1; j <= 2; j++) {
+    b.box(k, 0.045, 0.045, z1 - z0, x, y0 + (y1 - y0) * j / 3, (z0 + z1) / 2);
+  }
+}
+
+/* 门扇绕铰链真正敞开，不是一块贴上去的板 */
+function tvDoorLeaf(b, x, y, zH, side, ang) {
+  const g = new T.BoxGeometry(0.085, 2.48, 1.30);
+  g.translate(0, 0, side * 0.65);
+  g.rotateY(ang);
+  g.translate(x, y, zH);
+  b.add('tvDoor', g);
+  /* 门上的门钹与横带 */
+  const m = new T.BoxGeometry(0.10, 0.055, 0.94);
+  m.translate(0.02, 0.55, side * 0.62);
+  m.rotateY(ang);
+  m.translate(x, y, zH);
+  b.add('tvDoorD', m);
+}
+
+/* 屋面一段：把长边沿坡线的厚板压到坡线下侧，上表面贴坡线 */
+function tvSlope(b, key, x0, y0, x1, y1, z0, z1, th) {
+  const dx = x1 - x0, dy = y1 - y0, L = Math.sqrt(dx * dx + dy * dy);
+  let nx = -dy / L, ny = dx / L;
+  if (ny < 0) { nx = -nx; ny = -ny; }
+  const cx = (x0 + x1) / 2 - nx * th * 0.5;
+  const cy = (y0 + y1) / 2 - ny * th * 0.5;
+  b.box(key, L, th, z1 - z0, cx, cy, (z0 + z1) / 2, 0, 0, Math.atan2(dy, dx));
+}
+/* 两坡举折（下缓上陡）+ 瓦垄；只画指定 x 区间，前坡因此能只留檐口那一截 */
+function tvRoofRun(b, xA, yA, xB, yB, z0, z1, seg) {
+  /* seg=true 时只做一小段直坡（掀开后留下的前檐），不做举折两段 */
+  if (seg) {
+    tvSlope(b, 'tvTile', xA, yA, xB, yB, z0, z1, 0.19);
+    for (let z = z0 + 0.18; z < z1; z += 0.36)
+      b.to('tvTileD', 0.055, xA, yA + 0.045, z, xB, yB + 0.045, z, 6);
+    return;
+  }
+  const mx = xA + (xB - xA) * 0.34, my = yA - (yA - yB) * 0.66;
+  tvSlope(b, 'tvTile', xA, yA, mx, my, z0, z1, 0.19);
+  tvSlope(b, 'tvTileL', mx, my, xB, yB, z0, z1, 0.17);
+  for (let z = z0 + 0.18; z < z1; z += 0.36) {
+    b.to('tvTileD', 0.055, xA, yA + 0.045, z, mx, my + 0.045, z, 6);
+    b.to('tvTileD', 0.052, mx, my + 0.045, z, xB, yB + 0.045, z, 6);
+  }
+}
+
+/* 树冠：噪声位移的刻面球，不是一堆带黑边的小球 */
+function tvBlob(b, key, x, y, z, rx, ry, rz, seed) {
+  const g = new T.IcosahedronGeometry(1, 2);
+  const p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) {
+    const vx = p.getX(i), vy = p.getY(i), vz = p.getZ(i);
+    const n = 0.84 + 0.20 * Math.sin(vx * 5.3 + vy * 3.1 + seed)
+      + 0.12 * Math.sin(vz * 7.7 - vy * 4.2 + seed * 1.7);
+    p.setXYZ(i, vx * n, vy * n, vz * n);
+  }
+  g.computeVertexNormals();
+  g.scale(rx, ry, rz);
+  g.translate(x, y, z);
+  b.add(key, g);
+}
+
+/* 人：锥台袍身 + 球头 + 分段四肢，剪影先像人，再谈细节 */
+/* 人：统一积木小人。帽型按坐标散列，三层几十号人不会全戴同一顶。 */
+function tvPed(b, x, y, z, ry, mode, robe) {
+  const K = robe || 'tvRobeA';
+  const h = Math.abs(Math.round((x * 7.3 + z * 13.7 + y * 3.1) * 10)) % 3;
+  const hats = ['fang', 'bun', 'cap'];
+  buildFig({
+    b: b, x: x, y: y, z: z, ry: ry,
+    pose: mode === 'sit' ? 'sit' : (mode === 'walk' ? 'walk' : 'stand'),
+    coat: K, pants: 'tvRobeC', skin: 'tvSkin', hair: 'tvHair',
+    ink: 'tvHair', belt: 'tvRobeC', shoe: 'tvShoe',
+    hat: hats[h], hatKey: h === 2 ? 'tvApron' : 'tvHair',
+    apron: h === 2, apronKey: 'tvApron', armFront: h === 2
+  });
+}
+function tvCylAt(b, key, rt, rb, h, seg, x, y, z, ry, lx, ly, lz) {
+  return tvAdd(b, key, new T.CylinderGeometry(rt, rb, h, seg || 9), x, y, z, ry, lx, ly, lz);
+}
+
+/* ------------------------------------------------------------ 场院与台基 */
+function tvBase(b) {
+  /* 展台：切角土台，侧面四层剖面（别让模型像浮在空中的贴纸） */
+  b.box('tvBaseD', TV_BX * 2, 0.22, TV_BZ * 2, 0, TV_BT + 0.11, 0);
+  b.box('tvBase', TV_BX * 2 - 0.16, 0.14, TV_BZ * 2 - 0.16, 0, TV_BT + 0.29, 0);
+  b.box('tvSoil', TV_BX * 2 - 0.30, 0.72, TV_BZ * 2 - 0.30, 0, TV_BT + 0.72, 0);
+  b.box('tvSoilD', TV_BX * 2 - 0.30, 0.30, TV_BZ * 2 - 0.30, 0, TV_BT + 1.10, 0);
+  b.box('tvPave', TV_BX * 2 - 0.30, 0.10, TV_BZ * 2 - 0.30, 0, TV_GD - 0.05, 0);
+
+  /* 门前广场石板：三阶明度抖动，进 noOutline 免得整片砖缝 */
+  const S = 0.86;
+  let ix = 0;
+  for (let x = TV_X1 + 1.15; x < TV_BX - 0.35; x += S) {
+    let iz = 0;
+    for (let z = -TV_BZ + 0.45; z < TV_BZ - 0.35; z += S) {
+      const m = (ix * 5 + iz * 7) % 9;
+      const k = m === 0 ? 'tvPaveL' : (m === 4 ? 'tvPaveD' : 'tvPave');
+      b.box(k, S - 0.055, 0.045, S - 0.055, x, TV_GD + 0.022, z);
+      iz++;
+    }
+    ix++;
+  }
+  /* 楼两侧与后侧的窄石板 */
+  for (let z = -TV_BZ + 0.45; z < TV_BZ - 0.35; z += S) {
+    for (let x = -TV_BX + 0.55; x < TV_X1 + 1.10; x += S) {
+      if (x > TV_X0 - 1.0 && x < TV_X1 + 0.4 && z > TV_Z0 - 0.6 && z < TV_Z1 + 0.6) continue;
+      b.box('tvPaveD', S - 0.07, 0.038, S - 0.07, x, TV_GD + 0.019, z);
+    }
+  }
+
+  /* 台基：须弥座线脚 + 台面 */
+  b.box('tvStoneD', TV_X1 - TV_X0 + 1.10, 0.20, TV_Z1 - TV_Z0 + 1.10, (TV_X0 + TV_X1) / 2, 0.12, 0);
+  b.box('tvStone', TV_X1 - TV_X0 + 0.86, 0.20, TV_Z1 - TV_Z0 + 0.86, (TV_X0 + TV_X1) / 2, 0.25, 0);
+  b.box('tvStoneL', TV_X1 - TV_X0 + 0.72, 0.055, TV_Z1 - TV_Z0 + 0.72, (TV_X0 + TV_X1) / 2, TV_GY - 0.03, 0);
+  /* 台基四边压线 */
+  for (let i = 0; i < 4; i++) {
+    const zz = TV_Z0 - 0.55 + i * (TV_Z1 - TV_Z0 + 1.10) / 3;
+    b.box('tvStoneD', TV_X1 - TV_X0 + 1.10, 0.045, 0.055, (TV_X0 + TV_X1) / 2, 0.20, zz);
+  }
+  /* 门前台阶 3 级 */
+  for (let i = 0; i < 3; i++) {
+    const w = 0.42;
+    b.box('tvStoneL', w, 0.11, 3.70, TV_X1 + 0.72 - i * w, TV_GD + 0.165 - i * 0.095, 0);
+  }
+  b.box('tvStoneD', 1.42, 0.06, 4.10, TV_X1 + 0.55, TV_GD + 0.03, 0);
+}
+
+/* ------------------------------------------------------------ 楼身外壳 */
+function tvShell(b) {
+  const F = TV_X1, Bk = TV_X0, L = TV_Z0, R = TV_Z1;
+  const FL = [TV_GY, TV_Y1, TV_Y2, TV_Y3];
+
+  /* 楼板：整层一块，剖口侧留一道深色断面收边 */
+  for (let f = 1; f <= 2; f++) {
+    const y = FL[f];
+    b.box('tvFloor', F - Bk, 0.20, R - L, (F + Bk) / 2, y - 0.10, 0);
+    b.box('tvFloorD', F - Bk, 0.045, R - L, (F + Bk) / 2, y + 0.005, 0);
+    b.box('tvCut', 0.10, 0.20, R - L, F - 0.05, y - 0.10, 0);
+    /* 楼板底下的梁（沿 z 方向） */
+    for (let i = 0; i < 5; i++)
+      b.box('tvBeam', F - Bk, 0.16, 0.15, (F + Bk) / 2, y - 0.27, L + (R - L) * i / 4);
+    /* 顶棚：让下一层天花板不是一团黑 */
+    b.box('tvCeil', F - Bk - 0.30, 0.035, R - L - 0.30, (F + Bk) / 2, y - 0.30, 0);
+  }
+  /* 一层木地板：稍亮一档 + 板缝。斜视角下没有缝线会读成一块斜坡 */
+  b.box('tvFloor', F - Bk, 0.05, R - L, (F + Bk) / 2, TV_GY + 0.02, 0);
+  for (let z = L + 0.25; z < R; z += 0.44)
+    b.box('tvFloorD', F - Bk - 0.40, 0.014, 0.026, (F + Bk) / 2, TV_GY + 0.053, z);
+  for (let x = Bk + 0.60; x < F; x += 1.30)
+    b.box('tvFloorD', 0.026, 0.014, R - L - 0.40, x, TV_GY + 0.054, 0);
+
+  /* 后墙 / 左山墙：实心整块（室内背板），不做洞，家具有背景才不穿帮 */
+  for (let f = 0; f < 3; f++) {
+    tvWall(b, 'tvWall', 'x', Bk, L, R, FL[f], FL[f + 1] - 0.16, [], 0.24);
+    tvWall(b, 'tvWallD', 'z', L, Bk, F, FL[f], FL[f + 1] - 0.16, [], 0.24);
+  }
+  /* 室内背板：自发光暖灰，室内才不会死黑 */
+  for (let f = 0; f < 3; f++)
+    b.box('tvWallIn', 0.055, FL[f + 1] - FL[f] - 0.40, R - L - 0.5,
+      Bk + 0.17, (FL[f] + FL[f + 1]) / 2, 0);
+
+  /* 正面墙：三层各一整块，门窗是真洞 */
+  const doorHole = [-1.48, 1.48, TV_GY + 0.018, TV_GY + 2.62];
+  const w1 = [[-4.70, -2.10, TV_GY + 0.92, TV_GY + 2.56], [2.10, 4.70, TV_GY + 0.92, TV_GY + 2.56]];
+  const w2 = [[-4.70, -2.25, TV_Y1 + 1.00, TV_Y1 + 2.48],
+              [-1.12, 1.12, TV_Y1 + 1.00, TV_Y1 + 2.48],
+              [2.25, 4.70, TV_Y1 + 1.00, TV_Y1 + 2.48]];
+  const w3 = [[-4.35, -2.05, TV_Y2 + 0.98, TV_Y2 + 2.36],
+              [-1.00, 1.00, TV_Y2 + 0.98, TV_Y2 + 2.36],
+              [2.05, 4.35, TV_Y2 + 0.98, TV_Y2 + 2.36]];
+  tvWall(b, 'tvWall', 'x', F, L, R, TV_GY, TV_Y1 - 0.16, [doorHole, w1[0], w1[1]], TV_T);
+  tvWall(b, 'tvWall', 'x', F, L, R, TV_Y1, TV_Y2 - 0.16, w2, TV_T);
+  tvWall(b, 'tvWall', 'x', F, L, R, TV_Y2, TV_Y3 - 0.16, w3, TV_T);
+
+  /* 窗棂 / 门扇：全部在洞口里，稀疏透视线 */
+  [w1, w2, w3].forEach(function (arr, fi) {
+    arr.forEach(function (q, i) {
+      tvLattice(b, F + 0.02, q[0] + 0.04, q[1] - 0.04, q[2] + 0.04, q[3] - 0.04, fi === 0);
+      /* 窗楣与窗台：把洞口「框」出来 */
+      b.box('tvWoodL', 0.16, 0.09, q[1] - q[0] + 0.26, F + 0.12, q[3] + 0.07, (q[0] + q[1]) / 2);
+      b.box('tvWoodD', 0.20, 0.10, q[1] - q[0] + 0.30, F + 0.14, q[2] - 0.06, (q[0] + q[1]) / 2);
+    });
+  });
+  /* ★ 两扇都必须朝室内（-x）开：左铰链门扇往 +z 伸、右铰链往 -z 伸，
+     旋转角因此相反。写成同号会两块板一起斜插到门前，把门洞糊死。 */
+  tvDoorLeaf(b, F - 0.02, TV_GY + 1.26, -1.44, 1, -1.48);
+  tvDoorLeaf(b, F - 0.02, TV_GY + 1.26, 1.44, -1, 1.48);
+  b.box('tvWoodD', 0.30, 0.20, 3.50, F + 0.10, TV_GY + 2.72, 0);
+  b.box('tvWoodL', 0.34, 0.09, 3.70, F + 0.12, TV_GY + 2.86, 0);
+
+  /* 右山墙：整面剖开 —— 只有 0.82 高的槛墙 + 柱梁，三层室内全露出来 */
+  for (let f = 0; f < 3; f++) {
+    b.box('tvWallD', F - Bk, 0.82, TV_T, (F + Bk) / 2, FL[f] + 0.41, R - 0.02);
+    b.box('tvCut', F - Bk, 0.075, TV_T + 0.05, (F + Bk) / 2, FL[f] + 0.86, R - 0.02);
+    /* 剖口上沿的额枋 */
+    b.box('tvBeam', F - Bk, 0.20, 0.22, (F + Bk) / 2, FL[f + 1] - 0.28, R - 0.02);
+  }
+
+  /* 柱网：每层 4 角柱 + 正面 2 中柱，朱红 */
+  for (let f = 0; f < 3; f++) {
+    const y0 = FL[f], y1 = FL[f + 1] - 0.16, h = y1 - y0;
+    const pl = [[Bk + 0.20, L + 0.20], [Bk + 0.20, R - 0.20],
+                [F - 0.20, L + 0.20], [F - 0.20, R - 0.20],
+                [F - 0.20, -1.83], [F - 0.20, 1.83],
+                [Bk + 0.20, -1.83], [Bk + 0.20, 1.83]];
+    for (let i = 0; i < pl.length; i++) {
+      b.cyl('tvPillar', 0.175, 0.195, h, 10, pl[i][0], y0 + h / 2, pl[i][1]);
+      b.cyl('tvStoneD', 0.235, 0.255, 0.16, 10, pl[i][0], y0 + 0.08, pl[i][1]);
+      /* 柱头斗拱：一横两斜，青绿彩画 */
+      b.box('tvBracket', 0.44, 0.13, 0.44, pl[i][0], y1 - 0.06, pl[i][1]);
+      b.box('tvBracketR', 0.30, 0.075, 0.30, pl[i][0], y1 - 0.16, pl[i][1]);
+    }
+    /* 额枋：四面各一道 */
+    b.box('tvBeam', 0.20, 0.22, R - L, F - 0.14, y1 - 0.30, 0);
+    b.box('tvBeam', 0.20, 0.22, R - L, Bk + 0.14, y1 - 0.30, 0);
+    b.box('tvBeam', F - Bk, 0.22, 0.20, (F + Bk) / 2, y1 - 0.30, L + 0.14);
+    b.box('tvBeam', F - Bk, 0.22, 0.20, (F + Bk) / 2, y1 - 0.30, R - 0.14);
+    /* 腰檐：在下一层窗台之下，绝不压住窗洞 */
+    if (f < 2) {
+      const ey = FL[f + 1] - 0.42;
+      tvSlope(b, 'tvTile', F - 0.10, ey + 0.34, F + 0.62, ey, L - 0.45, R + 0.45, 0.14);
+      tvSlope(b, 'tvTile', Bk + 0.10, ey + 0.34, Bk - 0.62, ey, L - 0.45, R + 0.45, 0.14);
+      /* 左右山墙的腰檐：平板出挑，不沿 x 起坡 */
+      b.box('tvTile', F - Bk + 1.24, 0.13, 0.62, (F + Bk) / 2, ey + 0.05, L - 0.31);
+      b.box('tvTile', F - Bk + 1.24, 0.13, 0.62, (F + Bk) / 2, ey + 0.05, R + 0.31);
+      b.box('tvEave', 0.14, 0.13, R - L + 0.9, F + 0.64, ey - 0.02, 0);
+      b.box('tvEave', 0.14, 0.13, R - L + 0.9, Bk - 0.64, ey - 0.02, 0);
+      for (let z = L - 0.4; z < R + 0.4; z += 0.38) {
+        b.to('tvTileD', 0.045, F - 0.10, ey + 0.37, z, F + 0.62, ey + 0.03, z, 6);
+        b.to('tvTileD', 0.045, Bk + 0.10, ey + 0.37, z, Bk - 0.62, ey + 0.03, z, 6);
+      }
+    }
+  }
+
+  /* 二、三层正面平坐（回廊）+ 低栏杆：栏杆只挡窗下沿 0.6 米 */
+  for (let f = 1; f <= 2; f++) {
+    const y = FL[f];
+    b.box('tvDeck', 1.00, 0.13, R - L + 0.30, F + 0.50, y - 0.065, 0);
+    b.box('tvWoodD', 1.06, 0.055, R - L + 0.34, F + 0.50, y - 0.16, 0);
+    for (let z = L - 0.1; z <= R + 0.1; z += 0.62)
+      b.box('tvRail', 0.065, 0.58, 0.065, F + 0.96, y + 0.29, z);
+    b.box('tvRail', 0.085, 0.075, R - L + 0.30, F + 0.96, y + 0.60, 0);
+    b.box('tvRail', 0.065, 0.055, R - L + 0.30, F + 0.96, y + 0.30, 0);
+    /* 平坐下挂落（细斜撑） */
+    for (let z = L + 0.1; z < R; z += 1.24)
+      b.box('tvBracketR', 0.09, 0.09, 0.30, F + 0.82, y - 0.24, z);
+  }
+
+  /* 顶层屋顶：后坡完整，前坡只留檐口一截，中间掀开 */
+  const zA = L - TV_EF, zB = R + TV_EF;
+  const xBack = Bk - TV_EF, xFront = F + TV_EF;
+  tvRoofRun(b, TV_XR, TV_RG, xBack, TV_Y3 + 0.10, zA, zB);
+  tvRoofRun(b, xFront - 1.28, TV_Y3 + 0.72, xFront, TV_Y3 + 0.10, zA, zB, true);
+  /* 掀开区露出的椽子 + 两道檩：把「屋顶被剖开」这条边读出来，
+     否则从斜上方只看到一个三角黑洞，像穿帮 */
+  for (let z = zA + 0.20; z < zB; z += 0.45)
+    b.to('tvWoodD', 0.060, TV_XR, TV_RG - 0.14, z, xFront - 1.20, TV_Y3 + 0.74, z, 7);
+  [TV_XR + 0.55, xFront - 1.75].forEach(function (cx) {
+    const t = (cx - TV_XR) / (xFront - 1.20 - TV_XR);
+    const cy = TV_RG - 0.14 + (TV_Y3 + 0.74 - (TV_RG - 0.14)) * t;
+    b.cyl('tvBeam', 0.075, 0.075, zB - zA, 8, cx, cy - 0.06, 0, Math.PI / 2, 0, 0);
+  });
+  b.box('tvCut', 0.12, 0.16, zB - zA, xFront - 1.28, TV_Y3 + 0.70, 0);
+  /* 正脊、垂脊、宝顶 */
+  b.cyl('tvRidge', 0.135, 0.135, zB - zA, 9, TV_XR, TV_RG + 0.05, 0, Math.PI / 2, 0, 0);
+  b.cyl('tvRidge', 0.075, 0.075, zB - zA + 0.16, 8, TV_XR, TV_RG + 0.17, 0, Math.PI / 2, 0, 0);
+  [zA, zB].forEach(function (z) {
+    b.to('tvRidge', 0.085, TV_XR, TV_RG + 0.08, z, xBack, TV_Y3 + 0.14, z, 7);
+    b.to('tvRidge', 0.075, TV_XR, TV_RG + 0.08, z, xFront, TV_Y3 + 0.14, z, 7);
+    b.sph('tvFinial', 0.135, xFront, TV_Y3 + 0.24, z, 1, 1.3, 1);
+    b.sph('tvFinial', 0.135, xBack, TV_Y3 + 0.24, z, 1, 1.3, 1);
+  });
+  b.cyl('tvGold', 0.10, 0.16, 0.34, 10, TV_XR, TV_RG + 0.42, 0);
+  b.sph('tvGold', 0.16, TV_XR, TV_RG + 0.70, 0, 1, 1.15, 1);
+  b.sph('tvGold', 0.10, TV_XR, TV_RG + 0.90, 0, 1, 1.1, 1);
+  /* 前檐瓦当一排 */
+  for (let z = zA + 0.15; z < zB; z += 0.34)
+    b.cyl('tvTileL', 0.055, 0.055, 0.09, 7, xFront + 0.02, TV_Y3 + 0.06, z, Math.PI / 2, 0, 0);
+  /* 檐下椽头与匾托 */
+  b.box('tvEave', 0.24, 0.20, zB - zA, xFront - 0.06, TV_Y3 + 0.02, 0);
+  b.box('tvEave', 0.22, 0.20, zB - zA, xBack + 0.06, TV_Y3 + 0.02, 0);
+}
+
+/* ------------------------------------------------------------ 三层室内 */
+function tvTableSet(b, x, z, y, ry, round, s) {
+  s = s || 1;
+  const K = 'tvTable', D = 'tvTableD';
+  if (round) {
+    b.cyl(K, 0.62 * s, 0.62 * s, 0.075 * s, 14, x, y + 0.74 * s, z);
+    b.cyl(D, 0.11 * s, 0.15 * s, 0.74 * s, 9, x, y + 0.37 * s, z);
+    b.cyl(D, 0.36 * s, 0.36 * s, 0.055 * s, 12, x, y + 0.03 * s, z);
+  } else {
+    b.box(K, 1.16 * s, 0.085 * s, 1.16 * s, x, y + 0.76 * s, z, 0, ry || 0, 0);
+    for (let i = -1; i <= 1; i += 2) for (let j = -1; j <= 1; j += 2)
+      tvB(b, D, 0.10 * s, 0.76 * s, 0.10 * s, x, y, z, ry || 0, i * 0.47 * s, 0.38 * s, j * 0.47 * s);
+  }
+  /* 桌上：酒壶、两只碗、一碟菜 */
+  b.cyl('tvPot', 0.115 * s, 0.085 * s, 0.23 * s, 10, x - 0.20 * s, y + 0.90 * s, z - 0.10 * s);
+  b.cyl('tvPotD', 0.045 * s, 0.045 * s, 0.10 * s, 8, x - 0.20 * s, y + 1.06 * s, z - 0.10 * s);
+  for (let i = 0; i < 2; i++) {
+    b.cyl('tvCupW', 0.105 * s, 0.072 * s, 0.10 * s, 10,
+      x + (0.14 + i * 0.26) * s, y + 0.83 * s, z + (i ? 0.20 : -0.18) * s);
+  }
+  b.cyl('tvDish', 0.20 * s, 0.17 * s, 0.045 * s, 12, x + 0.02 * s, y + 0.81 * s, z + 0.30 * s);
+  b.sph('tvFood', 0.085 * s, x + 0.02 * s, y + 0.86 * s, z + 0.30 * s, 1, 0.6, 1);
+}
+function tvStool(b, x, y, z, ry) {
+  b.cyl('tvStool', 0.20, 0.20, 0.075, 10, x, y + 0.42, z);
+  for (let i = 0; i < 4; i++) {
+    const a = i * Math.PI / 2 + (ry || 0);
+    b.cyl('tvStoolD', 0.035, 0.042, 0.40, 6, x + Math.cos(a) * 0.14, y + 0.20, z + Math.sin(a) * 0.14);
+  }
+}
+function tvJar(b, x, y, z, s, k) {
+  b.cyl(k || 'tvJar', 0.16 * s, 0.24 * s, 0.50 * s, 12, x, y + 0.25 * s, z);
+  b.cyl('tvJarD', 0.13 * s, 0.16 * s, 0.12 * s, 12, x, y + 0.54 * s, z);
+  b.cyl('tvJarL', 0.175 * s, 0.175 * s, 0.045 * s, 12, x, y + 0.61 * s, z);
+  b.box('tvPaper', 0.17 * s, 0.20 * s, 0.012, x, y + 0.30 * s, z + 0.225 * s);
+}
+function tvScreen(b, x, y, z, w, h, ry) {
+  b.box('tvScreen', 0.10, h, w, x, y + h / 2, z, 0, ry || 0, 0);
+  const n = Math.max(3, Math.round(w / 0.26));
+  for (let i = 1; i < n; i++)
+    tvB(b, 'tvScreenD', 0.12, h - 0.18, 0.045, x, y, z, ry || 0, 0, h / 2, -w / 2 + w * i / n);
+  b.box('tvWoodD', 0.14, 0.09, w + 0.10, x, y + h - 0.02, z, 0, ry || 0, 0);
+}
+
+/* ------------------------------------------------------------ 后半堂填充
+   ★ 教训：家具若全挤在靠正面门窗的一半（x > -2.4），从剖开的 +Z 山墙
+     看进去，进深后半 3.5 米就是一整片空地板，每层「只有一半有内容」。
+     补齐四条：① 每层后半至少两席，且一席贴剖口侧（z > 2.5）保证第一眼
+     看得见；② 补一件面朝剖口的竖向背景（屏风 ry=π/2 让宽沿 X）；
+     ③ 人物错开朝向；④ 后半必须单独补点光，否则补了家具也是黑的。 */
+function tvBackHall(b) {
+  const Bk = TV_X0, G = TV_GY, Y1 = TV_Y1, Y2 = TV_Y2;
+
+  /* ---- 一层后堂：两席散座 + 大酒瓮 + 掌柜跑堂 ---- */
+  tvTableSet(b, -3.30, 3.05, G, 0.10, false, 0.94);
+  [[-3.30, 1.95], [-3.30, 4.15], [-4.40, 3.05], [-2.20, 3.05]].forEach(function (q) {
+    tvStool(b, q[0], G, q[1], 0);
+  });
+  tvPed(b, -3.30, G, 1.95, 0.15, 'sit', 'tvRobeA');
+  tvPed(b, -3.30, G, 4.15, Math.PI, 'sit', 'tvRobeC');
+  tvTableSet(b, -3.55, -2.55, G, 0, true, 0.88);
+  for (let i = 0; i < 3; i++)
+    tvStool(b, -3.55 + Math.cos(i * 2.1) * 0.86, G, -2.55 + Math.sin(i * 2.1) * 0.86, 0);
+  tvPed(b, -3.55, G, -3.42, 0, 'sit', 'tvRobeB');
+  tvPed(b, -2.68, G, -2.55, -1.1, 'sit', 'tvRobeA');
+  /* 大酒瓮：塞进两席之间的空档 */
+  b.box('tvWoodD', 0.76, 0.08, 2.20, -4.72, G + 0.02, 0.08);
+  for (let i = 0; i < 3; i++)
+    tvJar(b, -4.92 + (i % 2) * 0.56, G + 0.05, -0.72 + i * 0.62, 1.06,
+      i === 1 ? 'tvJarL' : 'tvJar');
+  tvPed(b, -5.15, G, 1.62, 0.5, 'stand', 'tvRobeB');
+  tvPed(b, -2.38, G, 0.68, -0.8, 'stand', 'tvRobeC');
+  /* 后堂落地罩：面朝剖口，宽沿 X，打破左端的空旷 */
+  tvScreen(b, -5.18, G, -3.82, 1.72, 1.62, Math.PI / 2);
+
+  /* ---- 二层后雅间：两席圆桌 + 屏风 + 花几 + 侍者 ---- */
+  tvTableSet(b, -3.35, 3.12, Y1, 0, true, 0.90);
+  for (let i = 0; i < 3; i++)
+    tvStool(b, -3.35 + Math.cos(i * 2.1) * 0.88, Y1, 3.12 + Math.sin(i * 2.1) * 0.88, 0);
+  tvPed(b, -3.35, Y1, 4.00, Math.PI, 'sit', 'tvRobeB');
+  tvPed(b, -2.47, Y1, 3.12, -1.1, 'sit', 'tvRobeA');
+  tvTableSet(b, -3.62, -2.52, Y1, 0, true, 0.88);
+  for (let i = 0; i < 3; i++)
+    tvStool(b, -3.62 + Math.cos(i * 2.1) * 0.86, Y1, -2.52 + Math.sin(i * 2.1) * 0.86, 0);
+  tvPed(b, -3.62, Y1, -3.38, 0, 'sit', 'tvRobeC');
+  tvPed(b, -2.76, Y1, -2.52, -1.1, 'sit', 'tvRobeB');
+  tvScreen(b, -5.10, Y1, -3.90, 2.30, 1.68, Math.PI / 2);
+  /* 花几上的盆景 */
+  b.cyl('tvWoodD', 0.19, 0.25, 0.62, 9, -2.42, Y1 + 0.31, 0.55);
+  b.cyl('tvJarD', 0.22, 0.18, 0.20, 10, -2.42, Y1 + 0.72, 0.55);
+  tvBlob(b, 'tvLeaf2', -2.42, Y1 + 1.02, 0.55, 0.31, 0.25, 0.31, 3.7);
+  tvBlob(b, 'tvLeaf1', -2.42, Y1 + 1.22, 0.55, 0.25, 0.21, 0.25, 8.3);
+  tvPed(b, -2.52, Y1, 1.72, -0.7, 'stand', 'tvRobeC');
+  /* 二层左端（靠后墙角）补一组花架，填掉剖口最左边的空当 */
+  b.box('tvWoodD', 0.46, 0.075, 1.55, Bk + 0.62, Y1 + 0.50, -4.45);
+  b.box('tvWoodD', 0.46, 0.075, 1.55, Bk + 0.62, Y1 + 1.10, -4.45);
+  for (let i = 0; i < 3; i++) {
+    const zz = -4.95 + i * 0.52;
+    b.cyl('tvJarD', 0.15, 0.13, 0.18, 9, Bk + 0.62, Y1 + 0.62, zz);
+    tvBlob(b, i % 2 ? 'tvLeaf1' : 'tvLeaf3', Bk + 0.62, Y1 + 0.86, zz,
+      0.22, 0.20, 0.22, i * 3.3 + 2.1);
+  }
+
+  /* ---- 三层后雅阁：棋桌 + 琴案 + 卧榻 + 第二列博古架 ---- */
+  tvTableSet(b, -3.32, 2.98, Y2, 0, true, 0.84);
+  [[-3.32, 3.80], [-3.32, 2.16], [-2.52, 2.98]].forEach(function (q) {
+    tvStool(b, q[0], Y2, q[1], 0);
+  });
+  tvPed(b, -3.32, Y2, 3.80, Math.PI, 'sit', 'tvRobeA');
+  tvPed(b, -3.32, Y2, 2.16, 0, 'sit', 'tvRobeC');
+  /* 琴案：案面 + 琴身 + 五根弦 */
+  b.box('tvTable', 1.46, 0.085, 0.64, -4.16, Y2 + 0.74, -2.46);
+  for (let i = -1; i <= 1; i += 2)
+    b.box('tvTableD', 0.10, 0.74, 0.56, -4.16 + i * 0.60, Y2 + 0.37, -2.46);
+  b.box('tvInk', 1.18, 0.055, 0.28, -4.16, Y2 + 0.81, -2.46);
+  for (let i = 0; i < 5; i++)
+    b.box('tvPaper', 1.08, 0.012, 0.014, -4.16, Y2 + 0.844, -2.58 + i * 0.062);
+  /* 卧榻 + 靠枕 */
+  b.box('tvWoodD', 1.72, 0.16, 0.88, -4.86, Y2 + 0.34, 0.36);
+  b.box('tvTableD', 1.72, 0.28, 0.10, -4.86, Y2 + 0.48, -0.04);
+  b.box('tvPaper', 0.60, 0.14, 0.30, -4.44, Y2 + 0.51, 0.36);
+  /* 博古架第二列（原来只有 z=3.10 一列，z 负侧全空） */
+  for (let f = 0; f < 3; f++)
+    b.box('tvWoodD', 0.40, 0.07, 1.80, Bk + 0.46, Y2 + 0.55 + f * 0.62, -2.55);
+  for (let f = 0; f < 2; f++)
+    for (let z = -3.18; z < -1.86; z += 0.66)
+      tvJar(b, Bk + 0.48, Y2 + 0.62 + f * 0.62, z, 0.40, f ? 'tvJarL' : 'tvJar');
+  tvScreen(b, -5.12, Y2, -4.05, 1.86, 1.52, Math.PI / 2);
+  tvPed(b, -2.30, Y2, 4.62, -1.3, 'stand', 'tvRobeA');
+  tvPed(b, -5.05, Y2, -1.20, 0.6, 'stand', 'tvRobeC');
+}
+
+function tvInterior(b) {
+  const F = TV_X1, Bk = TV_X0, L = TV_Z0, R = TV_Z1;
+  tvBackHall(b);
+
+  /* ---- 一层：大堂。柜台正对门，两桌靠窗，酒坛靠后墙 ---- */
+  b.box('tvCounter', 0.78, 1.06, 3.30, -1.20, TV_GY + 0.53, -2.60);
+  b.box('tvCounterD', 0.94, 0.10, 3.50, -1.20, TV_GY + 1.10, -2.60);
+  b.box('tvWoodL', 0.10, 0.55, 3.10, -0.78, TV_GY + 0.80, -2.60);
+  for (let i = 0; i < 3; i++) {
+    b.box('tvAbacus', 0.30, 0.035, 0.20, -1.20, TV_GY + 1.17, -3.55 + i * 0.85);
+    for (let j = 0; j < 5; j++)
+      b.cyl('tvGold', 0.017, 0.017, 0.16, 6, -1.20 + (j - 2) * 0.048, TV_GY + 1.20, -3.55 + i * 0.85);
+  }
+  /* 柜台后酒架：三层横板 + 一排酒坛 */
+  for (let f = 0; f < 3; f++)
+    b.box('tvWoodD', 0.42, 0.075, 4.20, Bk + 0.48, TV_GY + 0.66 + f * 0.68, 1.75);
+  for (let z = -0.15; z < 3.75; z += 0.62) {
+    tvJar(b, Bk + 0.50, TV_GY + 0.70, z, 0.72, 'tvJar');
+    tvJar(b, Bk + 0.50, TV_GY + 1.38, z + 0.22, 0.62, 'tvJarL');
+  }
+  /* 门轴正后方必须有东西：不然门洞敞开了，看进去只是一块空地板 */
+  tvTableSet(b, 0.55, 0.15, TV_GY, 0.08, false, 0.92);
+  [[0.55, -0.75], [0.55, 1.05], [-0.35, 0.15]].forEach(function (q) {
+    tvStool(b, q[0], TV_GY, q[1], 0);
+  });
+  tvPed(b, -0.55, TV_GY, 0.15, Math.PI * 0.15, 'stand', 'tvRobeB');
+  /* 两张八仙桌靠正面窗（视线从窗进来先撞到它们） */
+  tvTableSet(b, 0.92, -3.25, TV_GY, 0.12, false, 1.0);
+  tvTableSet(b, 0.92, 3.25, TV_GY, -0.10, false, 1.0);
+  [[0.92, -4.30], [0.92, -2.20], [-0.10, -3.25], [1.94, -3.25],
+   [0.92, 2.20], [0.92, 4.30], [-0.10, 3.25], [1.94, 3.25]].forEach(function (q) {
+    tvStool(b, q[0], TV_GY, q[1], 0);
+  });
+  /* 剖口侧（+Z）再摆一桌，从侧面能读到一层是「吃饭的地方」 */
+  tvTableSet(b, -1.60, 4.30, TV_GY, 0.3, true, 0.86);
+  for (let i = 0; i < 3; i++) tvStool(b, -1.60 + Math.cos(i * 2.1) * 0.86, TV_GY, 4.30 + Math.sin(i * 2.1) * 0.86, 0);
+  /* 楼梯：沿 -X 向 -Z 爬，整段实心踏步 */
+  for (let i = 0; i < 11; i++) {
+    const xx = Bk + 0.70 + i * 0.30;
+    b.box('tvWoodD', 0.30, 0.16 + i * 0.145, 1.05, xx, TV_GY + (0.16 + i * 0.145) / 2, L + 1.05);
+  }
+  b.box('tvRail', 3.40, 0.07, 0.075, Bk + 2.35, TV_GY + 1.75, L + 0.56, 0, 0, 0.34);
+  /* 一层的人：店小二（白围裙）+ 三位酒客 */
+  tvPed(b, -0.42, TV_GY, -2.60, 0.2, 'stand', 'tvRobeB');
+  tvPed(b, 0.92, TV_GY, -4.30, 0.0, 'sit', 'tvRobeC');
+  tvPed(b, 0.92, TV_GY, -2.20, Math.PI, 'sit', 'tvRobeA');
+  tvPed(b, 0.92, TV_GY, 4.30, Math.PI, 'sit', 'tvRobeB');
+  tvPed(b, 2.05, TV_GY, 0.10, -0.7, 'stand', 'tvRobeC');
+
+  /* ---- 二层：雅座。屏风分间，两桌圆席靠窗，一桌靠剖口 ---- */
+  tvScreen(b, -1.90, TV_Y1, -2.35, 2.70, 2.05, 0);
+  tvScreen(b, -1.90, TV_Y1, 2.35, 2.70, 2.05, 0);
+  tvTableSet(b, 0.70, -3.30, TV_Y1, 0, true, 0.94);
+  tvTableSet(b, 0.70, 3.30, TV_Y1, 0, true, 0.94);
+  tvTableSet(b, -1.90, 4.25, TV_Y1, 0, true, 0.82);
+  for (let c = 0; c < 2; c++) {
+    const zc = c ? 3.30 : -3.30;
+    for (let i = 0; i < 3; i++)
+      tvStool(b, 0.70 + Math.cos(i * 2.1) * 0.90, TV_Y1, zc + Math.sin(i * 2.1) * 0.90, 0);
+  }
+  /* 墙上挂画（在后墙的室内背板上） */
+  for (let i = 0; i < 2; i++) {
+    const zz = i ? 2.20 : -2.20;
+    b.box('tvWoodD', 0.055, 1.10, 0.86, Bk + 0.22, TV_Y1 + 1.75, zz);
+    b.box('tvScroll', 0.062, 0.96, 0.72, Bk + 0.26, TV_Y1 + 1.75, zz);
+    b.box('tvInk', 0.068, 0.055, 0.80, Bk + 0.27, TV_Y1 + 2.23, zz);
+    b.box('tvInk', 0.068, 0.055, 0.80, Bk + 0.27, TV_Y1 + 1.27, zz);
+  }
+  tvPed(b, 0.70, TV_Y1, -4.20, 0, 'sit', 'tvRobeA');
+  tvPed(b, 0.70, TV_Y1, 4.20, Math.PI, 'sit', 'tvRobeC');
+  tvPed(b, F - 0.85, TV_Y1, 0.30, -0.9, 'stand', 'tvRobeB');
+
+  /* ---- 三层：雅阁。一席大圆桌 + 书案 + 博古架 ---- */
+  tvTableSet(b, 0.55, 0.10, TV_Y2, 0, true, 1.18);
+  for (let i = 0; i < 5; i++)
+    tvStool(b, 0.55 + Math.cos(i * 1.26) * 1.12, TV_Y2, 0.10 + Math.sin(i * 1.26) * 1.12, 0);
+  /* 书案 */
+  b.box('tvTable', 1.50, 0.09, 0.72, -2.35, TV_Y2 + 0.76, -3.45);
+  for (let i = -1; i <= 1; i += 2)
+    b.box('tvTableD', 0.10, 0.76, 0.62, -2.35 + i * 0.62, TV_Y2 + 0.38, -3.45);
+  b.box('tvPaper', 0.66, 0.012, 0.46, -2.35, TV_Y2 + 0.815, -3.45);
+  b.cyl('tvBrush', 0.028, 0.028, 0.30, 7, -2.05, TV_Y2 + 0.90, -3.20, 0, 0, Math.PI / 2);
+  b.cyl('tvInk', 0.09, 0.11, 0.10, 10, -2.72, TV_Y2 + 0.85, -3.20);
+  /* 博古架：三格 + 几件摆设 */
+  for (let f = 0; f < 3; f++)
+    b.box('tvWoodD', 0.40, 0.07, 2.00, Bk + 0.46, TV_Y2 + 0.55 + f * 0.62, 3.10);
+  for (let f = 0; f < 2; f++)
+    for (let z = 2.35; z < 3.90; z += 0.72)
+      tvJar(b, Bk + 0.48, TV_Y2 + 0.62 + f * 0.62, z, 0.42, f ? 'tvJarL' : 'tvJar');
+  tvScreen(b, -0.15, TV_Y2, 3.35, 2.20, 1.85, Math.PI / 2);
+  /* 剖口侧也留一席：三层从 +Z 看进去不能是空的 */
+  tvTableSet(b, 0.05, 4.25, TV_Y2, 0, true, 0.80);
+  for (let i = 0; i < 3; i++)
+    tvStool(b, 0.05 + Math.cos(i * 2.1) * 0.80, TV_Y2, 4.25 + Math.sin(i * 2.1) * 0.80, 0);
+  tvPed(b, 0.05, TV_Y2, 3.35, Math.PI, 'sit', 'tvRobeC');
+  tvPed(b, 0.55, TV_Y2, -1.10, 0, 'sit', 'tvRobeB');
+  tvPed(b, 1.70, TV_Y2, 0.55, Math.PI * 0.8, 'sit', 'tvRobeA');
+  tvPed(b, F - 0.90, TV_Y2, -0.80, -1.2, 'stand', 'tvRobeC');
+
+  /* 梁下宫灯的吊绳：挂在正面檐下，正对下面那排灯笼 */
+  for (let f = 0; f < 3; f++) {
+    const ey = FLX(f) - (f === 0 ? 0.28 : 0.32);
+    [-2.00, 2.00].forEach(function (z) {
+      b.cyl('tvRope', 0.014, 0.014, 0.46, 5, TV_X1 + 0.80, ey - 0.23, z);
+    });
+  }
+}
+function FLX(f) { return f === 0 ? TV_Y1 : (f === 1 ? TV_Y2 : TV_Y3); }
+
+/* ------------------------------------------------------------ 室外陈设 */
+function tvProps(b) {
+  const F = TV_X1;
+  /* 门前石狮两只 */
+  [-2.30, 2.30].forEach(function (z) {
+    b.box('tvStoneD', 0.82, 0.30, 0.82, 3.55, TV_GD + 0.15, z);
+    b.box('tvLion', 0.52, 0.52, 0.62, 3.55, TV_GD + 0.56, z);
+    b.sph('tvLion', 0.24, 3.55, TV_GD + 0.96, z + 0.20, 1, 1, 0.9);
+    b.sph('tvLionD', 0.085, 3.55, TV_GD + 1.00, z + 0.42, 1, 0.8, 0.6);
+    for (let i = 0; i < 6; i++) {
+      const a = i * 1.05;
+      b.sph('tvLionD', 0.095, 3.55 + Math.cos(a) * 0.19, TV_GD + 0.99 + Math.sin(a) * 0.13, z + 0.10, 1, 1, 1);
+    }
+    b.box('tvLion', 0.16, 0.30, 0.16, 3.55 - 0.18, TV_GD + 0.48, z + 0.20);
+  });
+  /* 门两侧楹联木柱 + 幌子挑杆 */
+  [-1.92, 1.92].forEach(function (z) {
+    b.cyl('tvWoodD', 0.075, 0.085, 3.30, 8, F + 0.62, TV_GY + 1.65, z);
+    b.box('tvGold', 0.08, 0.08, 0.08, F + 0.62, TV_GY + 3.34, z);
+  });
+  /* ★ 匾额必须挑在腰檐之外：腰檐外沿 F+0.62，牌面放 F+0.72 才不会被整条瓦檐吃掉 */
+  b.box('tvSignBox', 0.13, 0.62, 3.10, F + 0.72, TV_GY + 2.98, 0);
+  b.box('tvGold', 0.15, 0.045, 3.24, F + 0.73, TV_GY + 3.32, 0);
+  b.box('tvGold', 0.15, 0.045, 3.24, F + 0.73, TV_GY + 2.64, 0);
+  /* 楹联同样挑出柱前 */
+  [-1.92, 1.92].forEach(function (z) {
+    b.box('tvSignBox', 0.10, 2.05, 0.38, F + 0.70, TV_GY + 1.72, z);
+  });
+
+  /* 酒旗：杆 + 底座 + 横挑（布面是独立 Group，见 tvBanners） */
+  b.cyl('tvWoodD', 0.085, 0.105, 4.60, 8, 6.60, TV_GD + 2.30, -5.55);
+  b.box('tvStoneD', 0.46, 0.20, 0.46, 6.60, TV_GD + 0.10, -5.55);
+  b.box('tvWoodD', 0.07, 0.07, 1.00, 6.60, TV_GD + 4.48, -5.05);
+  b.cyl('tvGold', 0.075, 0.075, 0.10, 8, 6.60, TV_GD + 4.66, -5.55);
+
+  /* 拴马桩 + 一匹马（放在远侧，别挡正面） */
+  b.cyl('tvStoneD', 0.10, 0.13, 1.15, 8, 7.80, TV_GD + 0.58, -2.35);
+  b.torus('tvMetal', 0.13, 0.028, 7.80, TV_GD + 1.05, -2.35, Math.PI / 2, 0, 0);
+  b.box('tvHorse', 0.52, 0.62, 1.30, 6.70, TV_GD + 1.05, -2.35);
+  b.box('tvHorseD', 0.34, 0.42, 0.42, 7.02, TV_GD + 1.42, -2.35);
+  b.box('tvHorseD', 0.28, 0.26, 0.48, 7.28, TV_GD + 1.30, -2.35);
+  for (let i = -1; i <= 1; i += 2) for (let j = -1; j <= 1; j += 2)
+    b.box('tvHorseD', 0.13, 0.72, 0.14, 6.70 + i * 0.18, TV_GD + 0.36, -2.35 + j * 0.50);
+  b.to('tvHorseD', 0.055, 6.36, TV_GD + 1.30, -2.35, 6.06, TV_GD + 1.78, -2.35, 6);
+  b.cyl('tvRope', 0.012, 0.012, 1.20, 5, 7.42, TV_GD + 1.25, -2.35, 0, 0, Math.PI / 2);
+
+  /* 街边货担（近侧压到 1.3 米以下，免得被画框切） */
+  [5.10, 3.10].forEach(function (x, i) {
+    const z = 6.10;
+    b.cyl('tvJar', 0.34, 0.27, 0.40, 10, x, TV_GD + 0.22, z);
+    b.cyl('tvJarD', 0.36, 0.36, 0.055, 10, x, TV_GD + 0.44, z);
+    b.box('tvWoodD', 0.045, 0.045, 1.90, x + 0.95, TV_GD + 0.82, z, 0, 0, 0);
+    for (let j = 0; j < 5; j++)
+      b.sph(i ? 'tvFood' : 'tvFruit', 0.11, x, TV_GD + 0.48, z - 0.24 + j * 0.12, 1, 0.75, 1);
+  });
+  /* 门两侧酒坛堆：填掉台阶旁的空地，也点明这是酒楼（高度压在 0.8 米内） */
+  [-3.85, 3.85].forEach(function (z, k) {
+    for (let i = 0; i < 3; i++)
+      tvJar(b, 3.45 + (i % 2) * 0.48, TV_GD, z + (i - 1) * 0.42, 0.86,
+        i === 1 ? 'tvJarL' : 'tvJar');
+    b.box('tvWoodD', 0.95, 0.08, 1.30, 3.68, TV_GD + 0.04, z);
+  });
+  /* 水缸 + 井台 */
+  b.cyl('tvJarD', 0.44, 0.38, 0.72, 12, 4.50, TV_GD + 0.36, -6.30);
+  b.cyl('tvWater', 0.40, 0.40, 0.03, 12, 4.50, TV_GD + 0.73, -6.30);
+  b.torus('tvStoneL', 0.44, 0.055, 4.50, TV_GD + 0.72, -6.30, Math.PI / 2, 0, 0);
+
+  /* 槐树：两棵都放远侧（-z），近侧留给广场 */
+  tvTree(b, 5.30, -5.90, 1.00);
+  tvTree(b, -8.20, -2.40, 0.78);
+  /* 行人：三个，站在广场与台阶之间 */
+  tvPed(b, 4.90, TV_GD, 1.05, -0.55, 'stand', 'tvRobeA');
+  tvPed(b, 5.90, TV_GD, -0.65, 0.35, 'stand', 'tvRobeC');
+  tvPed(b, 4.35, TV_GD, -3.70, 1.10, 'stand', 'tvRobeB');
+  /* 地面落叶 / 石缝草：只在广场边缘，别铺满 */
+  for (let i = 0; i < 26; i++) {
+    const x = 3.40 + tvR(i * 3.1) * 5.80, z = -7.60 + tvR(i * 7.7) * 15.20;
+    b.sph(i % 3 ? 'tvLeaf2' : 'tvLeaf3', 0.075, x, TV_GD + 0.055, z, 1, 0.35, 1.4);
+  }
+}
+function tvTree(b, x, z, s) {
+  b.cyl('tvBark', 0.16 * s, 0.24 * s, 2.20 * s, 9, x, TV_GD + 1.10 * s, z);
+  for (let i = 0; i < 4; i++)
+    b.to('tvBark', 0.075 * s, x, TV_GD + 1.80 * s, z,
+      x + Math.cos(i * 1.6) * 0.72 * s, TV_GD + (2.60 + tvR(i + 3) * 0.45) * s,
+      z + Math.sin(i * 1.6) * 0.72 * s, 6);
+  const cols = ['tvLeaf1', 'tvLeaf2', 'tvLeaf3', 'tvLeaf1'];
+  for (let i = 0; i < 4; i++) {
+    const a = i * 1.57;
+    tvBlob(b, cols[i], x + Math.cos(a) * 0.62 * s,
+      TV_GD + (2.95 + tvR(i * 2.3 + 1) * 0.38) * s,
+      z + Math.sin(a) * 0.62 * s, 1.02 * s, 0.76 * s, 0.98 * s, i * 2.7 + 1.3);
+  }
+  tvBlob(b, 'tvLeaf1', x, TV_GD + 3.55 * s, z, 1.05 * s, 0.78 * s, 1.00 * s, 8.1);
+}
+
+/* ------------------------------------------------------------ 文字牌匾 */
+function tvText(w, h, draw) { return canvasTex(w, h, draw); }
+function tvPlane(parent, w, h, x, y, z, ry, tex, op) {
+  const m = new T.MeshBasicMaterial({
+    map: tex, side: T.DoubleSide, transparent: op !== undefined, opacity: op === undefined ? 1 : op
+  });
+  const p = new T.Mesh(new T.PlaneGeometry(w, h), m);
+  p.position.set(x, y, z);
+  if (ry) p.rotation.y = ry;
+  parent.add(p);
+  return p;
+}
+function tvSigns(g) {
+  const F = TV_X1;
+  /* 横匾「醉仙樓」：黑底金字，字要真写 */
+  const plaque = tvText(768, 176, function (c, w, h) {
+    c.fillStyle = '#241a13'; c.fillRect(0, 0, w, h);
+    c.strokeStyle = '#b98d45'; c.lineWidth = 8; c.strokeRect(12, 12, w - 24, h - 24);
+    c.strokeStyle = 'rgba(216,178,90,0.45)'; c.lineWidth = 2; c.strokeRect(24, 24, w - 48, h - 48);
+    c.fillStyle = '#e2bf72';
+    c.font = '600 108px KaiTi, STKaiti, SimSun, serif';
+    c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.fillText('醉仙樓', w / 2, h / 2 + 6);
+  });
+  tvPlane(g, 2.96, 0.56, F + 0.805, TV_GY + 2.98, 0, Math.PI / 2, plaque);
+
+  /* 楹联：两句七字，竖排 */
+  const lines = ['勸君更盡一杯酒', '與爾同銷萬古愁'];
+  [-1.92, 1.92].forEach(function (z, i) {
+    const t = tvText(128, 640, function (c, w, h) {
+      c.fillStyle = '#2d2018'; c.fillRect(0, 0, w, h);
+      c.strokeStyle = '#8d6c38'; c.lineWidth = 5; c.strokeRect(9, 9, w - 18, h - 18);
+      c.fillStyle = '#dcc088';
+      c.font = '600 68px KaiTi, STKaiti, SimSun, serif';
+      c.textAlign = 'center'; c.textBaseline = 'middle';
+      for (let k = 0; k < lines[i].length; k++)
+        c.fillText(lines[i][k], w / 2, 66 + k * 74);
+    });
+    tvPlane(g, 0.34, 1.94, F + 0.765, TV_GY + 1.72, z, Math.PI / 2, t);
+  });
+
+  /* 一层柜台后的菜牌（贴在室内背板上，不挡窗） */
+  const menu = tvText(256, 384, function (c, w, h) {
+    c.fillStyle = '#e7dcc0'; c.fillRect(0, 0, w, h);
+    c.strokeStyle = '#5c4630'; c.lineWidth = 9; c.strokeRect(12, 12, w - 24, h - 24);
+    c.fillStyle = '#3b2c20';
+    c.font = '600 66px KaiTi, STKaiti, SimSun, serif';
+    c.textAlign = 'center'; c.textBaseline = 'middle';
+    const s = ['酒', '菜', '茶', '飯'];
+    for (let k = 0; k < s.length; k++) c.fillText(s[k], w / 2, 64 + k * 88);
+  });
+  tvPlane(g, 0.62, 0.92, TV_X0 + 0.245, TV_GY + 2.25, -0.05, Math.PI / 2, menu);
+}
+
+/* ------------------------------------------------------------ 灯笼 / 布幡 / 灯光 */
+function tvLanterns(g) {
+  const items = [];
+  /* 正面檐下 4 盏 + 门口 2 盏 + 剖口侧 2 盏 */
+  const pos = [
+    [TV_X1 + 0.78, TV_GY + 2.62, -2.00, 1.00], [TV_X1 + 0.78, TV_GY + 2.62, 2.00, 1.00],
+    [TV_X1 + 0.90, TV_Y1 + 2.62, -3.30, 0.86], [TV_X1 + 0.90, TV_Y1 + 2.62, 3.30, 0.86],
+    [TV_X1 + 0.90, TV_Y2 + 2.48, -3.10, 0.80], [TV_X1 + 0.90, TV_Y2 + 2.48, 3.10, 0.80],
+    [TV_X1 - 0.90, TV_Y1 + 2.20, 4.30, 0.72], [TV_X1 - 0.90, TV_Y2 + 2.10, 4.30, 0.72]
+  ];
+  for (let i = 0; i < pos.length; i++) {
+    const q = pos[i], s = q[3];
+    const grp = new T.Group();
+    grp.position.set(q[0], q[1], q[2]);
+    const b = new Builder();
+    b.cyl('tvRope', 0.014, 0.014, 0.30 * s, 5, 0, 0.15 * s, 0);
+    b.cyl('tvLantern', 0.27 * s, 0.27 * s, 0.44 * s, 12, 0, -0.22 * s, 0, 0, 0, 0);
+    b.cyl('tvLantern', 0.18 * s, 0.27 * s, 0.12 * s, 12, 0, 0.03 * s, 0);
+    b.cyl('tvLantern', 0.27 * s, 0.18 * s, 0.12 * s, 12, 0, -0.47 * s, 0);
+    b.cyl('tvGold', 0.29 * s, 0.29 * s, 0.045 * s, 12, 0, 0.09 * s, 0);
+    b.cyl('tvGold', 0.29 * s, 0.29 * s, 0.045 * s, 12, 0, -0.53 * s, 0);
+    for (let j = 0; j < 7; j++)
+      b.cyl('tvTassel', 0.014 * s, 0.008 * s, 0.26 * s, 5,
+        Math.cos(j * 0.9) * 0.16 * s, -0.68 * s, Math.sin(j * 0.9) * 0.16 * s);
+    /* 灯笼上的「酒」字：一小片加色亮芯，远看是暖光点 */
+    b.sph('tvCandle', 0.11 * s, 0.26 * s, -0.22 * s, 0, 0.35, 1, 1);
+    b.build(grp, { noOutline: ['tvRope', 'tvTassel', 'tvCandle'] });
+    g.add(grp);
+    grp.userData.ph = i * 0.83;
+    items.push(grp);
+  }
+  CT_ANIM.push(function (t) {
+    for (let i = 0; i < items.length; i++)
+      items[i].rotation.z = Math.sin(t * 0.85 + items[i].userData.ph) * 0.055;
+  });
+}
+function tvBanners(g) {
+  const tex = tvText(192, 640, function (c, w, h) {
+    c.fillStyle = '#a83c2c'; c.fillRect(0, 0, w, h);
+    c.fillStyle = 'rgba(255,225,180,0.10)';
+    for (let i = 0; i < 14; i++) c.fillRect(0, i * h / 14, w, 3);
+    c.strokeStyle = '#e8c98a'; c.lineWidth = 7; c.strokeRect(13, 13, w - 26, h - 26);
+    c.fillStyle = '#f3dda8';
+    c.font = '600 150px KaiTi, STKaiti, SimSun, serif';
+    c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.fillText('酒', w / 2, 200);
+    c.font = '600 78px KaiTi, STKaiti, SimSun, serif';
+    const s = ['佳', '醞', '三', '杯'];
+    for (let i = 0; i < s.length; i++) c.fillText(s[i], w / 2, 360 + i * 70);
+  });
+  const grp = new T.Group();
+  grp.position.set(6.62, TV_GD + 3.38, -5.05);
+  const p = tvPlane(grp, 0.62, 2.05, 0, 0, 0, Math.PI / 2, tex);
+  p.geometry = new T.PlaneGeometry(0.62, 2.05, 3, 8);
+  g.add(grp);
+  CT_ANIM.push(function (t) {
+    grp.rotation.y = Math.sin(t * 0.72) * 0.13;
+    grp.rotation.z = Math.sin(t * 1.05 + 0.4) * 0.035;
+  });
+  /* 门楣两侧各一面小三角旗 */
+  const flagTex = tvText(192, 256, function (c, w, h) {
+    c.fillStyle = '#c25a36'; c.fillRect(0, 0, w, h);
+    c.fillStyle = '#f4e0b4';
+    c.font = '600 128px KaiTi, STKaiti, SimSun, serif';
+    c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.fillText('酒', w / 2, h / 2);
+  });
+  [-3.35, 3.35].forEach(function (z, i) {
+    const fg = new T.Group();
+    fg.position.set(TV_X1 + 0.30, TV_Y1 - 0.55, z);
+    tvPlane(fg, 0.42, 0.56, 0, 0, 0, Math.PI / 2, flagTex);
+    g.add(fg);
+    CT_ANIM.push(function (t) { fg.rotation.z = Math.sin(t * 1.3 + i) * 0.07; });
+  });
+}
+function tvLights() {
+  /* 三层各四盏暖点光：前半两盏照门窗视线，后半两盏照新补的后堂。
+     ★ 只把灯放在 x>-1 会让进深后半死黑，视觉上就是「半层楼是空的」。
+     第 5 项是单独的衰减距离，后堂灯压小一点，免得串到相邻楼层。 */
+  const L = [
+    [-1.10, TV_GY + 2.55, -2.60, 4.8, 7.2], [0.60, TV_GY + 2.55, 2.80, 4.5, 7.2],
+    [-1.10, TV_Y1 + 2.45, -2.60, 4.4, 7.2], [0.60, TV_Y1 + 2.45, 2.80, 4.2, 7.2],
+    [-1.10, TV_Y2 + 2.30, -2.60, 4.0, 7.2], [0.60, TV_Y2 + 2.30, 2.80, 3.8, 7.2],
+    [-4.05, TV_GY + 2.40, 1.30, 3.6, 6.0], [-3.55, TV_GY + 2.35, -2.55, 3.0, 5.4],
+    [-4.05, TV_Y1 + 2.35, 1.30, 3.4, 6.0], [-3.55, TV_Y1 + 2.30, -2.55, 2.9, 5.4],
+    [-4.05, TV_Y2 + 2.20, 1.30, 3.2, 6.0], [-3.55, TV_Y2 + 2.15, -2.55, 2.8, 5.4]
+  ];
+  for (let i = 0; i < L.length; i++) {
+    const q = L[i];
+    const lp = new T.PointLight(0xffcf92, q[3] * cfg(PS.lampK, 1), q[4] || 7.2, 2);
+    lp.position.set(q[0], q[1], q[2]);
+    scene.add(lp);
+  }
+  const door = new T.PointLight(0xffdcae, 3.6 * cfg(PS.lampK, 1), 6.0, 2);
+  door.position.set(TV_X1 + 1.15, TV_GY + 2.30, 0);
+  scene.add(door);
+  const court = new T.PointLight(0xffbc83, 2.2 * cfg(PS.lampK, 1), 8.0, 2);
+  court.position.set(5.20, 3.20, -2.0);
+  scene.add(court);
+}
+
+/* ------------------------------------------------------------ 组装 */
+const TV_NO = [
+  'tvLattice', 'tvWallIn', 'tvFloor', 'tvFloorD', 'tvCeil', 'tvPave', 'tvPaveD',
+  'tvPaveL', 'tvSoil', 'tvSoilD', 'tvLeaf1', 'tvLeaf2', 'tvLeaf3', 'tvTuft',
+  'tvRope', 'tvTassel', 'tvCandle', 'tvPaper', 'tvAbacus', 'tvBrush', 'tvInk',
+  'tvCupW', 'tvDish', 'tvFood', 'tvFruit', 'tvWater', 'tvScroll', 'tvMetal'
+];
+function buildTvAll() {
+  const g = new T.Group();
+  const b = new Builder();
+  tvBase(b);
+  tvShell(b);
+  tvInterior(b);
+  tvProps(b);
+  b.build(g, { noOutline: TV_NO });
+  scene.add(g);
+  tvSigns(g);
+  tvLanterns(g);
+  tvBanners(g);
+  tvLights();
+  if (window.__expose) {
+    window.__tv = { floors: 3, eave: TV_Y3, ridge: TV_RG, cutSide: '+Z' };
+  }
+}
+
   /* ================= 组装 ================= */
   const TOWER = !!PS.tower;
   const STORE = !!PS.store;
   const CLUB = !!PS.club;
   const WRH = !!PS.wh;
-  if (SEC) {
+  if (TV) {
+    buildTvAll();
+  } else if (DK) {
+    buildDkAll();
+  } else if (SEC) {
     buildSecAll();
   } else if (RW) {
     buildRwAll();
@@ -15043,7 +16404,11 @@ function buildSecAll() {
 
   /* 室内暖光 */
   const LAMPK = cfg(PS.lampK, 1);
-  if (SEC) {
+  if (TV) {
+    /* 三层暖点光与门口补光已在 buildTvAll() 内按灯位布好 */
+  } else if (DK) {
+    /* 全场唯一的光源是灯罩里的聚光灯，已在 buildDkAll() 内布好 */
+  } else if (SEC) {
     /* 每层一盏室内灯 + 隧道两盏 + 路灯一盏，都在 buildSecAll() 里按位置布好 */
   } else if (RW) {
     /* 春日上午的散射光已经够亮，不设点光；一放暖灯就变成傍晚了 */
@@ -15227,23 +16592,23 @@ function buildSecAll() {
   }
 
   const VEG = PS.veg || {};
-  const willowPos = cfg(VEG.willows, (STORE || CLUB || JD || CYB || KFC || RL || LN || RW || SEC) ? [] : [[4.0, -4.35, 0.95], [-6.5, 1.95, 0.72]]);
+  const willowPos = cfg(VEG.willows, (STORE || CLUB || JD || CYB || KFC || RL || LN || RW || SEC || DK || TV) ? [] : [[4.0, -4.35, 0.95], [-6.5, 1.95, 0.72]]);
   for (let i = 0; i < willowPos.length; i++) {
     scene.add(willow(willowPos[i][0], willowPos[i][1], willowPos[i][2]));
   }
 
-  if (!STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW && !SEC) {
+  if (!STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW && !SEC && !DK && !TV) {
     boatGroup = buildBoat(5.9, 1.15, Math.PI / 2 + 0.05);
     scene.add(boatGroup);
   }
 
-  const bamPos = cfg(VEG.bamboo, (STORE || CLUB || WRH || JD || CYB || KFC || RL || LN || RW || SEC) ? [] : [[-7.0, -4.6, 1.0], [-6.9, 6.9, 0.75]]);
+  const bamPos = cfg(VEG.bamboo, (STORE || CLUB || WRH || JD || CYB || KFC || RL || LN || RW || SEC || DK || TV) ? [] : [[-7.0, -4.6, 1.0], [-6.9, 6.9, 0.75]]);
   for (let i = 0; i < bamPos.length; i++) scene.add(bamboo(bamPos[i][0], bamPos[i][1], bamPos[i][2]));
-  const potPos = cfg(VEG.pots, (STORE || CLUB || WRH || JD || CYB || KFC || RL || LN || RW || SEC) ? [] : [[1.85, 2.35], [2.1, -2.55]]);
+  const potPos = cfg(VEG.pots, (STORE || CLUB || WRH || JD || CYB || KFC || RL || LN || RW || SEC || DK || TV) ? [] : [[1.85, 2.35], [2.1, -2.55]]);
   for (let i = 0; i < potPos.length; i++) scene.add(pot(potPos[i][0], potPos[i][1]));
 
   /* ================= 招牌 / 布幡 / 晾布 ================= */
-  if (!STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW && !SEC) {
+  if (!STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW && !SEC && !DK && !TV) {
   const plaqueMat = new T.MeshBasicMaterial({ map: TEX.plaque });
   const psz = cfg(PS.plaqueSize, [1.55, 0.46]);
   const plaque = new T.Mesh(new T.PlaneGeometry(psz[0], psz[1]), plaqueMat);
@@ -15267,7 +16632,7 @@ function buildSecAll() {
     'uniform sampler2D map; varying vec2 vUv;\n' +
     'void main(){ gl_FragColor = texture2D(map, vUv); }';
 
-  if (!TOWER && !STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW && !SEC) {
+  if (!TOWER && !STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW && !SEC && !DK && !TV) {
   const bannerMat = new T.ShaderMaterial({
     uniforms: { uTime: bannerUni.uTime, uAmp: { value: 0.11 }, map: { value: TEX.banner } },
     vertexShader: clothVert, fragmentShader: clothFrag, side: T.DoubleSide
@@ -15295,14 +16660,14 @@ function buildSecAll() {
     vertexShader: clothVert, fragmentShader: clothFrag, side: T.DoubleSide
   });
   const cloths = [];
-  if (!TOWER && !STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW && !SEC) for (let i = 0; i < 2; i++) {
+  if (!TOWER && !STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW && !SEC && !DK && !TV) for (let i = 0; i < 2; i++) {
     const c = new T.Mesh(new T.PlaneGeometry(0.7, 1.05, 4, 6), clothMat);
     c.position.set(2.62 + i * 0.86, 1.5 - i * 0.05, -1.95);
     c.rotation.y = -0.04 + i * 0.08;
     scene.add(c);
     cloths.push(c);
   }
-  if (!TOWER && !STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW && !SEC) (function () {
+  if (!TOWER && !STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW && !SEC && !DK && !TV) (function () {
     const b = new Builder();
     const g = new T.Group();
     b.cyl('woodDark', 0.055, 0.065, 2.15, 6, 2.24, 1.07, -1.95);
@@ -15323,7 +16688,7 @@ function buildSecAll() {
   /* ================= 屋檐铜铃 ================= */
   const bells = [];
   (function () {
-    const pos = (STORE || CLUB || JD || CYB || KFC || RL || LN || RW || SEC) ? [] : cfg(PS.bellPos, [[2.78, 5.86, 3.08], [2.78, 5.86, -3.86], [-5.98, 5.86, 3.08], [-5.98, 5.86, -3.86]]);
+    const pos = (STORE || CLUB || JD || CYB || KFC || RL || LN || RW || SEC || DK || TV) ? [] : cfg(PS.bellPos, [[2.78, 5.86, 3.08], [2.78, 5.86, -3.86], [-5.98, 5.86, 3.08], [-5.98, 5.86, -3.86]]);
     for (let i = 0; i < pos.length; i++) {
       const g = new T.Group();
       g.position.set(pos[i][0], pos[i][1], pos[i][2]);
@@ -15354,7 +16719,7 @@ function buildSecAll() {
     patches.push({ m: p, base: op, x0: x, z0: z });
     return p;
   }
-  if (STORE || CLUB || KFC || RL || LN || RW || SEC) {
+  if (STORE || CLUB || KFC || RL || LN || RW || SEC || DK || TV) {
     // 玻璃幕面，不做木格窗光斑
   } else if (TOWER) {
     addPatch(4.4, 4.4, -2.05 + 3.2, 1.24, -0.2, 0.1, 0.18);
@@ -15418,7 +16783,7 @@ function buildSecAll() {
     smokes.push(new Smoke(-3.10, 2.20, 6.10, 0.70, 5));
   } else if (JD) {
     smokes.push(new Smoke(DHCX + 0.30, DH_RG + 0.92, DW1 - 0.62, 1.15, 7));
-  } else if (!TOWER && !STORE && !CLUB && !WRH && !CYB && !KFC && !RL && !LN && !RW && !SEC) {
+  } else if (!TOWER && !STORE && !CLUB && !WRH && !CYB && !KFC && !RL && !LN && !RW && !SEC && !DK && !TV) {
     smokes.push(new Smoke(-1.62, FL + 0.88, 0.73, 1.0, 6));
     smokes.push(new Smoke(-3.55, FL + 0.66, -2.3, 1.2, 7));
     smokes.push(new Smoke(2.3, F2 + 0.8, -0.5, 0.9, 5));
