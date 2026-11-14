@@ -1151,6 +1151,83 @@
       },
       veg: { willows: [], bamboo: [], pots: [] },
       cam: { theta: 0.88, phi: 1.012, dist: 1.09, target: [-0.03, 0.050, 0.02] }
+    },
+
+    /* ---------------------------------------------------------
+       醉仙楼 · 三层酒肆（第 17 套）
+       正立面的门窗全是真洞口，右山墙整面剖开，屋顶掀掉前坡：
+       门里、窗里、剖口里，三层的堂食 / 雅座 / 雅阁都看得见。
+       黄昏暖光，室内靠低强度宫灯与自发光背板提亮，不糊窗纸。
+       --------------------------------------------------------- */
+    tavern: {
+      id: 'tavern',
+      title: '醉仙楼 · 三层酒肆',
+      tavern: true,
+      emis: 1.0,
+      lampK: 1.0,
+      sky: ['#fbe9c8', '#f2cd9e', '#d99a7a', '#7e5f68'],
+      vig: 'rgba(52,34,26,0.26)',
+      shadowSpan: 12.0,
+      shadowFar: 80,
+      palette: {
+        /* 展台与场院 */
+        tvBaseD: 0x3b2c22, tvBase: 0x58412f,
+        tvSoil: 0x7a6144, tvSoilD: 0x5d4a35,
+        tvPave: 0xa8a294, tvPaveD: 0x8b877b, tvPaveL: 0xc0bbac,
+        tvStone: 0xb3ad9e, tvStoneD: 0x847e70, tvStoneL: 0xcfc8b6,
+        /* 墙与室内背板 */
+        tvWall: 0xd8cdb4, tvWallD: 0xb4a992, tvWallIn: 0xc8b08a,
+        tvFloor: 0x9a7042, tvFloorD: 0x8a6339, tvCeil: 0xc0a983,
+        tvCut: 0x5e4229, tvDeck: 0x8a6238,
+        /* 木构：朱柱 / 梁 / 斗拱青绿彩画 / 栏杆 / 门窗 */
+        tvWoodD: 0x5a3a24, tvWoodL: 0xb98a55,
+        tvPillar: 0xa63c2c, tvBeam: 0x7a4e2e,
+        tvBracket: 0x3f6b60, tvBracketR: 0xb45a38,
+        tvRail: 0x9a3c2a, tvLattice: 0x6b452a,
+        tvDoor: 0x8b4f2c, tvDoorD: 0x51301c,
+        /* 青灰瓦三阶 */
+        tvTile: 0x4d5a60, tvTileD: 0x354047, tvTileL: 0x68777c,
+        tvRidge: 0x30383d, tvEave: 0x6b4a30, tvFinial: 0x8a6a3a,
+        tvGold: 0xd4ae5c, tvSignBox: 0x2b2018,
+        /* 家具 */
+        tvTable: 0xa57643, tvTableD: 0x6d4a2c,
+        tvStool: 0x8a5c34, tvStoolD: 0x5d3d24,
+        tvCounter: 0x8f5f34, tvCounterD: 0x6a4325,
+        tvScreen: 0xd6c6a4, tvScreenD: 0x7a5a38,
+        tvScroll: 0xeee2c6, tvInk: 0x3b332a, tvPaper: 0xe8ddc2,
+        tvBrush: 0x4a3a2c, tvAbacus: 0x70492c,
+        /* 酒器与吃食 */
+        tvJar: 0x8a6a4c, tvJarD: 0x4a3828, tvJarL: 0xa88154,
+        tvPot: 0x9fb8a6, tvPotD: 0x6d8a7e,
+        tvCupW: 0xe4dcc6, tvDish: 0xd8cdb4,
+        tvFood: 0xc05a38, tvFruit: 0xd9a13b, tvWater: 0x5f8a92,
+        /* 灯火 */
+        tvLantern: 0xd94a2c, tvTassel: 0xd8a63c, tvCandle: 0xffe6b0,
+        tvRope: 0x6a5438,
+        /* 人物：衣袍三色 + 肤色发色 */
+        tvSkin: 0xe8bd9a, tvHair: 0x2e2823,
+        tvRobeA: 0x4a6b78, tvRobeB: 0x9a4638, tvRobeC: 0x6f6a8c,
+        tvShoe: 0x3a312a,
+        /* 室外陈设 */
+        tvLion: 0xb9b2a2, tvLionD: 0x8c8678,
+        tvBark: 0x6b5540, tvLeaf1: 0x6f8f4a, tvLeaf2: 0x517038,
+        tvLeaf3: 0x8faa5a, tvTuft: 0x7d9a52,
+        tvHorse: 0x8a6242, tvHorseD: 0x5f422c, tvMetal: 0x8d8f92
+      },
+      emit: {
+        tvWallIn:  { c: 0xc8b08a, e: 0x3a2814 },
+        tvLantern: { c: 0xd94a2c, e: 0x8a2510 },
+        tvCandle:  { c: 0xffe6b0, e: 0xffd080 }
+      },
+      light: {
+        /* 黄昏斜光从相机同侧来，正面门窗才不逆光 */
+        sun:  { color: 0xffd9a8, i: 2.45, pos: [18.0, 20.0, 14.0] },
+        fill: { color: 0x8a9cc0, i: 0.55, pos: [-14.0, 8.0, -12.0] },
+        hemi: { sky: 0xd8c4b0, ground: 0x8a7258, i: 0.86 },
+        amb:  { color: 0x9c8c86, i: 0.26 }
+      },
+      veg: { willows: [], bamboo: [], pots: [] },
+      cam: { theta: 0.72, phi: 1.17, dist: 34, target: [0.0, 5.40, 0.0] }
     }
   };
 });
