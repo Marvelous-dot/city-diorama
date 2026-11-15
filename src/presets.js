@@ -1233,6 +1233,71 @@
       },
       veg: { willows: [], bamboo: [], pots: [] },
       cam: { theta: 0.95, phi: 1.19, dist: 34, target: [0.0, 5.40, 0.0] }
+    },
+
+    /* ---------------------------------------------------------
+       水车磨坊 · 溪畔（第 18 套：第一套「机器在干活」的形制）
+       --------------------------------------------------------- */
+    mill: {
+      id: 'mill',
+      title: '水车磨坊 · 溪畔',
+      mill: true,
+      figStyle: 'voxel',
+      emis: 1.0,
+      lampK: 1.0,
+      sky: ['#fdf4dd', '#f3e0bb', '#c9c4a4', '#8b9587'],
+      vig: 'rgba(48,40,28,0.24)',
+      shadowSpan: 13.0,
+      shadowFar: 90,
+      palette: {
+        /* 展台 / 土层 / 驳岸 */
+        mlBase: 0x6b5b46, mlBaseD: 0x4c4438,
+        mlSoil: 0x9a7c56, mlSoilD: 0x6d5138, mlSoilL: 0xb09268,
+        mlGrass: 0x8a9b58, mlGrassL: 0xa8b46a, mlTuft: 0x778c48,
+        mlStone: 0xb3ac99, mlStoneD: 0x817c6e, mlStoneL: 0xd0c8b3,
+        mlBankD: 0x4e6a6a, mlPave: 0xbeb6a2, mlPaveD: 0xa39c8a,
+        /* 木作三阶 */
+        mlWood: 0x9a6c3e, mlWoodD: 0x5f4025, mlWoodL: 0xc09558,
+        /* 墙 / 楼板 / 断面 / 瓦 */
+        mlWall: 0xd9cbaa, mlWallD: 0xb9ab8e, mlWallIn: 0xc4aa80,
+        mlFloor: 0xa87c4c, mlFloorD: 0x8b633a, mlCut: 0x4e3520,
+        mlTile: 0x59635e, mlTileD: 0x3c4542, mlTileL: 0x76807a,
+        mlRidge: 0x333a37, mlEave: 0x6b4a2e,
+        mlLattice: 0x67462a, mlDoor: 0x8b5a32, mlDoorD: 0x4e2f1b,
+        mlSignBox: 0x2a1c12, mlGold: 0xc9a659,
+        /* 水车 / 传动 / 石磨 */
+        mlWheel: 0x8a6037, mlWheelD: 0x5e4026, mlWheelL: 0xb3834c,
+        mlBucket: 0x9a7044, mlBucketD: 0x6a4a2c, mlHub: 0x5b4028,
+        mlAxle: 0x6d6a62, mlGear: 0xb08548, mlGearD: 0x62462a, mlGearL: 0xd8ad68,
+        mlMill: 0xb0a89a, mlMillD: 0x7e786c, mlMillL: 0x8d8577, mlFlour: 0xe6dcc2,
+        /* 粮 / 袋 / 麦 / 树 */
+        mlSack: 0xc9b891, mlSackD: 0xa08e6c,
+        mlGrain: 0xd8b661, mlGrainD: 0xb98f42,
+        mlWheat: 0xd6b45c, mlWheatD: 0xb8903c,
+        mlBark: 0x6a5238, mlLeaf1: 0x6f8c47, mlLeaf2: 0x51703a, mlLeaf3: 0x93a856,
+        /* 水 / 灯火 / 杂物 */
+        mlWaterD: 0x6fa0a4, mlFoam: 0xeef9f3, mlSpray: 0xcfeae6,
+        mlLantern: 0xd8562e, mlRope: 0x7c6644,
+        mlMetal: 0x94989a, mlMetalD: 0x5a6064,
+        mlCloth: 0xb6503a, mlClothD: 0xe3c98a,
+        mlDuck: 0xe9e3cf, mlDuckD: 0xd8a03c,
+        /* 积木人 */
+        mlSkin: 0xe8bd9a, mlHair: 0x2e2823,
+        mlRobeA: 0x4a6b78, mlRobeB: 0x9a4638, mlRobeC: 0x6f6a8c,
+        mlShoe: 0x3a312a, mlApron: 0xe2d7bd
+      },
+      emit: {
+        mlWallIn:  { c: 0xc4aa80, e: 0x322313 },
+        mlLantern: { c: 0xd8562e, e: 0x8a2510 }
+      },
+      light: {
+        sun:  { color: 0xffe0ae, i: 2.35, pos: [16.0, 19.0, 15.0] },
+        fill: { color: 0x9fb6d0, i: 0.55, pos: [-14.0, 9.0, -12.0] },
+        hemi: { sky: 0xe6d6b8, ground: 0x8a7458, i: 0.90 },
+        amb:  { color: 0xa89a88, i: 0.28 }
+      },
+      veg: { willows: [], bamboo: [], pots: [] },
+      cam: { theta: 0.95, phi: 1.16, dist: 33, target: [-1.20, 3.70, 0.80] }
     }
   };
 });
