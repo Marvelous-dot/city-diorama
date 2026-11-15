@@ -16296,17 +16296,102 @@ function mlWaterSurface(g) {
   return tex;
 }
 
-/* 上游引水槽：高架木槽 + 支柱 + 槽内水 + 出水口 */
+/* 水舌贴图：沿水流方向滚动的纵向亮条，让水体读成「在流」而不是一块塑料片 */
+function mlJetTexture() {
+  const t = canvasTex(512, 96, function (c, w, h) {
+    const gr = c.createLinearGradient(0, 0, 0, h);
+    gr.addColorStop(0, '#d7efeb'); gr.addColorStop(0.42, '#a4d4d4');
+    gr.addColorStop(1, '#74aeb5');
+    c.fillStyle = gr; c.fillRect(0, 0, w, h);
+    /* 条纹必须沿贴图的 x 轴（= 水舌的路径 u）铺成长条，滚动时才是「水在流」。
+       画成竖条会横切水舌，读成一条带齿的传送带。 */
+    for (let i = 0; i < 176; i++) {
+      const x = mlR(i * 3.1) * w, y = mlR(i * 7.7) * h;
+      const len = 32 + mlR(i * 5.3) * 130;
+      const th = 0.9 + mlR(i * 9.1) * 3.0;
+      const a = 0.14 + mlR(i * 4.7) * 0.50;
+      c.fillStyle = i % 4 === 0
+        ? 'rgba(255,255,255,' + a.toFixed(2) + ')'
+        : 'rgba(232,250,248,' + (a * 0.72).toFixed(2) + ')';
+      c.fillRect(x, y, len, th);
+      c.fillRect(x - w, y, len, th);   /* 横向平铺无缝补画 */
+    }
+    /* 成片的白沫带，急流跌水本来就是白绿相间，不是一整块纯青板 */
+    for (let i = 0; i < 22; i++) {
+      const x = mlR(i * 9.3) * w, y = mlR(i * 12.1) * h;
+      const len = 50 + mlR(i * 6.7) * 130, th = 2.2 + mlR(i * 4.9) * 4.0;
+      c.fillStyle = 'rgba(255,255,255,' + (0.22 + mlR(i * 3.7) * 0.30).toFixed(2) + ')';
+      c.fillRect(x, y, len, th);
+      c.fillRect(x - w, y, len, th);
+    }
+    for (let i = 0; i < 30; i++) {
+      const x = mlR(i * 11.7) * w, y = mlR(i * 13.9) * h;
+      c.fillStyle = 'rgba(255,255,255,' + (0.16 + mlR(i * 2.3) * 0.32).toFixed(2) + ')';
+      c.beginPath();
+      c.ellipse(x, y, 6 + mlR(i * 4.1) * 15, 1.4 + mlR(i * 6.3) * 2.6, 0, 0, Math.PI * 2);
+      c.fill();
+    }
+  });
+  t.wrapS = t.wrapT = T.RepeatWrapping;
+  t.repeat.set(1.9, 1.0);
+  return t;
+}
+
+/* 矩形截面的抛物线水舌：起步水平、末端加速下坠。四个侧面都建，
+   从任何机位看都是一条有宽有厚的连续水体，不是几根细杆。 */
+function mlJetRibbon(p0, p1, zc, seg) {
+  const N = seg || 26;
+  const pos = [], uv = [], idx = [];
+  for (let i = 0; i <= N; i++) {
+    const u = i / N;
+    const x = p0[0] + (p1[0] - p0[0]) * u;
+    const y = p0[1] + (p1[1] - p0[1]) * Math.pow(u, 2.2);  /* 先平抛、再加速砸下 */
+    const z = zc + 0.10 * u;
+    const w = 0.90 + 0.10 * Math.sin(u * Math.PI) - 0.04 * u;
+    const th = 0.16 - 0.045 * u;   /* 水越冲越薄、末端散开 */
+    const zL = z - w / 2, zR = z + w / 2, yT = y + th / 2, yB = y - th / 2;
+    pos.push(x, yT, zL, x, yT, zR, x, yB, zR, x, yB, zL);
+    uv.push(u, 0, u, 0.34, u, 0.67, u, 1);
+  }
+  for (let i = 0; i < N; i++) {
+    const a = i * 4, q = (i + 1) * 4;
+    for (let k = 0; k < 4; k++) {
+      const k2 = (k + 1) % 4;
+      idx.push(a + k, q + k, q + k2, a + k, q + k2, a + k2);
+    }
+  }
+  const g = new T.BufferGeometry();
+  g.setAttribute('position', new T.Float32BufferAttribute(pos, 3));
+  g.setAttribute('uv', new T.Float32BufferAttribute(uv, 2));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  return g;
+}
+
+/* ---------------- 上游引水槽：高架木槽 + 支柱 + 槽内活水 + 跌水口 ---------------- */
 function mlChannel(b, g) {
   const y0 = 5.72, xA = -10.70, xB = -4.38, zc = ML_WCZ;
   b.box('mlWoodD', xB - xA, 0.16, 1.05, (xA + xB) / 2, y0 - 0.10, zc);
-  [-0.50, 0.50].forEach(function (dz) {
-    b.box('mlWood', xB - xA, 0.32, 0.10, (xA + xB) / 2, y0 + 0.10, zc + dz);
-  });
-  b.box('mlWaterD', xB - xA - 0.12, 0.035, 0.88, (xA + xB) / 2, y0 + 0.005, zc);
+  /* 近相机侧板末端 1.15m 锯短，否则 0.32 高的板把跌水口整个挡住 */
+  b.box('mlWood', xB - xA - 1.15, 0.32, 0.10, (xA + xB - 1.15) / 2, y0 + 0.10, zc + 0.50);
+  b.box('mlWood', xB - xA, 0.32, 0.10, (xA + xB) / 2, y0 + 0.10, zc - 0.50);
+  /* 槽内水面走独立 Mesh + 滚动贴图，跟河面同一套波纹语言但流速更快 */
+  const flowTex = mlWaterTexture();
+  flowTex.repeat.set(2.6, 1.0);
+  const fm = new T.Mesh(new T.PlaneGeometry(xB - xA - 0.14, 0.90),
+    new T.MeshToonMaterial({ map: flowTex, gradientMap: GRAD, color: 0xffffff, side: T.DoubleSide }));
+  fm.rotation.x = -Math.PI / 2;
+  fm.position.set((xA + xB) / 2, y0 + 0.045, zc);
+  g.add(fm);
+  /* 槽内顺流白色浮沫，明确水是从左往右跑的 */
+  for (let i = 0; i < 9; i++) {
+    const x = xA + 0.45 + i * 0.72;
+    b.box('mlFoam', 0.42 + mlR(i * 3.7) * 0.28, 0.018, 0.055,
+      x, y0 + 0.068, zc + (mlR(i * 5.1) - 0.5) * 0.62);
+  }
   for (let i = 0; i < 5; i++) {
     const x = xA + 0.75 + i * 1.36;
-    b.box('mlWoodL', 0.10, 0.36, 1.18, x, y0 + 0.06, zc);
+    /* 不要横跨水面的加固箍：俯视下会把一整条活水切成一格格水池 */
     b.cyl('mlWoodD', 0.13, 0.17, y0 - ML_WY - 0.10, 8, x, (ML_WY + y0 - 0.10) / 2, zc);
     b.box('mlStoneD', 0.62, 0.16, 0.62, x, ML_WY + 0.08, zc);
   }
@@ -16315,8 +16400,10 @@ function mlChannel(b, g) {
     const x = xA + 1.1 + i * 1.50;
     b.to('mlWoodD', 0.075, x, ML_WY + 1.55, zc - 0.55, x + 0.75, y0 - 0.22, zc - 0.55, 6);
   }
-  /* 槽口落水帘由 mlFallGroup() 单独建（独立 Group 才摆得动） */
-  return null;
+  /* 跌水唇：槽口外伸一小段下倾木板，水从这里平抛出去 */
+  b.box('mlWoodL', 0.44, 0.075, 1.05, xB + 0.18, y0 - 0.06, zc, 0, 0, -0.16);
+  /* 槽口到轮顶的连续水舌由 mlFallGroup() 建（独立 Group + 独立贴图） */
+  return flowTex;
 }
 
 /* ---------------- 磨坊壳体 ---------------- */
@@ -16790,7 +16877,7 @@ function buildMlAll() {
   const b = new Builder();
 
   mlBase(b);
-  mlChannel(b, g);
+  const channelTex = mlChannel(b, g);
   mlShell(b);
   mlMachineStatic(b);
   mlInterior(b);
@@ -16820,6 +16907,10 @@ function buildMlAll() {
   const dust = mlPoints(64, '0.96,0.90,0.76', 155.0, 0.14, 2.10, [3.4, 0.35, 2.2]);
   dust.p.position.set(-0.60, ML_LY + 0.95, 1.60);
   g.add(dust.p);
+  /* 水舌砸进轮斗的飞溅：位置贴冲击点，上抛后回落 */
+  const impact = mlPoints(90, '0.97,1.00,1.00', 250.0, 0.95, 0.85, [1.10, 0.35, 0.85]);
+  impact.p.position.set(-2.62, 4.94, ML_WCZ + 0.30);
+  g.add(impact.p);
 
   mlLights();
 
@@ -16828,10 +16919,14 @@ function buildMlAll() {
     wheel.rotation.z = t * 0.42;
     shaft.rotation.x = -t * 0.42;
     stone.rotation.y = t * 0.96;
-    fall.rotation.z = Math.sin(t * 1.25) * 0.014;
+    /* 两张水贴图的 offset 才真的让「水在流」：水舌快、槽内慢、河面最慢 */
+    fall.userData.jetTex.offset.x = -t * 0.62;
+    fall.userData.jetTex.offset.y = Math.sin(t * 1.25) * 0.006;
+    channelTex.offset.x = -t * 0.26;
     banner.rotation.z = Math.sin(t * 0.82 + 0.7) * 0.048;
     waterTex.offset.x = -t * 0.055;
     spray.u.uTime.value = t;
+    impact.u.uTime.value = t;
     dust.u.uTime.value = t;
     spins.length = 0;
     spins.push(wheel.rotation.z, shaft.rotation.x, stone.rotation.y);
@@ -16840,7 +16935,10 @@ function buildMlAll() {
   if (window.__expose) {
     window.__ml = {
       wheel: wheel, shaft: shaft, stone: stone, spins: spins,
-      getSpin: function () { return [wheel.rotation.z, shaft.rotation.x, stone.rotation.y]; }
+      getSpin: function () { return [wheel.rotation.z, shaft.rotation.x, stone.rotation.y]; },
+      getFlow: function () {
+        return [fall.userData.jetTex.offset.x, channelTex.offset.x, impact.u.uTime.value];
+      }
     };
   }
 }
@@ -16856,31 +16954,72 @@ function mlSignBoards(b) {
   });
 }
 
-/* 落水帘：独立 Group 才摆得动 */
+/* 落水：槽口 → 连续水舌 → 砸进轮斗 → 飞溅 → 随轮倒出 → 轮底浪花 */
 function mlFallGroup() {
   const g = new T.Group(), b = new Builder();
-  /* 竖直水帘会被轮缘与槽侧板挡得干干净净。改成从槽口斜冲下来的水带，
-     整体往 +z（相机侧）挪 0.42，再在轮顶压一道泡沫冠，落点才读得出来。 */
-  const zc = ML_WCZ + 0.42;
-  for (let i = 0; i < 5; i++) {
-    const z = zc + (i - 2) * 0.21;
-    b.to(i % 2 ? 'mlFoam' : 'mlSpray', 0.052,
-      -4.40, 5.68, z, -3.98, 5.16, z + 0.09, 6);
+  const zc = ML_WCZ + 0.30;
+  /* 起点贴着跌水唇，终点落在轮顶偏下游（约 70°）的斗口里。
+     水平 1.75m / 下落 0.82m，用 u² 让水先平抛、再加速砸下去。 */
+  const p0 = [-4.30, 5.70], p1 = [-2.55, 4.88];
+  const jetTex = mlJetTexture();
+  const jet = new T.Mesh(mlJetRibbon(p0, p1, zc, 26),
+    new T.MeshToonMaterial({
+      map: jetTex, gradientMap: GRAD, color: 0xffffff,
+      side: T.DoubleSide, emissive: 0x1d3d42, emissiveIntensity: 0.34
+    }));
+  jet.frustumCulled = false;
+  g.add(jet);
+  /* 水舌两侧白沫边：小球串，绝不连成一整块白板 */
+  for (let i = 0; i < 20; i++) {
+    const u = (i + 0.4) / 20;
+    const x = p0[0] + (p1[0] - p0[0]) * u;
+    const y = p0[1] + (p1[1] - p0[1]) * Math.pow(u, 2.2);  /* 先平抛、再加速砸下 */
+    const z = zc + 0.10 * u;
+    const w = 0.90 + 0.10 * Math.sin(u * Math.PI) - 0.04 * u;
+    [-1, 1].forEach(function (s) {
+      b.sph('mlFoam', 0.030 + mlR(i * 5.1 + s * 3.3) * 0.038,
+        x, y + 0.05, z + s * w * 0.5, 1, 0.75, 1);
+    });
   }
+  /* 水舌末端散成几簇水滴，绝不用细长杆（又会读成白筷子） */
+  for (let j = 0; j < 8; j++) {
+    const q = mlR(j * 4.9);
+    b.sph(j % 2 ? 'mlFoam' : 'mlSpray', 0.030 + mlR(j * 7.1) * 0.042,
+      p1[0] + 0.05 + q * 0.30,
+      p1[1] - 0.04 - q * 0.26,
+      zc + (mlR(j * 6.3) - 0.5) * 0.80, 1, 1.1, 1);
+  }
+  /* 冲击点：扇形散开的碎水滴 */
+  for (let i = 0; i < 18; i++) {
+    const a = mlR(i * 3.7), d = mlR(i * 5.9);
+    b.sph(i % 3 ? 'mlFoam' : 'mlSpray', 0.034 + d * 0.046,
+      p1[0] + (a - 0.30) * 0.90,
+      p1[1] + (d - 0.28) * 0.62,
+      zc + (mlR(i * 7.3) - 0.5) * 0.92, 1, 0.8, 1);
+  }
+  /* 轮顶几个斗里兜着的水膜，压小压薄免得像贴纸 */
   for (let i = 0; i < 4; i++) {
-    const z = zc + (i - 1.5) * 0.25;
-    b.box(i % 2 ? 'mlFoam' : 'mlSpray', 0.075, 0.34, 0.075, -3.95, 5.00, z);
+    const a = (58 + i * 13) * Math.PI / 180;
+    const px = ML_WCX + Math.cos(a) * (ML_WR - 0.13);
+    const py = ML_WCY + Math.sin(a) * (ML_WR - 0.13);
+    b.box('mlSpray', 0.22, 0.050, 0.56, px, py, zc, 0, 0, a - Math.PI / 2);
   }
-  /* 泡沫要碎，一整块白板会读成悬空的斜片 */
-  for (let i = 0; i < 6; i++) {
-    const z = ML_WCZ - 0.55 + i * 0.22;
-    b.box('mlFoam', 0.30 + mlR(i * 3.7) * 0.20, 0.065, 0.16,
-      -3.90 + mlR(i * 5.1) * 0.16, 5.14 + mlR(i * 7.3) * 0.07, z);
+  /* 水被斗带着转到左侧倒出：散碎下落的水滴，绝不拉成长白线 */
+  for (let i = 0; i < 12; i++) {
+    const u = i / 11;
+    b.sph(i % 3 ? 'mlFoam' : 'mlSpray', 0.028 + mlR(i * 4.3) * 0.030,
+      -5.98 - u * 0.34,
+      1.40 - u * 1.60,
+      zc - 0.18 + (mlR(i * 6.1) - 0.5) * 0.58, 1, 1.2, 1);
   }
-  for (let i = 0; i < 3; i++) {
-    b.box('mlSpray', 0.30, 0.055, 0.20, -4.36, 5.74, ML_WCZ - 0.30 + i * 0.30);
+  /* 轮底砸进河面的浪花：贴水面的一排碎白片 */
+  for (let i = 0; i < 11; i++) {
+    b.box('mlFoam', 0.22 + mlR(i * 3.3) * 0.20, 0.035, 0.26,
+      ML_WCX - 1.45 + i * 0.29, ML_WY + 0.085,
+      ML_WCZ + (mlR(i * 5.7) - 0.5) * 1.05);
   }
   b.build(g, { noOutline: ['mlFoam', 'mlSpray'] });
+  g.userData.jetTex = jetTex;
   return g;
 }
 
