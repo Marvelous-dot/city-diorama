@@ -338,9 +338,9 @@ node build.js city store # 构建指定的几个
 
 ```js
 CT_ANIM.push(function (t) {
-  wheel.rotation.z =  t * 0.42;   // 上击式水车（含穿墙主轴）
-  shaft.rotation.x = -t * 0.42;   // 室内长轴，反向
-  stone.rotation.y =  t * 0.96;   // 竖轴 + 磨盘上扇，增速
+  wheel.rotation.z = -t * 0.42;   // 上击式水车：水从 -x 冲来 → 顺时针
+  shaft.rotation.x =  t * 0.42;   // 室内长轴，反向
+  stone.rotation.y = -t * 0.96;   // 竖轴 + 磨盘上扇，再反向
   fall.userData.jetTex.offset.x = -t * 0.62;  // 水舌流纹（最快）
   channelTex.offset.x = -t * 0.26;           // 槽内水面
   waterTex.offset.x = -t * 0.055;            // 河面（最慢）
@@ -350,8 +350,15 @@ CT_ANIM.push(function (t) {
 
 每个动态件**用自己的 `Builder` 在局部坐标里建，再挂到独立 `T.Group`** —— 进主场景的
 合批就转不动了。轮轴沿 `-z` 穿墙、长轴沿 `x`、竖轴沿 `y`，三级换向靠三对咬合齿轮
-在视觉上交代清楚；`window.__ml.getSpin()` 暴露三个角度，用 playwright 隔 2.5 秒采样
-两次验证确实在转（实测 `0.336 / -0.336 / 0.768`，比例与速率设定一致）。
+在视觉上交代清楚；`window.__ml.getSpin()` 暴露三个角度，用 playwright 在同一帧取两次
+样本，按**每秒速率**核对方向与比例（实测 `-0.42 / +0.42 / -0.96`）。
+
+**转向必须由水流方向推出来，不能凭感觉写**。水从 `-x` 冲向 `+x`、砸在轮顶偏 `+x`
+（约 67°）的斗上，力矩 `τ = r × F` 在 `z` 轴为负 → 轮必须**顺时针**（`rotation.z`
+递减）。顺时针时轮顶表面速度也朝 `+x`，与水同向；轮斗外挡板在切向 `+0.50`
+（运动前方），开口朝 `-x`，水从上游进斗、被挡板兜住才兜得住。倒水点在轮右侧
+（约 4 点钟），所以轮侧水滴、河面浪花、水雾粒子全部要跟着搬到 `+x` 侧 ——
+只翻轮子不搬水花，会出现「水往左倒」的新破绽。
 
 八条踩过的坑：
 
@@ -388,7 +395,7 @@ CT_ANIM.push(function (t) {
 
 `window.__ml.getFlow()` 暴露 `[水舌 offset, 槽内 offset, 飞溅时间]`。playwright 隔 2.5 秒
 采样两次，验的是**每秒速率比**而不是绝对位移 —— 软渲染只有几 fps，2.5 秒真实时间
-未必推进 2.5 秒 `t`；实测 `jet -0.62 / channel -0.26 / wheel +0.42`，与设定完全一致。
+未必推进 2.5 秒 `t`；实测 `jet -0.62 / channel -0.26 / wheel -0.42`，与设定完全一致。
 
 定稿 165 mesh / 51633 三角，`magenta:[] / errors:[]`；18 套全量回归全绿。
 

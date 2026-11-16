@@ -17078,24 +17078,27 @@ function buildMlAll() {
   const fall = mlFallGroup();
   g.add(fall);
 
-  const spray = mlPoints(130, '0.88,0.96,0.98', 210.0, 0.62, 1.35, [1.9, 0.25, 1.0]);
-  spray.p.position.set(ML_WCX - 0.35, ML_WY + 0.18, ML_WCZ);
+  const spray = mlPoints(130, '0.88,0.96,0.98', 210.0, 0.62, 1.35, [1.25, 0.25, 0.95]);
+  /* 轮底不入水（轮底 y=-0.30 / 水面 -0.55），水雾要跟着右侧倒水点走 */
+  spray.p.position.set(ML_WCX + 1.15, ML_WY + 0.18, ML_WCZ);
   g.add(spray.p);
   const dust = mlPoints(64, '0.96,0.90,0.76', 155.0, 0.14, 2.10, [3.4, 0.35, 2.2]);
   dust.p.position.set(-0.60, ML_LY + 0.95, 1.60);
   g.add(dust.p);
   /* 水舌砸进轮斗的飞溅：位置贴冲击点，上抛后回落 */
   const impact = mlPoints(90, '0.97,1.00,1.00', 250.0, 0.95, 0.85, [1.10, 0.35, 0.85]);
-  impact.p.position.set(-2.62, 4.94, ML_WCZ + 0.30);
+  impact.p.position.set(-2.62, 4.94, ML_WCZ + 0.20);
   g.add(impact.p);
 
   mlLights();
 
   const spins = [];
   CT_ANIM.push(function (t) {
-    wheel.rotation.z = t * 0.42;
-    shaft.rotation.x = -t * 0.42;
-    stone.rotation.y = t * 0.96;
+    /* 水从 -x 冲向 +x、砸在轮顶偏 +x 的斗上 → 力矩顺时针，rotation.z 必须取负。
+       顺时针时轮顶表面速度也朝 +x，与水同向；轮反转后长轴、竖轴、磨盘全部跟着反。 */
+    wheel.rotation.z = -t * 0.42;
+    shaft.rotation.x = t * 0.42;
+    stone.rotation.y = -t * 0.96;
     /* 两张水贴图的 offset 才真的让「水在流」：水舌快、槽内慢、河面最慢 */
     fall.userData.jetTex.offset.x = -t * 0.62;
     fall.userData.jetTex.offset.y = Math.sin(t * 1.25) * 0.006;
@@ -17134,7 +17137,7 @@ function mlSignBoards(b) {
 /* 落水：槽口 → 连续水舌 → 砸进轮斗 → 飞溅 → 随轮倒出 → 轮底浪花 */
 function mlFallGroup() {
   const g = new T.Group(), b = new Builder();
-  const zc = ML_WCZ + 0.30;
+  const zc = ML_WCZ + 0.20;
   /* 起点贴着跌水唇，终点落在轮顶偏下游（约 70°）的斗口里。
      水平 1.75m / 下落 0.82m，用 u² 让水先平抛、再加速砸下去。 */
   const p0 = [-4.30, 5.70], p1 = [-2.55, 4.88];
@@ -17181,18 +17184,18 @@ function mlFallGroup() {
     const py = ML_WCY + Math.sin(a) * (ML_WR - 0.13);
     b.box('mlSpray', 0.22, 0.050, 0.56, px, py, zc, 0, 0, a - Math.PI / 2);
   }
-  /* 水被斗带着转到左侧倒出：散碎下落的水滴，绝不拉成长白线 */
+  /* 顺时针转：水在轮顶接住后沿右侧下行倒出，水滴必须在 +x 侧 */
   for (let i = 0; i < 12; i++) {
     const u = i / 11;
     b.sph(i % 3 ? 'mlFoam' : 'mlSpray', 0.028 + mlR(i * 4.3) * 0.030,
-      -5.98 - u * 0.34,
-      1.40 - u * 1.60,
+      -1.14 + u * 0.30,
+      1.02 - u * 1.38,
       zc - 0.18 + (mlR(i * 6.1) - 0.5) * 0.58, 1, 1.2, 1);
   }
-  /* 轮底砸进河面的浪花：贴水面的一排碎白片 */
+  /* 轮右下倒水处的河面浪花：贴水面的一排碎白片 */
   for (let i = 0; i < 11; i++) {
     b.box('mlFoam', 0.22 + mlR(i * 3.3) * 0.20, 0.035, 0.26,
-      ML_WCX - 1.45 + i * 0.29, ML_WY + 0.085,
+      ML_WCX + 0.52 + i * 0.24, ML_WY + 0.085,
       ML_WCZ + (mlR(i * 5.7) - 0.5) * 1.05);
   }
   b.build(g, { noOutline: ['mlFoam', 'mlSpray'] });
