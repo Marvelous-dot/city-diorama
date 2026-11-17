@@ -17206,7 +17206,7 @@ function gdGround(b) {
     b.box('gdGrass', w, 0.08, d, cx, GD_GY + 0.04, cz);   /* 草皮顶面 = GD_GY + 0.08 */
   }
   /* 西侧南北溪流 x -26.1..-21.9：陆地必须按溪槽拆开，否则水面被埋在草下 */
-  const RX0 = -26.7, RX1 = -21.3;
+  const RX0 = -28.2, RX1 = -19.8;
   land(GD_X0, RX0, GD_Z0, PZ0);          // 北-西
   land(RX1, GD_X1, GD_Z0, PZ0);          // 北-东
   land(GD_X0, RX0, PZ1, GD_Z1);          // 南-西
@@ -17268,10 +17268,10 @@ function gdWater(g) {
   m2.position.set(15.8, GD_WY, 4.7);
   g.add(m2);
   /* 西侧南北溪流：与主池共用贴图，水一起流动 */
-  const g3 = new T.PlaneGeometry(5.0, 45.6);
+  const g3 = new T.PlaneGeometry(8.0, 30.0);
   g3.rotateX(-Math.PI / 2);
   const m3 = new T.Mesh(g3, mat);
-  m3.position.set(-24.0, GD_WY + 0.22, 0);
+  m3.position.set(-24.0, GD_GY + 0.01, -2.0);
   g.add(m3);
   return tex;
 }
@@ -17748,15 +17748,46 @@ function gdRock(b, x, y, z, sx, sy, sz, seed) {
   b.add('gdRock', g);
 }
 
+
+/* 整块变形山体：一个连续几何，没有球与球的接缝，近景也不会碎成纸片 */
+function gdRockMass(b, cx, cz, w, d, h, seed) {
+  const g = new T.SphereGeometry(1, 32, 22);
+  const p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) {
+    let x = p.getX(i), y = p.getY(i), z = p.getZ(i);
+    /* 半径噪声：低频起伏 + 高频皱褶，模拟太湖石的「瘦皱」 */
+    const n = 1
+      + 0.15 * Math.sin(x * 3.7 + seed) * Math.cos(z * 3.1 + seed * 1.7)
+      + 0.08 * Math.sin(x * 8.3 + z * 6.7 + seed * 2.3);
+    x *= w * 0.5 * n;
+    z *= d * 0.5 * n;
+    let yy = y * h * 0.5;
+    if (yy < 0) yy *= 0.30;                       // 底部收窄，稳稳坐在岸上
+    /* 山脊：中心隆起，形成主峰而非圆馒头 */
+    const peak = Math.exp(-((x * x) / (w * w * 0.10) + (z * z) / (d * d * 0.14))) * h * 0.62;
+    yy += peak * Math.max(0, y + 1) * 0.55;
+    p.setXYZ(i, x, yy, z);
+  }
+  g.computeVertexNormals();
+  g.translate(cx, GD_GY + 0.05, cz);
+  b.add('gdRock', g);
+}
+
+/* 洞壑：山体正面嵌几个深色凹陷，远看就是「透」的洞 */
+function gdCave(b, x, y, z, r, ry) {
+  b.sph('gdRockD', r, x, y, z, 1, 0.85, 0.55);
+  b.sph('gdRockD', r * 0.55, x + 0.15, y + r * 0.20, z - 0.02, 1, 0.9, 0.5);
+}
 function gdHills(b) {
-  /* 主峰：三块大石 + 一块瘦峰，少而大。
-     多个中等球叠加会互相穿插露出内壁，近景就是一堆碎纸片。 */
+  /* 四块整石：少而大。多点叠加会露内壁，整块变形又会拉成石柱，四块是最稳的折中 */
   const HX = -4.5, cz = 12.6;
   gdRock(b, HX + 2.4, GD_GY + 1.55, cz, 1.55, 2.55, 1.35, 1);
   gdRock(b, HX + 0.3, GD_GY + 0.90, cz + 0.7, 1.60, 1.05, 1.45, 2);
   gdRock(b, HX + 4.4, GD_GY + 0.85, cz - 0.5, 1.50, 1.00, 1.40, 3);
-  gdRock(b, HX + 2.5, GD_GY + 4.05, cz + 0.1, 0.55, 1.30, 0.50, 4);
-  /* 苔藓：压在石肩，遮住石与石的接缝 */
+  gdRock(b, HX + 2.5, GD_GY + 4.05, cz + 0.1, 0.58, 1.28, 0.52, 4);
+  /* 洞壑：深色凹陷贴在石面上，读出「透」 */
+  gdCave(b, HX + 1.5, GD_GY + 1.10, cz + 1.35, 0.58);
+  gdCave(b, HX + 3.4, GD_GY + 1.55, cz + 1.10, 0.40);
   for (let i = 0; i < 10; i++) {
     const a = gdR(i * 3.1) * Math.PI * 2;
     const r = 0.5 + gdR(i * 5.7) * 1.4;
@@ -17764,15 +17795,12 @@ function gdHills(b) {
       HX + 2.4 + Math.cos(a) * r, GD_GY + 2.1 + gdR(i * 9.1) * 1.6,
       cz + Math.sin(a) * r * 0.7, 1.3, 0.30, 1.1);
   }
-  /* 上山步道 */
   for (let i = 0; i < 6; i++) {
     b.box('gdStoneL', 0.95, 0.16, 0.52,
       0.9 - i * 0.26, GD_GY + 0.28 + i * 0.40, 11.0 + i * 0.26, 0, -0.55, 0);
   }
-  /* 次峰 */
   gdRock(b, -9.0, GD_GY + 0.85, 1.0, 1.30, 1.05, 1.10, 11);
   gdRock(b, -8.5, GD_GY + 1.85, 0.7, 0.70, 0.95, 0.62, 12);
-  /* 池边立峰 */
   gdRock(b, -4.8, GD_GY + 1.30, 10.0, 0.60, 1.30, 0.55, 21);
   gdRock(b, 13.2, GD_GY + 1.00, 11.2, 0.52, 1.00, 0.48, 22);
   gdRock(b, -4.3, GD_GY + 1.05, -6.4, 0.48, 1.10, 0.46, 23);
@@ -17984,17 +18012,17 @@ function gdFrontCourt(b) {
 /* ---------------- 西花园：南北溪流 + 石桥 + 竹林梅林 ---------------- */
 function gdWestGarden(b) {
   /* 溪流贯穿南北，把西侧 20 米空地变成「水轴」 */
-  b.box('gdBaseD', 5.4, 0.30, 46.0, -24.0, GD_GY - 0.14, 0);
-  for (let i = 0; i < 42; i++) {
-    const z = -22.5 + i * 1.10;
+  b.box('gdBaseD', 8.4, 0.30, 30.4, -24.0, GD_GY - 0.14, -2.0);
+  for (let i = 0; i < 44; i++) {
+    const z = -16.5 + i * 0.75;
     [-1, 1].forEach(function (s) {
       b.box(i % 2 ? 'gdRock' : 'gdRockL', 0.45, 0.35, 0.55,
-        -24.0 + s * 2.65, GD_WY + 0.34, z, 0, gdR(i * 3.1) * 1.2, 0.10);
+        -24.0 + s * 4.10, GD_GY + 0.14, z, 0, gdR(i * 3.1) * 1.2, 0.10);
     });
   }
   /* 三座石板桥，桥栏留矮石 */
-  [-12.0, 2.0, 16.0].forEach(function (z, k) {
-    b.box('gdStoneL', 7.2, 0.18, 1.3, -24.0, GD_GY + 0.10, z);
+  [-11.0, -2.0, 7.0].forEach(function (z, k) {
+    b.box('gdStoneL', 9.2, 0.18, 1.3, -24.0, GD_GY + 0.10, z);
     for (let i = 0; i < 6; i++) {
       b.box('gdStoneL', 0.20, 0.30, 0.20, -26.8 + i * 1.1, GD_GY + 0.30, z - 0.56);
       b.box('gdStoneL', 0.20, 0.30, 0.20, -26.8 + i * 1.1, GD_GY + 0.30, z + 0.56);
@@ -18006,6 +18034,12 @@ function gdWestGarden(b) {
   }
   for (let i = 0; i < 14; i++) {
     gdPlum(b, -21.2 + gdR(i * 4.3) * 3.6, -22.0 + gdR(i * 6.1) * 44.0, 0.78 + gdR(i * 8.7) * 0.26);
+  }
+  /* 水面浮沫：细碎白条顺流散布，溪水才读得出「在流」 */
+  for (let i = 0; i < 44; i++) {
+    b.box('gdFoam', 0.22 + gdR(i * 3.7) * 0.32, 0.02, 0.05,
+      -24.0 + (gdR(i * 5.1) - 0.5) * 7.0, GD_GY + 0.05,
+      -15.5 + gdR(i * 7.3) * 28.0);
   }
   /* 西岸临水小亭 */
   const cx = -28.2, cz = -3.0, FY = GD_GY + 0.40;
@@ -18389,7 +18423,7 @@ function buildGdAll() {
   gdPeople(b);
 
   b.build(g, {
-    noOutline: ['gdGrass', 'gdGrassL', 'gdBloom', 'gdFlower', 'gdRock', 'gdRockL', 'gdLeaf1', 'gdLeaf2',
+    noOutline: ['gdGrass', 'gdGrassL', 'gdBloom', 'gdFlower', 'gdRock', 'gdRockL', 'gdRockD', 'gdFoam', 'gdLeaf1', 'gdLeaf2',
       'gdLeaf3', 'gdLeaf4', 'gdBlossom', 'gdVine', 'gdSky']
   });
 
