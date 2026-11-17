@@ -1332,7 +1332,7 @@
         gdSignBox: 0x241a12, gdGold: 0xd8b35e, gdLantern: 0xd4562e,
         gdScreenP: 0xd9cdb4, gdSky: 0xcfe0e6,
         /* 水 / 荷 */
-        gdBloom: 0x5c8a5e, gdFlower: 0xe8a6b8,
+        gdBloom: 0x5c8a5e, gdFlower: 0xe8a6b8, gdWaterD: 0x4c7d75,
         /* 植被 */
         gdBark: 0x5e4a34,
         gdLeaf1: 0x7fa25a, gdLeaf2: 0x4a6b45, gdLeaf3: 0x6f9455, gdLeaf4: 0x88a862,
@@ -1350,7 +1350,7 @@
         amb:  { color: 0xb0b8b0, i: 0.30 }
       },
       veg: { willows: [], bamboo: [], pots: [] },
-      cam: { theta: 0.90, phi: 1.10, dist: 82, target: [1.50, 2.20, 0.00] }
+      cam: { theta: 0.90, phi: 1.10, dist: 102, target: [4.00, 2.20, 0.00] }
     }
   };
 });

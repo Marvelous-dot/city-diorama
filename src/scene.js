@@ -17056,8 +17056,8 @@ function mlFallGroup() {
      东：小飞虹（廊桥跨水尾）+ 门厅小院 + 月洞门
      西北：竹林；西南：芭蕉；东院：梅
    ==================================================================== */
-const GD_X0 = -26.0, GD_X1 = 26.0;
-const GD_Z0 = -20.0, GD_Z1 = 20.0;
+const GD_X0 = -34.0, GD_X1 = 34.0;
+const GD_Z0 = -26.0, GD_Z1 = 26.0;
 const GD_GY = 0.55, GD_WY = 0.10, GD_BB = -1.80;
 
 /* 主池岸线（控制点；用 splineThru 平滑，真实园林没有折线岸） */
@@ -17197,7 +17197,7 @@ function gdGround(b) {
   /* 用实心分块拼陆地，不用 Shape+holes：
      带两个洞的 Shape 在 Extrude/ShapeGeometry 下顶面都不可靠（只出侧壁）。
      池做成矩形，四角再由石矶与水生植物柔化，比「草地露土」重要得多。 */
-  const PX0 = -8.6, PX1 = 11.6, PZ0 = -5.6, PZ1 = 8.4;
+  const PX0 = -8.6, PX1 = 11.6, PZ0 = -5.6, PZ1 = 10.0;
   function land(x0, x1, z0, z1) {
     const w = x1 - x0, d = z1 - z0;
     if (w <= 0.02 || d <= 0.02) return;
@@ -17205,9 +17205,14 @@ function gdGround(b) {
     b.box('gdSoil', w, 0.95, d, cx, GD_GY - 0.475, cz);
     b.box('gdGrass', w, 0.08, d, cx, GD_GY + 0.04, cz);   /* 草皮顶面 = GD_GY + 0.08 */
   }
-  land(GD_X0, GD_X1, GD_Z0, PZ0);        // 北
-  land(GD_X0, GD_X1, PZ1, GD_Z1);        // 南
-  land(GD_X0, PX0, PZ0, PZ1);            // 西
+  /* 西侧南北溪流 x -26.1..-21.9：陆地必须按溪槽拆开，否则水面被埋在草下 */
+  const RX0 = -26.7, RX1 = -21.3;
+  land(GD_X0, RX0, GD_Z0, PZ0);          // 北-西
+  land(RX1, GD_X1, GD_Z0, PZ0);          // 北-东
+  land(GD_X0, RX0, PZ1, GD_Z1);          // 南-西
+  land(RX1, GD_X1, PZ1, GD_Z1);          // 南-东
+  land(GD_X0, RX0, PZ0, PZ1);            // 中-西（溪西）
+  land(RX1, PX0, PZ0, PZ1);              // 中-东（溪东）
   land(PX1, GD_X1, PZ0, 3.2);            // 东上
   land(PX1, GD_X1, 6.2, PZ1);            // 东下
   land(20.0, GD_X1, 3.2, 6.2);           // 水尾东岸
@@ -17252,22 +17257,28 @@ function gdWater(g) {
     map: tex, gradientMap: GRAD, color: 0xffffff, side: T.DoubleSide
   });
   /* 主池 20.2×14.0（中心 1.5,1.4）+ 东南水尾 5.6×3.0 */
-  const g1 = new T.PlaneGeometry(20.2, 14.0);
+  const g1 = new T.PlaneGeometry(20.2, 15.6);
   g1.rotateX(-Math.PI / 2);
   const m1 = new T.Mesh(g1, mat);
-  m1.position.set(1.5, GD_WY, 1.4);
+  m1.position.set(1.5, GD_WY, 2.2);
   g.add(m1);
   const g2 = new T.PlaneGeometry(8.4, 3.0);
   g2.rotateX(-Math.PI / 2);
   const m2 = new T.Mesh(g2, mat);
   m2.position.set(15.8, GD_WY, 4.7);
   g.add(m2);
+  /* 西侧南北溪流：与主池共用贴图，水一起流动 */
+  const g3 = new T.PlaneGeometry(5.0, 45.6);
+  g3.rotateX(-Math.PI / 2);
+  const m3 = new T.Mesh(g3, mat);
+  m3.position.set(-24.0, GD_WY + 0.22, 0);
+  g.add(m3);
   return tex;
 }
 
 /* 岸石：沿矩形池四边密排，压住硬边，读成「石矶」 */
 function gdBankRocks(b) {
-  const PX0 = -8.6, PX1 = 11.6, PZ0 = -5.6, PZ1 = 8.4;
+  const PX0 = -8.6, PX1 = 11.6, PZ0 = -5.6, PZ1 = 10.0;
   const edges = [
     [PX0, PZ0, PX1, PZ0], [PX1, PZ0, PX1, PZ1],
     [PX1, PZ1, PX0, PZ1], [PX0, PZ1, PX0, PZ0]
@@ -17301,7 +17312,8 @@ function gdWalls(b) {
   gdWall(b, 'gdWall', 'z', GD_Z1 - 0.4, GD_X0, GD_X1, GD_GY, GD_GY + H, [
     { cx: 10.6, cy: GD_GY + 1.55, r: 1.45 },
     { x0: -6.6, x1: -5.1, y0: GD_GY + 1.40, y1: GD_GY + 2.55 },
-    { x0: 2.0, x1: 3.5, y0: GD_GY + 1.40, y1: GD_GY + 2.55 }
+    { x0: 2.0, x1: 3.5, y0: GD_GY + 1.40, y1: GD_GY + 2.55 },
+    { x0: 20.6, x1: 22.8, y0: GD_GY, y1: GD_GY + 2.85 }
   ], T0);
   gdLattice(b, 'gdLattice', 'z', GD_Z1 - 0.4, -6.6, -5.1, GD_GY + 1.40, GD_GY + 2.55);
   gdLattice(b, 'gdLattice', 'z', GD_Z1 - 0.4, 2.0, 3.5, GD_GY + 1.40, GD_GY + 2.55);
@@ -17587,11 +17599,12 @@ function gdFanPavilion(b) {
   for (let i = 0; i < 8; i++) {
     const aa = a0 + aLen * (i + 0.5) / 8;
     const len = aLen * R / 8 + 0.20;
-    b.box('gdWall', len, 2.8, 0.24, cx + Math.cos(aa) * R, FY + 1.40, cz + Math.sin(aa) * R, 0, -aa + Math.PI / 2, 0);
+    b.box('gdWall', len, 1.15, 0.22, cx + Math.cos(aa) * R, FY + 0.58, cz + Math.sin(aa) * R, 0, -aa + Math.PI / 2, 0);
   }
   const aw = a0 + aLen * 0.5;
-  b.cyl('gdWall', 0.66, 0.66, 0.26, 16, cx + Math.cos(aw) * (R + 0.01), FY + 1.58, cz + Math.sin(aw) * (R + 0.01), 0, 0, Math.PI / 2);
-  b.cyl('gdSky', 0.50, 0.50, 0.30, 16, cx + Math.cos(aw) * (R + 0.03), FY + 1.58, cz + Math.sin(aw) * (R + 0.03), 0, 0, Math.PI / 2);
+  /* 矮墙上摆一只石盆，代替原来那圈「水塔」似的月洞窗 */
+  b.cyl('gdStoneL', 0.30, 0.34, 0.26, 10, cx + Math.cos(aw) * R, FY + 1.28, cz + Math.sin(aw) * R);
+  b.sph('gdGrassL', 0.26, cx + Math.cos(aw) * R, FY + 1.48, cz + Math.sin(aw) * R, 1.1, 0.55, 1.1);
   /* 三根「扇骨」柱：弧两端 + 弧中 */
   [a0 + 0.10, a0 + aLen * 0.5, a0 + aLen - 0.10].forEach(function (aa) {
     gdPost(b, cx + Math.cos(aa) * (R - 0.36), cz + Math.sin(aa) * (R - 0.36), FY, 3.2, 0.14);
@@ -17614,7 +17627,7 @@ function gdFanPavilion(b) {
 
 /* ---------------- 香洲：南岸石舫 ---------------- */
 function gdBoatHouse(b) {
-  const cx = 5.6, cz = 9.2;
+  const cx = 5.6, cz = 10.8;
   const DY = GD_WY + 0.30;
   /* 船体：船头两块斜板拼尖，方头会读成拖船 */
   b.box('gdWoodD', 7.2, 0.62, 2.9, cx, DY + 0.18, cz + 0.2);
@@ -17736,43 +17749,33 @@ function gdRock(b, x, y, z, sx, sy, sz, seed) {
 }
 
 function gdHills(b) {
-  /* 主峰：下宽上瘦的三叠太湖石；整体西移 2.4 米，避开池中亭的视线遮挡 */
-  const HX = -4.5, cz = 10.8;
-  [
-    [HX - 0.2, 0.85, 10.8, 2.3, 1.05, 1.9],
-    [HX + 4.9, 0.80, 10.6, 2.1, 1.00, 1.8],
-    [HX + 2.4, 1.05, 11.2, 2.5, 1.25, 2.1],
-    [HX + 1.5, 2.60, 10.9, 1.35, 1.65, 1.15],
-    [HX + 3.4, 2.85, 10.7, 1.10, 1.50, 1.05],
-    [HX + 2.4, 4.35, 10.9, 0.78, 1.05, 0.72],
-    [HX + 2.3, 6.05, 10.9, 0.46, 1.10, 0.42]
-  ].forEach(function (q, i) {
-    gdRock(b, q[0], GD_GY + q[1], q[2], q[3], q[4], q[5], i + 1);
-  });
-  /* 苔藓：石顶压几片绿，硬石才不「生」 */
-  for (let i = 0; i < 14; i++) {
+  /* 主峰：三块大石 + 一块瘦峰，少而大。
+     多个中等球叠加会互相穿插露出内壁，近景就是一堆碎纸片。 */
+  const HX = -4.5, cz = 12.6;
+  gdRock(b, HX + 2.4, GD_GY + 1.55, cz, 1.55, 2.55, 1.35, 1);
+  gdRock(b, HX + 0.3, GD_GY + 0.90, cz + 0.7, 1.60, 1.05, 1.45, 2);
+  gdRock(b, HX + 4.4, GD_GY + 0.85, cz - 0.5, 1.50, 1.00, 1.40, 3);
+  gdRock(b, HX + 2.5, GD_GY + 4.05, cz + 0.1, 0.55, 1.30, 0.50, 4);
+  /* 苔藓：压在石肩，遮住石与石的接缝 */
+  for (let i = 0; i < 10; i++) {
     const a = gdR(i * 3.1) * Math.PI * 2;
-    const r = 0.3 + gdR(i * 5.7) * 1.8;
-    b.sph('gdGrassL', 0.22 + gdR(i * 7.3) * 0.18,
-      HX + 2.4 + Math.cos(a) * r, GD_GY + 2.20 + gdR(i * 9.1) * 2.20, cz + Math.sin(a) * r * 0.7, 1.4, 0.35, 1.2);
+    const r = 0.5 + gdR(i * 5.7) * 1.4;
+    b.sph('gdGrassL', 0.30 + gdR(i * 7.3) * 0.22,
+      HX + 2.4 + Math.cos(a) * r, GD_GY + 2.1 + gdR(i * 9.1) * 1.6,
+      cz + Math.sin(a) * r * 0.7, 1.3, 0.30, 1.1);
   }
-  /* 上山步道：东侧绕上去，踏步要看得见 */
-  for (let i = 0; i < 7; i++) {
+  /* 上山步道 */
+  for (let i = 0; i < 6; i++) {
     b.box('gdStoneL', 0.95, 0.16, 0.52,
-      0.75 - i * 0.28, GD_GY + 0.28 + i * 0.44, 9.25 + i * 0.26, 0, -0.55, 0);
+      0.9 - i * 0.26, GD_GY + 0.28 + i * 0.40, 11.0 + i * 0.26, 0, -0.55, 0);
   }
   /* 次峰 */
-  [
-    [-8.9, 0.80, 0.9, 1.55, 1.05, 1.15],
-    [-8.4, 1.85, 0.6, 0.85, 1.05, 0.75],
-    [-9.3, 1.25, 1.5, 0.72, 0.72, 0.66]
-  ].forEach(function (q, i) {
-    gdRock(b, q[0], GD_GY + q[1], q[2], q[3], q[4], q[5], i + 11);
-  });
-  /* 池南石矶与几块立峰 */
-  gdRock(b, -4.8, GD_GY + 1.35, 8.4, 0.62, 1.35, 0.58, 21);
-  gdRock(b, 13.2, GD_GY + 1.05, 9.6, 0.55, 1.05, 0.50, 22);
-  gdRock(b, -4.3, GD_GY + 1.10, -6.4, 0.50, 1.15, 0.48, 23);
+  gdRock(b, -9.0, GD_GY + 0.85, 1.0, 1.30, 1.05, 1.10, 11);
+  gdRock(b, -8.5, GD_GY + 1.85, 0.7, 0.70, 0.95, 0.62, 12);
+  /* 池边立峰 */
+  gdRock(b, -4.8, GD_GY + 1.30, 10.0, 0.60, 1.30, 0.55, 21);
+  gdRock(b, 13.2, GD_GY + 1.00, 11.2, 0.52, 1.00, 0.48, 22);
+  gdRock(b, -4.3, GD_GY + 1.05, -6.4, 0.48, 1.10, 0.46, 23);
 }
 
 /* ---------------- 曲桥：北岸到池中岛 ---------------- */
@@ -17885,6 +17888,151 @@ function gdLochan(b) {
   }
   /* 门额 */
   b.box('gdSignBox', 1.6, 0.38, 0.10, -13.4, GD_GY + 2.72, 15.0, 0, Math.PI / 2, 0);
+}
+
+/* ---------------- 东路：花厅 + 海棠春坞 + 书房小院（第三路） ---------------- */
+function gdEastWing(b) {
+  const X0 = 25.4, X1 = 33.2, CX = (X0 + X1) / 2, H = 4.4;
+  gdWall(b, 'gdWall', 'x', 25.4, GD_Z0 + 1.0, GD_Z1 - 1.0, GD_GY, GD_GY + H, [
+    { cx: 8.0, cy: GD_GY + 1.40, r: 1.10 },
+    { cx: -6.0, cy: GD_GY + 1.40, r: 1.10 }
+  ], 0.28);
+  /* 花厅：面向小院，歇山 */
+  gdHall(b, CX, 8.0, 5.6, 4.4, 4.2);
+  /* 花厅前小院：方池 + 石桥 + 铺地 */
+  b.box('gdBaseD', 4.2, 0.30, 2.6, CX, GD_GY - 0.12, 1.6);
+  b.box('gdWaterD', 3.9, 0.06, 2.3, CX, GD_WY, 1.6);
+  b.box('gdStoneL', 0.9, 0.20, 2.7, CX, GD_GY + 0.10, 1.6);
+  b.box('gdPave', 5.2, 0.07, 3.2, CX, GD_GY + 0.035, 12.0);
+  gdPlum(b, X0 + 1.2, 12.4, 0.80);
+  gdPlum(b, X1 - 1.2, 12.4, 0.78);
+  /* 书房：小而静，硬山 */
+  gdHall(b, CX, -6.0, 4.2, 3.8, 3.4);
+  gdBanana(b, X0 + 1.0, -2.4, 0.78);
+  gdRock(b, X1 - 1.0, GD_GY + 0.70, -2.6, 0.45, 1.00, 0.42, 71);
+  b.cyl('gdStoneL', 0.50, 0.54, 0.11, 12, CX - 1.6, GD_GY + 0.66, -10.4);
+  b.cyl('gdStoneD', 0.15, 0.19, 0.64, 10, CX - 1.6, GD_GY + 0.33, -10.4);
+  /* 南北院墙 */
+  gdWall(b, 'gdWall', 'z', 12.6, X0, X1, GD_GY, GD_GY + 3.0, [
+    { cx: CX, cy: GD_GY + 1.25, r: 1.00 }
+  ], 0.24);
+  gdWall(b, 'gdWall', 'z', -12.4, X0, X1, GD_GY, GD_GY + 3.0, [
+    { cx: CX, cy: GD_GY + 1.22, r: 0.95 }
+  ], 0.24);
+  b.box('gdTile', 0.56, 0.15, GD_Z1 - GD_Z0 - 1.8, 25.4, GD_GY + H + 0.05, 0);
+  b.box('gdRidge', 0.18, 0.12, GD_Z1 - GD_Z0 - 1.8, 25.4, GD_GY + H + 0.19, 0);
+  b.box('gdSignBox', 1.5, 0.36, 0.10, 25.4, GD_GY + 2.72, 8.0, 0, Math.PI / 2, 0);
+}
+
+/* ---------------- 北后园：土山小亭 + 梅林 + 竹 ---------------- */
+function gdBackGarden(b) {
+  gdWall(b, 'gdWall', 'z', -20.4, GD_X0 + 1.0, 25.2, GD_GY, GD_GY + 3.6, [
+    { cx: -8.0, cy: GD_GY + 1.35, r: 1.10 },
+    { cx: 6.0, cy: GD_GY + 1.35, r: 1.10 },
+    { x0: -26.2, x1: -21.8, y0: GD_GY, y1: GD_GY + 2.55 }
+  ], 0.28);
+  /* 土山 + 六角小亭 */
+  gdRock(b, -14.0, GD_GY + 0.85, -23.2, 2.6, 1.0, 2.0, 81);
+  gdRock(b, -13.2, GD_GY + 1.85, -22.8, 1.4, 1.0, 1.1, 82);
+  const cx = -12.6, cz = -22.6, FY = GD_GY + 1.35;
+  for (let i = 0; i < 6; i++) {
+    const a = i / 6 * Math.PI * 2 + Math.PI / 6;
+    gdPost(b, cx + Math.cos(a) * 1.5, cz + Math.sin(a) * 1.5, FY, 2.2, 0.10);
+  }
+  const roof = new T.CylinderGeometry(0.05, 1.9, 1.3, 6, 1);
+  roof.rotateY(Math.PI / 6);
+  roof.translate(cx, FY + 2.2 + 0.65, cz);
+  b.add('gdTile', roof);
+  /* 梅林与竹 */
+  for (let i = 0; i < 9; i++) {
+    gdPlum(b, 1.0 + gdR(i * 3.1) * 13.0, -24.2 + gdR(i * 5.7) * 3.4, 0.75 + gdR(i * 7.3) * 0.25);
+  }
+  for (let i = 0; i < 12; i++) {
+    gdBamboo(b, -22.0 + gdR(i * 4.3) * 5.6, -24.6 + gdR(i * 6.1) * 3.6, 0.80 + gdR(i * 8.7) * 0.30);
+  }
+  /* 后园铺地 */
+  b.box('gdPave', 14.0, 0.07, 4.6, 4.0, GD_GY + 0.035, -23.4);
+}
+
+/* ---------------- 南前庭：大门 + 照壁 + 石狮 + 银杏 ---------------- */
+function gdFrontCourt(b) {
+  const CX = 21.7;
+  b.box('gdStoneL', 6.6, 0.30, 3.6, CX, GD_GY + 0.15, 23.4);
+  b.box('gdPave', 6.4, 0.06, 3.4, CX, GD_GY + 0.33, 23.4);
+  b.box('gdWall', 6.4, 3.0, 0.30, CX, GD_GY + 1.5, 25.4);
+  b.box('gdWoodD', 2.2, 2.6, 0.34, CX, GD_GY + 1.3, 25.4);
+  gdGableRoof(b, 'gdTile', 'gdRidge', CX, 25.4, 7.6, 2.6, GD_GY + 3.0, GD_GY + 4.1, 'z');
+  /* 照壁 */
+  b.box('gdWall', 5.0, 2.8, 0.36, 12.0, GD_GY + 1.4, 22.2);
+  b.box('gdTile', 5.4, 0.14, 0.60, 12.0, GD_GY + 2.86, 22.2);
+  b.box('gdRidge', 5.5, 0.12, 0.18, 12.0, GD_GY + 3.0, 22.2);
+  /* 银杏两株（梅骨架 + 金叶点） */
+  gdPlum(b, 7.6, 21.2, 1.10);
+  gdPlum(b, 16.6, 21.2, 1.05);
+  for (let i = 0; i < 14; i++) {
+    b.sph('gdGold', 0.07, 7.6 + (gdR(i * 3.1) - 0.5) * 2.6,
+      GD_GY + 2.4 + gdR(i * 5.7) * 1.6, 21.2 + (gdR(i * 7.3) - 0.5) * 2.2, 1, 0.9, 1);
+  }
+  /* 石狮一对 */
+  [[10.2, 23.6], [14.2, 23.6]].forEach(function (q) {
+    b.box('gdStone', 0.55, 0.55, 0.75, q[0], GD_GY + 0.55, q[1]);
+    b.sph('gdStoneL', 0.34, q[0], GD_GY + 1.02, q[1] + 0.18, 1, 1, 1);
+  });
+  b.box('gdPave', 10.0, 0.07, 4.4, 16.0, GD_GY + 0.035, 22.6);
+}
+
+/* ---------------- 西花园：南北溪流 + 石桥 + 竹林梅林 ---------------- */
+function gdWestGarden(b) {
+  /* 溪流贯穿南北，把西侧 20 米空地变成「水轴」 */
+  b.box('gdBaseD', 5.4, 0.30, 46.0, -24.0, GD_GY - 0.14, 0);
+  for (let i = 0; i < 42; i++) {
+    const z = -22.5 + i * 1.10;
+    [-1, 1].forEach(function (s) {
+      b.box(i % 2 ? 'gdRock' : 'gdRockL', 0.45, 0.35, 0.55,
+        -24.0 + s * 2.65, GD_WY + 0.34, z, 0, gdR(i * 3.1) * 1.2, 0.10);
+    });
+  }
+  /* 三座石板桥，桥栏留矮石 */
+  [-12.0, 2.0, 16.0].forEach(function (z, k) {
+    b.box('gdStoneL', 7.2, 0.18, 1.3, -24.0, GD_GY + 0.10, z);
+    for (let i = 0; i < 6; i++) {
+      b.box('gdStoneL', 0.20, 0.30, 0.20, -26.8 + i * 1.1, GD_GY + 0.30, z - 0.56);
+      b.box('gdStoneL', 0.20, 0.30, 0.20, -26.8 + i * 1.1, GD_GY + 0.30, z + 0.56);
+    }
+  });
+  /* 竹林与梅林：西岸密、东岸疏 */
+  for (let i = 0; i < 30; i++) {
+    gdBamboo(b, -32.4 + gdR(i * 3.1) * 5.4, -24.0 + gdR(i * 5.7) * 46.0, 0.80 + gdR(i * 7.3) * 0.30);
+  }
+  for (let i = 0; i < 14; i++) {
+    gdPlum(b, -21.2 + gdR(i * 4.3) * 3.6, -22.0 + gdR(i * 6.1) * 44.0, 0.78 + gdR(i * 8.7) * 0.26);
+  }
+  /* 西岸临水小亭 */
+  const cx = -28.2, cz = -3.0, FY = GD_GY + 0.40;
+  b.cyl('gdStoneL', 2.0, 2.2, 0.40, 8, cx, GD_GY + 0.20, cz);
+  for (let i = 0; i < 4; i++) {
+    const a = i / 4 * Math.PI * 2 + Math.PI / 4;
+    gdPost(b, cx + Math.cos(a) * 1.35, cz + Math.sin(a) * 1.35, FY, 2.5, 0.11);
+  }
+  const roof = new T.CylinderGeometry(0.05, 1.9, 1.4, 4, 1);
+  roof.rotateY(Math.PI / 4);
+  roof.translate(cx, FY + 2.5 + 0.70, cz);
+  b.add('gdTile', roof);
+}
+
+/* ---------------- 东北果园：畦垄 + 果树 ---------------- */
+function gdOrchard(b) {
+  for (let i = 0; i < 4; i++) {
+    for (let j = 0; j < 4; j++) {
+      const x = 26.6 + i * 1.75, z = -24.4 + j * 2.55;
+      b.cyl('gdSoil', 0.30, 0.34, 0.14, 8, x, GD_GY + 0.07, z);
+      gdShrub(b, x, z, 0.42);
+    }
+  }
+  /* 果园矮篱 */
+  [26.0, 32.6].forEach(function (x) {
+    b.box('gdWoodD', 0.08, 0.55, 10.4, x, GD_GY + 0.28, -19.6);
+  });
 }
 
 /* ---------------- 植被：柳 / 松 / 竹 / 芭蕉 / 梅 / 荷 ---------------- */
@@ -18137,6 +18285,9 @@ function gdPeople(b) {
   /* 宅院：正厅前与天井 */
   F({ x: 21.7, y: GD_GY + 0.33, z: 2.8, ry: 2.95, s: 0.98, coat: 'gdRobeA' });
   F({ x: 20.2, y: GD_GY + 0.33, z: 11.2, ry: 0.35, s: 0.95, pose: 'walk', coat: 'gdRobeC' });
+  /* 东路花厅前与南前庭 */
+  F({ x: 29.3, y: GD_GY + 0.33, z: 4.4, ry: 3.05, s: 0.96, coat: 'gdRobeB', hat: 'bun', hatKey: 'gdHair' });
+  F({ x: 17.2, y: GD_GY + 0.33, z: 23.2, ry: -1.6, s: 1.0, coat: 'gdRobeA' });
 }
 
 /* ---------------- 铺地 / 匾额 / 灯光 ---------------- */
@@ -18193,7 +18344,11 @@ function gdLights() {
     [14.6, GD_GY + 2.2, 11.6, 3.0, 5.0],
     [6.0, GD_GY + 2.6, 2.0, 3.2, 6.0],
     [21.7, GD_GY + 3.2, 0.0, 4.0, 6.0],
-    [21.7, GD_GY + 3.2, 15.2, 3.0, 5.0]
+    [21.7, GD_GY + 3.2, 15.2, 3.0, 5.0],
+    [29.3, GD_GY + 3.0, 8.0, 4.0, 6.0],
+    [-12.6, GD_GY + 3.2, -22.6, 3.0, 5.0],
+    [21.7, GD_GY + 2.6, 23.4, 4.0, 6.0],
+    [-28.2, GD_GY + 2.4, -3.0, 3.0, 5.0]
   ];
   L.forEach(function (q) {
     const lp = new T.PointLight(0xffd9a8, q[3], q[4], 2);
@@ -18226,6 +18381,11 @@ function buildGdAll() {
   gdCourtyards(b);
   gdEstate(b);
   gdLochan(b);
+  gdEastWing(b);
+  gdBackGarden(b);
+  gdFrontCourt(b);
+  gdWestGarden(b);
+  gdOrchard(b);
   gdPeople(b);
 
   b.build(g, {
