@@ -1298,6 +1298,59 @@
       },
       veg: { willows: [], bamboo: [], pots: [] },
       cam: { theta: 0.95, phi: 1.16, dist: 33, target: [-1.20, 3.70, 0.80] }
+    },
+
+    /* ---------------------------------------------------------
+       苏州园林 · 一池三山（第 19 套：大型园林群，36×30 米）
+       --------------------------------------------------------- */
+    garden: {
+      id: 'garden',
+      title: '苏州园林 · 一池三山',
+      garden: true,
+      figStyle: 'voxel',
+      emis: 1.0,
+      lampK: 1.0,
+      sky: ['#f2f6f1', '#dfe9dd', '#c2cfbf', '#8f9c8a'],
+      vig: 'rgba(58,62,50,0.22)',
+      shadowSpan: 23.0,
+      shadowFar: 130,
+      palette: {
+        /* 土 / 石 / 草 */
+        gdBase: 0x6d604c, gdBaseD: 0x4a4236,
+        gdSoil: 0x8d7556, gdSoilD: 0x63513c,
+        gdGrass: 0x273a1c, gdGrassL: 0x41602a,
+        gdStone: 0xa8a89c, gdStoneD: 0x777a72, gdStoneL: 0xc8c8ba,
+        gdRock: 0x6a7571, gdRockL: 0x818c86,
+        gdPave: 0xb6b0a0,
+        /* 木作：栗色梁柱 + 朱漆栏杆 */
+        gdWoodD: 0x5c3a24, gdWoodR: 0x8e3f2e,
+        gdDeck: 0x9a7a52, gdFloor: 0xa8855c,
+        /* 粉墙黛瓦 */
+        gdWall: 0xe8e2d4, gdTile: 0x4a5350, gdTileD: 0x333b39, gdRidge: 0x2e3533,
+        /* 门窗 / 匾 / 灯 / 屏 */
+        gdLattice: 0x6b4a2e, gdDoor: 0x7a4a2c, gdDoorD: 0x53301c,
+        gdSignBox: 0x241a12, gdGold: 0xd8b35e, gdLantern: 0xd4562e,
+        gdScreenP: 0xd9cdb4, gdSky: 0xcfe0e6,
+        /* 水 / 荷 */
+        gdBloom: 0x5c8a5e, gdFlower: 0xe8a6b8,
+        /* 植被 */
+        gdBark: 0x5e4a34,
+        gdLeaf1: 0x7fa25a, gdLeaf2: 0x4a6b45, gdLeaf3: 0x6f9455, gdLeaf4: 0x88a862,
+        gdBlossom: 0xf0c0cc, gdVine: 0x8a6fa8,
+        /* 积木人 */
+        gdSkin: 0xe8bd9a, gdHair: 0x2e2823, gdInk: 0x241f1a,
+        gdBelt: 0x4a4238, gdShoe: 0x332c24, gdHat: 0x2e2823,
+        gdRobeA: 0x4e6b78, gdRobeB: 0x9a4638, gdRobeC: 0x6f6a8c, gdRobeD: 0x3f5a48
+      },
+      emit: {},
+      light: {
+        sun:  { color: 0xfff3dd, i: 1.70, pos: [22.0, 26.0, 18.0] },
+        fill: { color: 0xb8cfe0, i: 0.62, pos: [-18.0, 12.0, -16.0] },
+        hemi: { sky: 0xe8e4d4, ground: 0x5c6a4c, i: 0.62 },
+        amb:  { color: 0xb0b8b0, i: 0.30 }
+      },
+      veg: { willows: [], bamboo: [], pots: [] },
+      cam: { theta: 0.90, phi: 1.10, dist: 62, target: [0.00, 2.40, 0.60] }
     }
   };
 });
