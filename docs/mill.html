@@ -16477,8 +16477,8 @@ function mlWaterSurface(g) {
 function mlJetTexture() {
   const t = canvasTex(512, 96, function (c, w, h) {
     const gr = c.createLinearGradient(0, 0, 0, h);
-    gr.addColorStop(0, '#d7efeb'); gr.addColorStop(0.42, '#a4d4d4');
-    gr.addColorStop(1, '#74aeb5');
+    gr.addColorStop(0, '#c8e8e3'); gr.addColorStop(0.42, '#8ec4c4');
+    gr.addColorStop(1, '#5e9ba3');
     c.fillStyle = gr; c.fillRect(0, 0, w, h);
     /* 条纹必须沿贴图的 x 轴（= 水舌的路径 u）铺成长条，滚动时才是「水在流」。
        画成竖条会横切水舌，读成一条带齿的传送带。 */
@@ -16493,11 +16493,11 @@ function mlJetTexture() {
       c.fillRect(x, y, len, th);
       c.fillRect(x - w, y, len, th);   /* 横向平铺无缝补画 */
     }
-    /* 成片的白沫带，急流跌水本来就是白绿相间，不是一整块纯青板 */
-    for (let i = 0; i < 22; i++) {
+    /* 白沫要细碎：长条一宽就变成水面上的白砖 */
+    for (let i = 0; i < 34; i++) {
       const x = mlR(i * 9.3) * w, y = mlR(i * 12.1) * h;
-      const len = 50 + mlR(i * 6.7) * 130, th = 2.2 + mlR(i * 4.9) * 4.0;
-      c.fillStyle = 'rgba(255,255,255,' + (0.22 + mlR(i * 3.7) * 0.30).toFixed(2) + ')';
+      const len = 24 + mlR(i * 6.7) * 46, th = 1.2 + mlR(i * 4.9) * 1.4;
+      c.fillStyle = 'rgba(255,255,255,' + (0.12 + mlR(i * 3.7) * 0.16).toFixed(2) + ')';
       c.fillRect(x, y, len, th);
       c.fillRect(x - w, y, len, th);
     }
@@ -16510,7 +16510,7 @@ function mlJetTexture() {
     }
   });
   t.wrapS = t.wrapT = T.RepeatWrapping;
-  t.repeat.set(1.9, 1.0);
+  t.repeat.set(2.1, 1.0);
   return t;
 }
 
@@ -16524,8 +16524,8 @@ function mlJetRibbon(p0, p1, zc, seg) {
     const x = p0[0] + (p1[0] - p0[0]) * u;
     const y = p0[1] + (p1[1] - p0[1]) * Math.pow(u, 2.2);  /* 先平抛、再加速砸下 */
     const z = zc + 0.10 * u;
-    const w = 0.90 + 0.10 * Math.sin(u * Math.PI) - 0.04 * u;
-    const th = 0.16 - 0.045 * u;   /* 水越冲越薄、末端散开 */
+    const w = 0.96 + 0.12 * Math.sin(u * Math.PI) - 0.02 * u;
+    const th = 0.22 - 0.075 * u;   /* 水越冲越薄、末端散开 */
     const zL = z - w / 2, zR = z + w / 2, yT = y + th / 2, yB = y - th / 2;
     pos.push(x, yT, zL, x, yT, zR, x, yB, zR, x, yB, zL);
     uv.push(u, 0, u, 0.34, u, 0.67, u, 1);
@@ -16561,10 +16561,10 @@ function mlChannel(b, g) {
   fm.position.set((xA + xB) / 2, y0 + 0.045, zc);
   g.add(fm);
   /* 槽内顺流白色浮沫，明确水是从左往右跑的 */
-  for (let i = 0; i < 9; i++) {
-    const x = xA + 0.45 + i * 0.72;
-    b.box('mlFoam', 0.42 + mlR(i * 3.7) * 0.28, 0.018, 0.055,
-      x, y0 + 0.068, zc + (mlR(i * 5.1) - 0.5) * 0.62);
+  for (let i = 0; i < 14; i++) {
+    const x = xA + 0.40 + i * 0.46;
+    b.box('mlFoam', 0.34 + mlR(i * 3.7) * 0.38, 0.020, 0.062,
+      x, y0 + 0.068, zc + (mlR(i * 5.1) - 0.5) * 0.66);
   }
   for (let i = 0; i < 5; i++) {
     const x = xA + 0.75 + i * 1.36;
@@ -17078,7 +17078,7 @@ function buildMlAll() {
   const fall = mlFallGroup();
   g.add(fall);
 
-  const spray = mlPoints(130, '0.88,0.96,0.98', 210.0, 0.62, 1.35, [1.25, 0.25, 0.95]);
+  const spray = mlPoints(180, '0.90,0.97,0.99', 250.0, 0.70, 1.70, [1.55, 0.30, 1.10]);
   /* 轮底不入水（轮底 y=-0.30 / 水面 -0.55），水雾要跟着右侧倒水点走 */
   spray.p.position.set(ML_WCX + 1.15, ML_WY + 0.18, ML_WCZ);
   g.add(spray.p);
@@ -17086,9 +17086,13 @@ function buildMlAll() {
   dust.p.position.set(-0.60, ML_LY + 0.95, 1.60);
   g.add(dust.p);
   /* 水舌砸进轮斗的飞溅：位置贴冲击点，上抛后回落 */
-  const impact = mlPoints(90, '0.97,1.00,1.00', 250.0, 0.95, 0.85, [1.10, 0.35, 0.85]);
-  impact.p.position.set(-2.62, 4.94, ML_WCZ + 0.20);
+  const impact = mlPoints(180, '0.98,1.00,1.00', 320.0, 1.10, 1.25, [1.45, 0.50, 1.05]);
+  impact.p.position.set(-2.50, 4.84, ML_WCZ + 0.16);
   g.add(impact.p);
+  /* 冲击点上方蒸腾的水雾：低速淡色，把「水量大」推到空气里 */
+  const mist = mlPoints(70, '0.93,0.98,1.00', 520.0, 0.30, 0.70, [1.70, 0.70, 1.30]);
+  mist.p.position.set(-2.50, 4.86, ML_WCZ + 0.16);
+  g.add(mist.p);
 
   mlLights();
 
@@ -17100,13 +17104,14 @@ function buildMlAll() {
     shaft.rotation.x = t * 0.42;
     stone.rotation.y = -t * 0.96;
     /* 两张水贴图的 offset 才真的让「水在流」：水舌快、槽内慢、河面最慢 */
-    fall.userData.jetTex.offset.x = -t * 0.62;
-    fall.userData.jetTex.offset.y = Math.sin(t * 1.25) * 0.006;
-    channelTex.offset.x = -t * 0.26;
+    fall.userData.jetTex.offset.x = -t * 0.95;
+    fall.userData.jetTex.offset.y = Math.sin(t * 2.1) * 0.010;
+    channelTex.offset.x = -t * 0.42;
     banner.rotation.z = Math.sin(t * 0.82 + 0.7) * 0.048;
     waterTex.offset.x = -t * 0.055;
     spray.u.uTime.value = t;
     impact.u.uTime.value = t;
+    mist.u.uTime.value = t;
     dust.u.uTime.value = t;
     spins.length = 0;
     spins.push(wheel.rotation.z, shaft.rotation.x, stone.rotation.y);
@@ -17134,69 +17139,84 @@ function mlSignBoards(b) {
   });
 }
 
-/* 落水：槽口 → 连续水舌 → 砸进轮斗 → 飞溅 → 随轮倒出 → 轮底浪花 */
+/* 落水：槽口 → 连续水舌 → 砸进轮斗 → 飞溅 → 随轮倒出 → 轮底浪花
+   加猛版：水舌更宽更厚、抛得更远、末速更快，冲击点炸开大水团 + 水雾 */
 function mlFallGroup() {
   const g = new T.Group(), b = new Builder();
-  const zc = ML_WCZ + 0.20;
-  /* 起点贴着跌水唇，终点落在轮顶偏下游（约 70°）的斗口里。
-     水平 1.75m / 下落 0.82m，用 u² 让水先平抛、再加速砸下去。 */
-  const p0 = [-4.30, 5.70], p1 = [-2.55, 4.88];
+  const zc = ML_WCZ + 0.12;
+  /* 起点贴着跌水唇，终点落在轮顶偏下游（约 65°）的斗口里。
+     水平 1.94m / 下落 0.94m，pow(u,2.2) 让水先平抛、再加速砸下去。 */
+  const p0 = [-4.34, 5.72], p1 = [-2.40, 4.78];
   const jetTex = mlJetTexture();
-  const jet = new T.Mesh(mlJetRibbon(p0, p1, zc, 26),
+  const jet = new T.Mesh(mlJetRibbon(p0, p1, zc, 28),
     new T.MeshToonMaterial({
       map: jetTex, gradientMap: GRAD, color: 0xffffff,
-      side: T.DoubleSide, emissive: 0x1d3d42, emissiveIntensity: 0.34
+      side: T.DoubleSide, emissive: 0x163236, emissiveIntensity: 0.28
     }));
   jet.frustumCulled = false;
   g.add(jet);
-  /* 水舌两侧白沫边：小球串，绝不连成一整块白板 */
-  for (let i = 0; i < 20; i++) {
-    const u = (i + 0.4) / 20;
+  /* 水舌两侧白沫边：小球串，加密加粗，水大才挂得住这么多沫 */
+  for (let i = 0; i < 22; i++) {
+    const u = (i + 0.4) / 22;
     const x = p0[0] + (p1[0] - p0[0]) * u;
-    const y = p0[1] + (p1[1] - p0[1]) * Math.pow(u, 2.2);  /* 先平抛、再加速砸下 */
+    const y = p0[1] + (p1[1] - p0[1]) * Math.pow(u, 2.2);
     const z = zc + 0.10 * u;
-    const w = 0.90 + 0.10 * Math.sin(u * Math.PI) - 0.04 * u;
+    const w = 0.96 + 0.12 * Math.sin(u * Math.PI) - 0.02 * u;
     [-1, 1].forEach(function (s) {
-      b.sph('mlFoam', 0.030 + mlR(i * 5.1 + s * 3.3) * 0.038,
-        x, y + 0.05, z + s * w * 0.5, 1, 0.75, 1);
+      /* 大小与位置都要抖，否则串成一圈整齐的珍珠项链 */
+      b.sph('mlFoam', 0.024 + mlR(i * 5.1 + s * 3.3) * 0.036,
+        x + (mlR(i * 7.7 + s) - 0.5) * 0.05, y + 0.05 + (mlR(i * 8.3 + s) - 0.5) * 0.07,
+        z + s * (w * 0.5 + (mlR(i * 9.1 + s) - 0.5) * 0.07), 1, 0.7, 1);
     });
   }
-  /* 水舌末端散成几簇水滴，绝不用细长杆（又会读成白筷子） */
-  for (let j = 0; j < 8; j++) {
+  /* 水舌末端散成几簇水滴 */
+  for (let j = 0; j < 12; j++) {
     const q = mlR(j * 4.9);
-    b.sph(j % 2 ? 'mlFoam' : 'mlSpray', 0.030 + mlR(j * 7.1) * 0.042,
-      p1[0] + 0.05 + q * 0.30,
-      p1[1] - 0.04 - q * 0.26,
-      zc + (mlR(j * 6.3) - 0.5) * 0.80, 1, 1.1, 1);
+    b.sph(j % 2 ? 'mlFoam' : 'mlSpray', 0.028 + mlR(j * 7.1) * 0.040,
+      p1[0] + 0.05 + q * 0.36,
+      p1[1] - 0.04 - q * 0.32,
+      zc + (mlR(j * 6.3) - 0.5) * 0.94, 1, 1.1, 1);
   }
-  /* 冲击点：扇形散开的碎水滴 */
-  for (let i = 0; i < 18; i++) {
+  /* 冲击点：扇形散开的碎水滴（打得更开、更多） */
+  for (let i = 0; i < 34; i++) {
     const a = mlR(i * 3.7), d = mlR(i * 5.9);
-    b.sph(i % 3 ? 'mlFoam' : 'mlSpray', 0.034 + d * 0.046,
-      p1[0] + (a - 0.30) * 0.90,
-      p1[1] + (d - 0.28) * 0.62,
-      zc + (mlR(i * 7.3) - 0.5) * 0.92, 1, 0.8, 1);
+    b.sph(i % 3 ? 'mlFoam' : 'mlSpray', 0.028 + d * 0.044,
+      p1[0] + (a - 0.30) * 1.18,
+      p1[1] + (d - 0.26) * 0.82,
+      zc + (mlR(i * 7.3) - 0.5) * 1.05, 1, 0.8, 1);
   }
-  /* 轮顶几个斗里兜着的水膜，压小压薄免得像贴纸 */
-  for (let i = 0; i < 4; i++) {
-    const a = (58 + i * 13) * Math.PI / 180;
-    const px = ML_WCX + Math.cos(a) * (ML_WR - 0.13);
-    const py = ML_WCY + Math.sin(a) * (ML_WR - 0.13);
-    b.box('mlSpray', 0.22, 0.050, 0.56, px, py, zc, 0, 0, a - Math.PI / 2);
+  /* 砸在轮斗上炸开的大水团：沿轮顶弧排一圈（别超过 0.11，太大会变白砖） */
+  for (let i = 0; i < 8; i++) {
+    const a = (50 + i * 8.5) * Math.PI / 180;
+    const rr = ML_WR + 0.10 + mlR(i * 3.9) * 0.20;
+    b.sph('mlFoam', 0.044 + mlR(i * 5.7) * 0.038,
+      ML_WCX + Math.cos(a) * rr, ML_WCY + Math.sin(a) * rr,
+      zc + (mlR(i * 7.1) - 0.5) * 0.82, 1, 0.85, 1);
+  }
+  /* 轮顶斗里兜着的水：两颗压扁的小水珠，别用方板（近景会读成白砖） */
+  for (let i = 0; i < 6; i++) {
+    const a = (54 + i * 12) * Math.PI / 180;
+    for (let j = 0; j < 2; j++) {
+      const off = (j - 0.5) * 0.20;
+      b.sph('mlSpray', 0.040 + mlR(i * 4.1 + j * 2.7) * 0.018,
+        ML_WCX + Math.cos(a) * (ML_WR - 0.13) + Math.cos(a + Math.PI / 2) * off,
+        ML_WCY + Math.sin(a) * (ML_WR - 0.13) + Math.sin(a + Math.PI / 2) * off,
+        zc + (mlR(i * 3.3 + j) - 0.5) * 0.40, 1.5, 0.55, 1.1);
+    }
   }
   /* 顺时针转：水在轮顶接住后沿右侧下行倒出，水滴必须在 +x 侧 */
-  for (let i = 0; i < 12; i++) {
-    const u = i / 11;
-    b.sph(i % 3 ? 'mlFoam' : 'mlSpray', 0.028 + mlR(i * 4.3) * 0.030,
-      -1.14 + u * 0.30,
-      1.02 - u * 1.38,
-      zc - 0.18 + (mlR(i * 6.1) - 0.5) * 0.58, 1, 1.2, 1);
+  for (let i = 0; i < 18; i++) {
+    const u = i / 17;
+    b.sph(i % 3 ? 'mlFoam' : 'mlSpray', 0.026 + mlR(i * 4.3) * 0.030,
+      -1.14 + u * 0.34,
+      1.02 - u * 1.42,
+      zc - 0.18 + (mlR(i * 6.1) - 0.5) * 0.66, 1, 1.2, 1);
   }
-  /* 轮右下倒水处的河面浪花：贴水面的一排碎白片 */
-  for (let i = 0; i < 11; i++) {
-    b.box('mlFoam', 0.22 + mlR(i * 3.3) * 0.20, 0.035, 0.26,
-      ML_WCX + 0.52 + i * 0.24, ML_WY + 0.085,
-      ML_WCZ + (mlR(i * 5.7) - 0.5) * 1.05);
+  /* 轮右下倒水处的河面浪花：更大更散 */
+  for (let i = 0; i < 16; i++) {
+    b.box('mlFoam', 0.26 + mlR(i * 3.3) * 0.26, 0.040, 0.30,
+      ML_WCX + 0.42 + i * 0.21, ML_WY + 0.085,
+      ML_WCZ + (mlR(i * 5.7) - 0.5) * 1.25);
   }
   b.build(g, { noOutline: ['mlFoam', 'mlSpray'] });
   g.userData.jetTex = jetTex;
