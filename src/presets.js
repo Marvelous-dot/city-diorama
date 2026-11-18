@@ -1320,7 +1320,7 @@
         gdSoil: 0x8d7556, gdSoilD: 0x63513c,
         gdGrass: 0x273a1c, gdGrassL: 0x41602a,
         gdStone: 0xa8a89c, gdStoneD: 0x777a72, gdStoneL: 0xc8c8ba,
-        gdRock: 0x6a7571, gdRockL: 0x818c86, gdRockD: 0x39423e,
+        gdRock: 0x6a7571, gdRockL: 0x77817c, gdRockD: 0x4f5a54,
         gdPave: 0xb6b0a0,
         /* 木作：栗色梁柱 + 朱漆栏杆 */
         gdWoodD: 0x5c3a24, gdWoodR: 0x8e3f2e,
@@ -1329,7 +1329,7 @@
         gdWall: 0xe8e2d4, gdTile: 0x4a5350, gdTileD: 0x333b39, gdRidge: 0x2e3533,
         /* 门窗 / 匾 / 灯 / 屏 */
         gdLattice: 0x6b4a2e, gdDoor: 0x7a4a2c, gdDoorD: 0x53301c,
-        gdSignBox: 0x241a12, gdGold: 0xd8b35e, gdLantern: 0xd4562e,
+        gdSignBox: 0x241a12, gdGold: 0xd8b35e, gdLantern: 0xc04a26,
         gdScreenP: 0xd9cdb4, gdSky: 0xcfe0e6,
         /* 水 / 荷 */
         gdBloom: 0x5c8a5e, gdFlower: 0xe8a6b8, gdWaterD: 0x4c7d75, gdFoam: 0xeef9f3,

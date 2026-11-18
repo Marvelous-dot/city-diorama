@@ -52,8 +52,8 @@ window.PRESET = {
     "gdStoneD": 7830130,
     "gdStoneL": 13158586,
     "gdRock": 6976881,
-    "gdRockL": 8490118,
-    "gdRockD": 3752510,
+    "gdRockL": 7831932,
+    "gdRockD": 5200468,
     "gdPave": 11972768,
     "gdWoodD": 6044196,
     "gdWoodR": 9322286,
@@ -68,7 +68,7 @@ window.PRESET = {
     "gdDoorD": 5451804,
     "gdSignBox": 2365970,
     "gdGold": 14201694,
-    "gdLantern": 13915694,
+    "gdLantern": 12601894,
     "gdScreenP": 14273972,
     "gdSky": 13623526,
     "gdBloom": 6064734,
@@ -17433,7 +17433,7 @@ function gdBankRocks(b) {
       const t = i / n;
       const x = e[0] + (e[2] - e[0]) * t, z = e[1] + (e[3] - e[1]) * t;
       const s = 0.30 + gdR(k * 17 + i * 5.1) * 0.34;
-      b.box(i % 3 ? 'gdRock' : 'gdRockL', s, s * 0.74, s * 1.25,
+      b.box(i % 4 ? 'gdRock' : 'gdRockL', s, s * 0.74, s * 1.25,
         x, GD_WY + s * 0.20, z, 0, gdR(i * 7.3) * 1.2, (gdR(i * 9.1) - 0.5) * 0.18);
     }
   });
@@ -17581,8 +17581,9 @@ function gdYuanxiang(b) {
   b.box('gdStoneL', 7.2, 0.40, 2.0, cx, GD_GY + 0.20, cz + D / 2 + 1.4);
   b.box('gdPave', 7.0, 0.06, 1.9, cx, GD_GY + 0.43, cz + D / 2 + 1.4);
   /* 三级台阶下到池岸 */
+  /* 入水踏步：实心砌到水下，否则三级台阶像悬在水面上 */
   for (let i = 0; i < 3; i++) {
-    b.box('gdStoneL', 4.2, 0.14, 0.46, cx, GD_GY + 0.33 - i * 0.13, cz + D / 2 + 2.65 + i * 0.42);
+    b.box('gdStoneL', 4.2, 0.62, 0.46, cx, GD_GY - 0.10 - i * 0.13, cz + D / 2 + 2.65 + i * 0.42);
   }
   /* 柱网：面宽 5 间 × 进深 3 间；柱高 5.6 米，屋顶才压不扁 */
   const xs = [-W / 2, -W / 4, 0, W / 4, W / 2];
@@ -17602,6 +17603,8 @@ function gdYuanxiang(b) {
     const x0 = -W / 2 + i * W / 4;
     gdScreen(b, cx + x0 + W / 8, FY, cz + D / 2 - 0.06, W / 4 - 0.34, 4.3, 0);
   }
+  /* 长窗后 0.5 米一块绢面屏板：否则从外面看是一排黑洞 */
+  b.box('gdScreenP', W - 1.0, 3.9, 0.06, cx, FY + 2.05, cz + D / 2 - 0.70);
   [-1, 1].forEach(function (s) {
     b.box('gdWall', 0.34, 4.0, D - 0.6, cx + s * W / 2, FY + 2.0, cz);
     gdScreen(b, cx + s * W / 2 + s * 0.05, FY + 4.02, cz - 1.2, 1.9, 1.15, Math.PI / 2);
@@ -17917,20 +17920,21 @@ function gdRockMass(b, cx, cz, w, d, h, seed) {
 }
 
 /* 洞壑：山体正面嵌几个深色凹陷，远看就是「透」的洞 */
-function gdCave(b, x, y, z, r, ry) {
-  b.sph('gdRockD', r, x, y, z, 1, 0.85, 0.55);
-  b.sph('gdRockD', r * 0.55, x + 0.15, y + r * 0.20, z - 0.02, 1, 0.9, 0.5);
+function gdCave(b, x, y, z, r) {
+  /* 洞要「浅」：深色球一大会读成黑洞眼 */
+  b.sph('gdRockD', r * 0.62, x, y, z, 1, 0.80, 0.45);
 }
 function gdHills(b) {
   /* 四块整石：少而大。多点叠加会露内壁，整块变形又会拉成石柱，四块是最稳的折中 */
   const HX = -4.5, cz = 12.6;
-  gdRock(b, HX + 2.4, GD_GY + 1.55, cz, 1.55, 2.55, 1.35, 1);
+  gdRock(b, HX + 2.4, GD_GY + 0.34, cz, 2.30, 0.52, 2.00, 5);
+  gdRock(b, HX + 2.4, GD_GY + 1.62, cz, 1.55, 2.55, 1.35, 1);
   gdRock(b, HX + 0.3, GD_GY + 0.90, cz + 0.7, 1.60, 1.05, 1.45, 2);
   gdRock(b, HX + 4.4, GD_GY + 0.85, cz - 0.5, 1.50, 1.00, 1.40, 3);
   gdRock(b, HX + 2.5, GD_GY + 4.05, cz + 0.1, 0.58, 1.28, 0.52, 4);
   /* 洞壑：深色凹陷贴在石面上，读出「透」 */
-  gdCave(b, HX + 1.5, GD_GY + 1.10, cz + 1.35, 0.58);
-  gdCave(b, HX + 3.4, GD_GY + 1.55, cz + 1.10, 0.40);
+  gdCave(b, HX + 1.5, GD_GY + 1.10, cz + 1.35, 0.38);
+  gdCave(b, HX + 3.4, GD_GY + 1.55, cz + 1.10, 0.26);
   for (let i = 0; i < 10; i++) {
     const a = gdR(i * 3.1) * Math.PI * 2;
     const r = 0.5 + gdR(i * 5.7) * 1.4;
@@ -17959,13 +17963,13 @@ function gdZigBridge(b) {
     const ry = Math.atan2(-dz, dx);
     b.box('gdDeck', len + 0.16, 0.14, 1.25, (x0 + x1) / 2, y, (z0 + z1) / 2, 0, ry, 0);
     /* 低石栏：每隔 0.55 米一根，压在桥面两侧 */
-    const n = Math.max(2, Math.round(len / 0.55));
+    const n = Math.max(2, Math.round(len / 0.92));
     for (let j = 0; j <= n; j++) {
       const t = j / n;
       [-1, 1].forEach(function (s) {
-        b.box('gdStoneL', 0.10, 0.34, 0.10,
-          x0 + dx * t + s * Math.sin(ry) * 0.52, y + 0.24,
-          z0 + dz * t + s * Math.cos(ry) * 0.52);
+        b.box('gdStone', 0.12, 0.42, 0.12,
+          x0 + dx * t + s * Math.sin(ry) * 0.52, y + 0.28,
+          z0 + dz * t + s * Math.cos(ry) * 0.52, 0, ry, 0);
       });
     }
   }
@@ -18034,6 +18038,9 @@ function gdEstate(b) {
   b.box('gdRockL', 0.50, 0.40, 0.50, CX + 1.3, GD_GY + 0.18, -16.4);
   gdBanana(b, X1 - 1.0, -14.4, 0.75);
   gdShrub(b, X0 + 1.2, -16.8, 0.80);
+  gdBamboo(b, X0 + 1.4, -13.2, 0.80);
+  gdBamboo(b, X0 + 2.3, -15.2, 0.74);
+  gdPlum(b, X1 - 1.6, -17.4, 0.70);
   /* 长墙压顶 */
   b.box('gdTile', 0.56, 0.15, GD_Z1 - GD_Z0 - 1.8, 18.0, GD_GY + H + 0.05, 0);
   b.box('gdRidge', 0.18, 0.12, GD_Z1 - GD_Z0 - 1.8, 18.0, GD_GY + H + 0.19, 0);
@@ -18310,9 +18317,24 @@ function gdReed(b, x, z, s) {
   s = s || 1;
   for (let i = 0; i < 4; i++) {
     const dx = (gdR(i * 3.1 + x) - 0.5) * 0.24, dz = (gdR(i * 5.7 + z) - 0.5) * 0.24;
-    const h = (0.75 + gdR(i * 7.3 + x) * 0.65) * s;
-    b.box('gdLeaf3', 0.05, h, 0.05, x + dx, GD_WY + h / 2, z + dz, 0, 0, (gdR(i * 9.1) - 0.5) * 0.28);
-    b.box('gdBark', 0.065, 0.20, 0.065, x + dx, GD_WY + h + 0.09, z + dz);
+    const h = (0.45 + gdR(i * 7.3 + x) * 0.40) * s;
+    b.box('gdLeaf2', 0.045, h, 0.045, x + dx, GD_WY + h / 2, z + dz, 0, 0, (gdR(i * 9.1) - 0.5) * 0.30);
+    if (i === 0) b.box('gdBark', 0.06, 0.16, 0.06, x + dx, GD_WY + h + 0.07, z + dz);
+  }
+}
+
+function gdGardenBed(b, cx, cz, w, d) {
+  b.box('gdSoilD', w, 0.12, d, cx, GD_GY + 0.06, cz);
+  for (let i = 0; i < 20; i++) {
+    const x = cx + (gdR(i * 3.1) - 0.5) * w * 0.92;
+    const z = cz + (gdR(i * 5.7) - 0.5) * d * 0.92;
+    b.sph('gdLeaf2', 0.22 + gdR(i * 7.3) * 0.14, x, GD_GY + 0.24, z, 1.1, 0.7, 1.0);
+    if (i % 2 === 0) b.sph('gdFlower', 0.10, x + 0.10, GD_GY + 0.40, z, 1, 0.9, 1);
+  }
+  /* 边框矮石 */
+  for (let i = 0; i < 8; i++) {
+    b.box('gdStoneL', 0.22, 0.12, 0.22, cx - w / 2 + i * w / 7, GD_GY + 0.14, cz - d / 2);
+    b.box('gdStoneL', 0.22, 0.12, 0.22, cx - w / 2 + i * w / 7, GD_GY + 0.14, cz + d / 2);
   }
 }
 
@@ -18326,17 +18348,17 @@ function gdShrub(b, x, z, s) {
 function gdPlants(b) {
   /* 西北竹林：成片才有「幽」的味道，散点会变盆栽 */
   for (let i = 0; i < 26; i++) {
-    const x = -16.4 + gdR(i * 3.1) * 5.6;
+    const x = -20.8 + gdR(i * 3.1) * 5.4;
     const z = -13.6 + gdR(i * 5.7) * 4.8;
     gdBamboo(b, x, z, 0.85 + gdR(i * 7.3) * 0.35);
   }
   /* 西院竹：填补楼后空地 */
   for (let i = 0; i < 10; i++) {
-    gdBamboo(b, -16.2 + gdR(i * 4.3) * 2.2, -4.0 + gdR(i * 6.1) * 5.6, 0.80 + gdR(i * 8.7) * 0.30);
+    gdBamboo(b, -18.2 + gdR(i * 4.3) * 2.4, -4.0 + gdR(i * 6.1) * 5.6, 0.80 + gdR(i * 8.7) * 0.30);
   }
   /* 东院竹：四丛，靠院墙 */
   for (let i = 0; i < 6; i++) {
-    gdBamboo(b, 14.0 + gdR(i * 3.7) * 2.4, 8.6 + gdR(i * 5.3) * 2.6, 0.75 + gdR(i * 7.9) * 0.30);
+    gdBamboo(b, 14.7 + gdR(i * 3.7) * 2.0, 8.6 + gdR(i * 5.3) * 2.6, 0.75 + gdR(i * 7.9) * 0.30);
   }
   /* 芭蕉两株：扇亭两侧 */
   gdBanana(b, -12.6, 8.0, 1.0);
@@ -18392,13 +18414,18 @@ function gdPlants(b) {
     const len = Math.hypot(e[2] - e[0], e[3] - e[1]);
     const n = Math.max(2, Math.round(len / 2.2));
     for (let i = 0; i <= n; i++) {
-      if ((i + k) % 3) continue;
+      if ((i + k) % 4) continue;
       const t = i / n;
       gdReed(b,
         e[0] + (e[2] - e[0]) * t + (k % 2 ? 0.28 : -0.28),
         e[1] + (e[3] - e[1]) * t + (k % 2 ? -0.28 : 0.28), 0.9);
     }
   });
+  /* 西南花圃与石径：把枇杷园东侧的空草地填掉 */
+  gdGardenBed(b, -11.0, 20.2, 4.8, 5.2);
+  gdGardenBed(b, -11.2, 25.4, 4.2, 2.4);
+  gdGardenBed(b, -10.6, 15.4, 4.4, 2.8);
+  b.box('gdPave', 1.6, 0.07, 10.0, -7.8, GD_GY + 0.035, 20.0);
   /* 南岸石桌石凳：假山脚下可坐可弈 */
   b.cyl('gdStoneL', 0.58, 0.62, 0.11, 12, 7.6, GD_GY + 0.70, 11.2);
   b.cyl('gdStoneD', 0.17, 0.21, 0.68, 10, 7.6, GD_GY + 0.35, 11.2);
@@ -18517,7 +18544,7 @@ function gdLights() {
   const L = [
     [1.4, GD_GY + 3.1, -9.2, 5.2, 8.0],
     [2.0, GD_WY + 2.5, 3.4, 3.4, 5.5],
-    [-11.9, GD_GY + 4.6, -0.6, 4.2, 6.5],
+    [-12.4, GD_GY + 4.4, -0.6, 2.6, 5.5],
     [14.6, GD_GY + 2.2, 11.6, 3.0, 5.0],
     [6.0, GD_GY + 2.6, 2.0, 3.2, 6.0],
     [21.7, GD_GY + 3.2, 0.0, 4.0, 6.0],
