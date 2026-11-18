@@ -1351,6 +1351,61 @@
       },
       veg: { willows: [], bamboo: [], pots: [] },
       cam: { theta: 0.90, phi: 1.10, dist: 102, target: [4.00, 2.20, 0.00] }
+    },
+
+    /* ---------------------------------------------------------
+       福建土楼 · 承启楼（第 20 套：圆形夯土巨构，外径 30.4 米）
+       --------------------------------------------------------- */
+    tulou: {
+      id: 'tulou',
+      title: '福建土楼 · 承启楼',
+      tulou: true,
+      figStyle: 'voxel',
+      emis: 1.0,
+      lampK: 1.0,
+      sky: ['#eef4ec', '#dbe7d8', '#c2d0bd', '#8d9c86'],
+      vig: 'rgba(50,58,44,0.20)',
+      shadowSpan: 26.0,
+      shadowFar: 120,
+      palette: {
+        /* 夯土三阶 */
+        tlEarth: 0xc4a06a, tlEarthD: 0x9c7a4c, tlEarthL: 0xd8b884,
+        tlSoil: 0x8d7556, tlSoilD: 0x63513c, tlBaseD: 0x4a4236,
+        /* 石 */
+        tlStone: 0xa9a496, tlStoneD: 0x7d796c, tlStoneL: 0xc9c4b4,
+        tlPave: 0xb5af9e, tlPaveD: 0x968f7e,
+        /* 木作 */
+        tlWood: 0x9a7048, tlWoodD: 0x63432a, tlWoodR: 0x8e3f2e,
+        /* 瓦 */
+        tlTile: 0x4c5450, tlTileD: 0x343b38, tlRidge: 0x2d3330,
+        /* 门窗 / 匾 */
+        tlDoor: 0x6d4528, tlDoorD: 0x4a2f1c, tlWin: 0x241d16,
+        tlWinFrame: 0x6d4a2c, tlLattice: 0x6a4526, tlWall: 0xd9cdb0,
+        tlSignBox: 0x241a12, tlGold: 0xd8b35e,
+        /* 院 / 草 */
+        tlGrass: 0x42662f, tlGrassL: 0x5c7f3c,
+        /* 水 */
+        tlWaterD: 0x4a7a72, tlFoam: 0xeef9f3,
+        /* 植物 */
+        tlBark: 0x5e4a34, tlBamboo: 0x6f9455,
+        tlLeaf1: 0x5c8046, tlLeaf2: 0x3d5a30, tlLeaf3: 0x6d8c42, tlFlower: 0xe8a6b8,
+        /* 陈设 */
+        tlLantern: 0xc04a26, tlCloth: 0xb8503a, tlClothB: 0x4a6b78,
+        tlStraw: 0xc9b06a, tlIron: 0x6a6a66, tlJar: 0x6e5a44, tlChicken: 0xe6ddc6,
+        /* 积木人 */
+        tlSkin: 0xe8bd9a, tlHair: 0x2e2823, tlInk: 0x241f1a,
+        tlBelt: 0x4a4238, tlShoe: 0x332c24, tlHat: 0x2a241e,
+        tlRobeA: 0x4e6b78, tlRobeB: 0x9a4638, tlRobeC: 0x6f6a8c, tlRobeD: 0x3f5a48
+      },
+      emit: {},
+      light: {
+        sun:  { color: 0xfff3dd, i: 1.75, pos: [24.0, 28.0, 20.0] },
+        fill: { color: 0xb8cfe0, i: 0.58, pos: [-20.0, 13.0, -18.0] },
+        hemi: { sky: 0xe8e4d4, ground: 0x5c6a4c, i: 0.64 },
+        amb:  { color: 0xb0b8b0, i: 0.28 }
+      },
+      veg: { willows: [], bamboo: [], pots: [] },
+      cam: { theta: 0.85, phi: 1.05, dist: 54, target: [0.00, 5.50, 0.00] }
     }
   };
 });

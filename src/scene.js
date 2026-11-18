@@ -15179,6 +15179,7 @@ function buildDkAll() {
 const TV = !!PS.tavern;
 const ML = !!PS.mill;
 const GD = !!PS.garden;
+const TL = !!PS.tulou;
 
 const TV_X0 = -6.20, TV_X1 = 2.60;    // 进深 8.80（正面 +X）
 const TV_Z0 = -5.60, TV_Z1 = 5.60;    // 面阔 11.20
@@ -18532,12 +18533,484 @@ function buildGdAll() {
   }
 }
 
+/* ================= 第 20 套：福建土楼（tulou / TL） =================
+   圆形夯土巨构：外径 30.4 米、墙厚 1.5、四层、36 开间环廊，
+   内院一座祠堂，门前半月池。坐标以楼心为原点，大门朝 +z（南）。
+   ==================================================================== */
+const TL_R = 15.2, TL_T = 1.5, TL_RI = TL_R - TL_T;
+const TL_H = 13.2, TL_FLOOR = 3.0, TL_N = 36;
+const TL_X0 = -22.0, TL_X1 = 22.0, TL_Z0 = -22.0, TL_Z1 = 22.0;
+const TL_GY = 0.55, TL_BB = -1.60;
+
+function tlR(n) { const s = Math.sin(n * 12.9898) * 43758.5453; return s - Math.floor(s); }
+
+/* 平放的圆环（用于回廊地板、墙顶、铺地） */
+function tlRing(b, key, r0, r1, y) {
+  const g = new T.RingGeometry(r0, r1, 64);
+  g.rotateX(-Math.PI / 2);
+  g.translate(0, y, 0);
+  b.add(key, g);
+}
+
+/* ---------------- 展台与院外石坪 ---------------- */
+function tlBase(b) {
+  const w = TL_X1 - TL_X0, d = TL_Z1 - TL_Z0;
+  b.box('tlBaseD', w, TL_GY - TL_BB, d, 0, (TL_GY + TL_BB) / 2, 0);
+  const layers = [
+    ['tlSoil', TL_GY, TL_GY - 0.52],
+    ['tlSoilD', TL_GY - 0.52, TL_GY - 1.10],
+    ['tlBaseD', TL_GY - 1.10, TL_BB]
+  ];
+  layers.forEach(function (q) {
+    const hh = q[1] - q[2], yy = (q[1] + q[2]) / 2;
+    b.box(q[0], w - 0.02, hh, 0.03, 0, yy, TL_Z1 - 0.015);
+    b.box(q[0], w - 0.02, hh, 0.03, 0, yy, TL_Z0 + 0.015);
+    b.box(q[0], 0.03, hh, d - 0.02, TL_X1 - 0.015, yy, 0);
+    b.box(q[0], 0.03, hh, d - 0.02, TL_X0 + 0.015, yy, 0);
+  });
+  /* 院外：草地 + 楼前石坪 */
+  b.box('tlGrass', w - 0.1, 0.10, d - 0.1, 0, TL_GY + 0.04, 0);
+  b.cyl('tlPave', 15.6, 15.8, 0.12, 48, 0, TL_GY + 0.12, 0);
+  for (let i = 0; i < 9; i++) {
+    b.box('tlPaveD', 4.2, 0.02, 0.06, 0, TL_GY + 0.19, 16.4 + i * 0.52);
+  }
+  /* 门前石坪向半月池延伸 */
+  b.box('tlPave', 6.5, 0.10, 3.2, 0, TL_GY + 0.09, 16.6);
+}
+
+/* ---------------- 环形夯土外墙：外皮 + 内皮 + 勒脚 + 墙顶 ---------------- */
+function tlOuterWall(b) {
+  /* 外皮：下大上小，收分 0.15 */
+  const g1 = new T.CylinderGeometry(TL_R, TL_R + 0.18, TL_H, 64, 1, true);
+  g1.translate(0, TL_GY + 0.55 + TL_H / 2, 0);
+  b.add('tlEarth', g1);
+  /* 内皮：翻转法线，院内才看得见 */
+  const g2 = new T.CylinderGeometry(TL_RI, TL_RI + 0.12, TL_H, 64, 1, true);
+  g2.scale(-1, 1, 1);
+  g2.translate(0, TL_GY + 0.55 + TL_H / 2, 0);
+  b.add('tlEarthD', g2);
+  /* 石砌勒脚 */
+  const g3 = new T.CylinderGeometry(TL_R + 0.34, TL_R + 0.52, 0.72, 64, 1, false);
+  g3.translate(0, TL_GY + 0.36, 0);
+  b.add('tlStone', g3);
+  /* 墙顶环面（被屋顶压住，只露出一圈） */
+  tlRing(b, 'tlEarthL', TL_RI, TL_R + 0.05, TL_GY + 0.55 + TL_H);
+  /* 夯土雨痕：竖向深浅条，白墙才不假 */
+  for (let i = 0; i < 46; i++) {
+    const a = tlR(i * 3.1) * Math.PI * 2;
+    const w = 0.10 + tlR(i * 5.7) * 0.24;
+    const hh = 2.2 + tlR(i * 7.3) * 7.5;
+    b.box(i % 3 ? 'tlEarthD' : 'tlEarthL', w, hh, 0.05,
+      Math.cos(a) * (TL_R + 0.11), TL_GY + 1.4 + tlR(i * 9.1) * 5.2, Math.sin(a) * (TL_R + 0.11),
+      0, -a + Math.PI / 2, 0);
+  }
+}
+
+/* ---------------- 环形双坡瓦顶（贴图瓦垄） ---------------- */
+function tlRoof(b, g) {
+  const yEave = TL_GY + 0.55 + TL_H;
+  const rEave = TL_R + 1.30, rRidge = TL_R - 1.50;
+  const yRidge = yEave + 2.25;
+  /* 瓦垄贴图：u 沿圆周，画竖向深条 = 一圈瓦垄 */
+  const tex = canvasTex(256, 64, function (c, w, h) {
+    c.fillStyle = '#5b635e'; c.fillRect(0, 0, w, h);
+    for (let i = 0; i < 8; i++) {
+      c.fillStyle = '#3f4744'; c.fillRect(i * 32 + 6, 0, 7, h);
+      c.fillStyle = '#6d756f'; c.fillRect(i * 32 + 13, 0, 3, h);
+    }
+  });
+  tex.wrapS = tex.wrapT = T.RepeatWrapping;
+  tex.repeat.set(26, 1);
+  const mat = new T.MeshToonMaterial({ map: tex, gradientMap: GRAD, side: T.DoubleSide });
+  /* 外坡 */
+  const g1 = new T.CylinderGeometry(rRidge, rEave, 2.25, 72, 1, true);
+  g1.translate(0, (yEave + yRidge) / 2, 0);
+  g.add(new T.Mesh(g1, mat));
+  /* 内坡 */
+  const g2 = new T.CylinderGeometry(rRidge, TL_RI + 0.55, 1.45, 72, 1, true);
+  g2.translate(0, yRidge - 0.66, 0);
+  g.add(new T.Mesh(g2, mat));
+  /* 环形脊 */
+  const g3 = new T.TorusGeometry(rRidge, 0.16, 8, 72);
+  g3.rotateX(Math.PI / 2);
+  g3.translate(0, yRidge + 0.03, 0);
+  b.add('tlRidge', g3);
+  /* 檐口瓦当 */
+  for (let i = 0; i < 72; i++) {
+    const a = i / 72 * Math.PI * 2;
+    b.box('tlTileD', 0.26, 0.10, 0.14, Math.cos(a) * rEave, yEave + 0.02, Math.sin(a) * rEave, 0, -a + Math.PI / 2, 0);
+  }
+  /* 檐下椽头 */
+  for (let i = 0; i < 60; i++) {
+    const a = i / 60 * Math.PI * 2;
+    b.box('tlWoodD', 0.10, 0.10, 0.55, Math.cos(a) * (rEave - 0.45), yEave - 0.16, Math.sin(a) * (rEave - 0.45), 0, -a + Math.PI / 2, 0);
+  }
+}
+
+/* ---------------- 四层环形柱廊 ---------------- */
+function tlCloister(b) {
+  for (let f = 1; f <= 3; f++) {
+    const y = TL_GY + 0.55 + f * TL_FLOOR;
+    /* 回廊地板：宽 2.0 的环 */
+    tlRing(b, 'tlWood', TL_RI - 2.0, TL_RI - 0.05, y);
+    tlRing(b, 'tlWoodD', TL_RI - 2.0, TL_RI - 1.92, y + 0.02);
+    /* 每层 36 根檐柱 */
+    for (let i = 0; i < TL_N; i++) {
+      const a = i / TL_N * Math.PI * 2;
+      b.cyl('tlWoodD', 0.13, 0.14, TL_FLOOR - 0.35, 8,
+        Math.cos(a) * (TL_RI - 1.85), y + (TL_FLOOR - 0.35) / 2, Math.sin(a) * (TL_RI - 1.85));
+    }
+    /* 栏杆：36 段，留出上楼梯口 */
+    for (let i = 0; i < TL_N; i++) {
+      if (i % 9 === 0) continue;
+      const a0 = i / TL_N * Math.PI * 2, a1 = (i + 1) / TL_N * Math.PI * 2;
+      const x0 = Math.cos(a0) * (TL_RI - 1.92), z0 = Math.sin(a0) * (TL_RI - 1.92);
+      const x1 = Math.cos(a1) * (TL_RI - 1.92), z1 = Math.sin(a1) * (TL_RI - 1.92);
+      const len = Math.hypot(x1 - x0, z1 - z0);
+      const ry = Math.atan2(-(z1 - z0), x1 - x0);
+      b.box('tlWoodR', len, 0.08, 0.09, (x0 + x1) / 2, y + 0.62, (z0 + z1) / 2, 0, ry, 0);
+      b.box('tlWoodR', len, 0.06, 0.07, (x0 + x1) / 2, y + 0.26, (z0 + z1) / 2, 0, ry, 0);
+    }
+    /* 房间门板：贴内墙，每开间一樘（部分关） */
+    for (let i = 0; i < TL_N; i++) {
+      if (i % 4 === 1) continue;
+      const a = (i + 0.5) / TL_N * Math.PI * 2;
+      b.box(i % 5 === 0 ? 'tlDoor' : 'tlDoorD', 1.05, 2.05, 0.10,
+        Math.cos(a) * (TL_RI - 0.08), y + 1.02, Math.sin(a) * (TL_RI - 0.08), 0, -a + Math.PI / 2, 0);
+    }
+    /* 层间腰檐：一圈小披檐，四层才有土楼的层次 */
+    if (f < 3) {
+      const gr = new T.CylinderGeometry(TL_RI - 2.05, TL_RI - 1.55, 0.42, 64, 1, true);
+      gr.translate(0, y + TL_FLOOR - 0.22, 0);
+      b.add('tlTileD', gr);
+    }
+  }
+  /* 一层：地面环廊 + 房门 */
+  const y0 = TL_GY + 0.55;
+  tlRing(b, 'tlWood', TL_RI - 1.9, TL_RI - 0.05, y0 + 0.10);
+  for (let i = 0; i < TL_N; i++) {
+    const a = (i + 0.5) / TL_N * Math.PI * 2;
+    if (i % 6 === 0) continue;
+    b.box('tlDoorD', 1.10, 2.20, 0.10, Math.cos(a) * (TL_RI - 0.08), y0 + 1.15, Math.sin(a) * (TL_RI - 0.08), 0, -a + Math.PI / 2, 0);
+  }
+}
+
+/* ---------------- 大门：石框 + 双扇木门 + 匾额 + 台阶 ---------------- */
+function tlGate(b) {
+  const y0 = TL_GY + 0.55;
+  /* 门洞两侧条石 */
+  [-1.7, 1.7].forEach(function (s) {
+    b.box('tlStoneL', 0.55, 3.1, 0.62, s, y0 + 1.55, TL_R + 0.06);
+  });
+  b.box('tlStoneL', 4.0, 0.42, 0.62, 0, y0 + 3.30, TL_R + 0.06);
+  b.box('tlStoneL', 4.4, 0.20, 0.75, 0, y0 + 3.60, TL_R + 0.12);
+  /* 门楣与匾 */
+  b.box('tlSignBox', 2.6, 0.56, 0.12, 0, y0 + 4.05, TL_R + 0.30);
+  b.box('tlGold', 2.75, 0.05, 0.14, 0, y0 + 4.36, TL_R + 0.30);
+  b.box('tlGold', 2.75, 0.05, 0.14, 0, y0 + 3.74, TL_R + 0.30);
+  /* 两扇木门（半开） */
+  [-1, 1].forEach(function (s) {
+    b.box('tlDoor', 1.35, 2.85, 0.12, s * 0.95, y0 + 1.45, TL_R + 0.18, 0, s * 0.42, 0);
+    for (let i = 0; i < 3; i++) {
+      b.box('tlIron', 0.05, 0.05, 0.14, s * (0.55 + i * 0.28), y0 + 1.10 + i * 0.55, TL_R + 0.25);
+    }
+  });
+  /* 门前三级台阶 */
+  for (let i = 0; i < 3; i++) {
+    b.box('tlStoneL', 4.6 - i * 0.4, 0.18, 0.52, 0, y0 + 0.36 - i * 0.18, TL_R + 1.0 + i * 0.50);
+  }
+  /* 两只灯笼 */
+  [-2.3, 2.3].forEach(function (s) {
+    b.cyl('tlLantern', 0.22, 0.26, 0.46, 10, s, y0 + 3.10, TL_R + 0.55);
+    b.box('tlGold', 0.05, 0.30, 0.05, s, y0 + 3.42, TL_R + 0.55);
+  });
+}
+
+/* ---------------- 二至四层小窗：每层 36 个 ---------------- */
+function tlWindows(b) {
+  for (let f = 1; f <= 3; f++) {
+    const y = TL_GY + 0.55 + f * TL_FLOOR + 1.35;
+    for (let i = 0; i < TL_N; i++) {
+      if (i % 3 === 2) continue;
+      const a = (i + 0.5) / TL_N * Math.PI * 2;
+      const x = Math.cos(a) * (TL_R + 0.02), z = Math.sin(a) * (TL_R + 0.02);
+      b.box('tlWin', 0.46, 0.58, 0.08, x, y, z, 0, -a + Math.PI / 2, 0);
+      b.box('tlWinFrame', 0.56, 0.66, 0.05, x, y, z - 0.01, 0, -a + Math.PI / 2, 0);
+      /* 窗上小披檐 */
+      b.box('tlTileD', 0.56, 0.06, 0.18, x, y + 0.40, z + 0.04, 0, -a + Math.PI / 2, 0);
+    }
+  }
+}
+
+/* ---------------- 木柱底座（土楼版） ---------------- */
+function tlPost(b, x, z, y0, h, r) {
+  b.cyl('tlWoodD', r || 0.14, r || 0.15, h, 8, x, y0 + h / 2, z);
+  b.cyl('tlStoneD', (r || 0.14) * 1.5, (r || 0.14) * 1.6, 0.14, 8, x, y0 + 0.07, z);
+}
+
+/* ---------------- 内院：铺地 + 祠堂 + 水井 + 杂物 ---------------- */
+function tlCourtyard(b) {
+  const FY = TL_GY + 0.65;
+  /* 院内卵石地 */
+  b.cyl('tlPave', TL_RI - 1.95, TL_RI - 1.90, 0.12, 64, 0, FY - 0.06, 0);
+  /* 铺地石缝：放射状细线，内院才不是一块灰饼 */
+  for (let i = 0; i < 26; i++) {
+    const a = i / 26 * Math.PI * 2;
+    b.box('tlPaveD', 0.05, 0.02, TL_RI - 4.6, Math.cos(a) * (TL_RI - 2.4) * 0.5, FY + 0.015, Math.sin(a) * (TL_RI - 2.4) * 0.5, 0, -a + Math.PI / 2, 0);
+  }
+  /* 排水沟：一圈细槽 */
+  const g = new T.TorusGeometry(TL_RI - 2.4, 0.10, 6, 64);
+  g.rotateX(Math.PI / 2);
+  g.translate(0, FY + 0.01, 0);
+  b.add('tlStoneD', g);
+
+  /* 中心祠堂：面阔三间、前廊、硬山 */
+  const cx = 0, cz = -3.4, W = 8.2, D = 5.0;
+  b.box('tlStoneL', W + 1.1, 0.52, D + 1.1, cx, TL_GY + 0.26, cz);
+  b.box('tlPave', W + 1.0, 0.06, D + 1.0, cx, TL_GY + 0.55, cz);
+  [[-W / 2, D / 2], [W / 2, D / 2], [-W / 2, -D / 2], [W / 2, -D / 2]].forEach(function (q) {
+    tlPost(b, cx + q[0], cz + q[1], FY, 4.1, 0.15);
+  });
+  b.box('tlWall', W, 4.1, 0.30, cx, FY + 2.05, cz - D / 2 + 0.15);
+  b.box('tlWall', 0.30, 4.1, D, cx - W / 2 + 0.15, FY + 2.05, cz);
+  b.box('tlWall', 0.30, 4.1, D, cx + W / 2 - 0.15, FY + 2.05, cz);
+  for (let i = 0; i < 3; i++) {
+    const x0 = -W / 2 + i * W / 3;
+    b.box('tlLattice', W / 3 - 0.30, 3.2, 0.08, cx + x0 + W / 6, FY + 1.60, cz + D / 2 - 0.10);
+    b.box('tlDoor', W / 3 - 0.30, 0.10, 0.10, cx + x0 + W / 6, FY + 3.22, cz + D / 2 - 0.10);
+  }
+  gdGableRoof(b, 'tlTile', 'tlRidge', cx, cz, W + 0.7, D + 0.7, FY + 4.1, FY + 5.6, 'z');
+  b.box('tlSignBox', 2.4, 0.52, 0.12, cx, FY + 3.55, cz + D / 2 + 0.16);
+  /* 供桌与香炉 */
+  b.box('tlWoodD', 3.0, 0.12, 1.0, cx, FY + 0.82, cz - 1.4);
+  b.cyl('tlIron', 0.24, 0.20, 0.42, 10, cx, FY + 1.05, cz - 0.9);
+  b.cyl('tlLantern', 0.05, 0.05, 0.30, 6, cx, FY + 1.35, cz - 0.9);
+  /* 两侧灯笼 */
+  [-2.9, 2.9].forEach(function (dx) {
+    b.cyl('tlLantern', 0.20, 0.24, 0.42, 10, cx + dx, FY + 3.35, cz + D / 2 + 0.30);
+  });
+
+  /* 水井：石圈 + 井台 + 木架 */
+  const wx = 4.4, wz = 2.6;
+  b.cyl('tlStoneD', 0.78, 0.84, 0.62, 16, wx, FY + 0.31, wz);
+  b.cyl('tlStoneL', 0.66, 0.66, 0.10, 16, wx, FY + 0.64, wz);
+  b.cyl('tlBaseD', 0.52, 0.52, 0.06, 16, wx, FY + 0.62, wz);
+  [-0.85, 0.85].forEach(function (s) {
+    b.box('tlWoodD', 0.09, 1.45, 0.09, wx + s, FY + 0.72, wz);
+  });
+  b.box('tlWoodD', 1.85, 0.09, 0.09, wx, FY + 1.42, wz);
+  b.cyl('tlWoodR', 0.05, 0.05, 1.5, 8, wx, FY + 1.10, wz, 0, 0, Math.PI / 2);
+  b.cyl('tlWoodD', 0.20, 0.17, 0.28, 10, wx, FY + 0.62, wz + 0.05);
+
+  /* 石桌石凳 */
+  b.cyl('tlStoneL', 0.62, 0.66, 0.12, 14, -4.2, FY + 0.72, 2.2);
+  b.cyl('tlStoneD', 0.17, 0.21, 0.68, 10, -4.2, FY + 0.36, 2.2);
+  [[-3.2, 2.3], [-5.2, 2.1]].forEach(function (q) {
+    b.cyl('tlStoneL', 0.25, 0.27, 0.40, 10, q[0], FY + 0.20, q[1]);
+  });
+
+  /* 晾衣杆先撤掉：斜条在内院太抢眼，等几何定位准了再加回来 */
+
+  /* 贴内墙的柴房与谷仓：两间小木屋 */
+  [[-9.6, -6.4, 0.5], [8.8, -7.2, -0.6]].forEach(function (q) {
+    b.box('tlWoodD', 3.0, 2.4, 2.2, q[0], FY + 1.2, q[1], 0, q[2], 0);
+    b.box('tlTileD', 3.3, 0.10, 2.5, q[0], FY + 2.45, q[1], 0, q[2], 0);
+    b.box('tlDoorD', 0.9, 1.8, 0.08, q[0] + 0.9, FY + 0.9, q[1] + 1.12, 0, q[2], 0);
+  });
+
+  /* 石磨、水缸、鸡笼 */
+  b.cyl('tlStoneD', 0.55, 0.58, 0.18, 14, 6.2, FY + 0.35, -1.2);
+  b.cyl('tlStoneL', 0.50, 0.52, 0.16, 14, 6.2, FY + 0.52, -1.2);
+  b.box('tlWoodD', 1.6, 0.10, 0.10, 6.2, FY + 0.62, -1.2);
+  b.cyl('tlJar', 0.48, 0.42, 0.82, 14, -6.8, FY + 0.41, 5.6);
+  b.cyl('tlJar', 0.36, 0.32, 0.62, 12, -7.4, FY + 0.31, 4.9);
+  b.box('tlBamboo', 1.4, 1.0, 1.0, 7.6, FY + 0.50, 4.2);
+  for (let i = 0; i < 3; i++) {
+    b.sph('tlChicken', 0.16, 7.6 + (tlR(i * 3.1) - 0.5) * 0.9, FY + 0.16, 4.2 + (tlR(i * 5.7) - 0.5) * 0.6, 1.2, 0.9, 1.0);
+  }
+}
+
+/* ---------------- 门前半月池：半圆水面 + 石栏 ---------------- */
+function tlHalfPond(b) {
+  const cz = 16.2, R = 5.2;
+  /* 池沿：抬到草地之上，否则水面被地面整个盖住 */
+  const gb = new T.CylinderGeometry(R + 0.5, R + 0.5, 0.42, 40, 1, false, 0, Math.PI);
+  gb.translate(0, TL_GY + 0.21, cz);
+  b.add('tlStone', gb);
+  /* 水面：比草地高 4cm，才看得见 */
+  /* 水面用矩形，半月形状交给外面的弧形石栏去定 */
+  const gw = new T.PlaneGeometry(R * 2, 3.6);
+  gw.rotateX(-Math.PI / 2);
+  gw.translate(0, TL_GY + 0.30, 20.0);
+  b.add('tlWaterD', gw);
+  /* 池沿石栏 */
+  for (let i = 0; i <= 22; i++) {
+    const a = Math.PI + (i / 22) * Math.PI;
+    b.box('tlStoneL', 0.24, 0.50, 0.24, Math.cos(a) * (R + 0.42), TL_GY + 0.55, cz + Math.sin(a) * (R + 0.42), 0, -a, 0);
+  }
+  /* 浮沫 */
+  for (let i = 0; i < 26; i++) {
+    const a = Math.PI + tlR(i * 3.1) * Math.PI;
+    const r = 2.0 + tlR(i * 5.7) * 5.6;
+    b.box('tlFoam', 0.30 + tlR(i * 7.3) * 0.34, 0.02, 0.05,
+      Math.cos(a) * r, TL_GY + 0.35, cz + Math.sin(a) * r);
+  }
+}
+
+/* ---------------- 院外：旗杆石、石狮、竹林、菜地、柴垛、老樟 ---------------- */
+function tlOutdoor(b) {
+  /* 旗杆石两对 */
+  [[-7.6, 18.2], [7.6, 18.2]].forEach(function (q) {
+    b.box('tlStoneL', 1.15, 0.42, 1.15, q[0], TL_GY + 0.21, q[1]);
+    b.box('tlStoneD', 1.35, 0.14, 1.35, q[0], TL_GY + 0.46, q[1]);
+    b.cyl('tlWoodD', 0.15, 0.19, 5.0, 8, q[0], TL_GY + 2.95, q[1]);
+    b.sph('tlWoodD', 0.19, q[0], TL_GY + 5.55, q[1], 1, 1.2, 1);
+  });
+  /* 石狮一对 */
+  [[-6.2, 17.0], [6.2, 17.0]].forEach(function (q) {
+    b.box('tlStoneL', 0.82, 0.50, 1.00, q[0], TL_GY + 0.40, q[1]);
+    b.box('tlStone', 0.56, 0.76, 0.78, q[0], TL_GY + 1.03, q[1] + 0.04);
+    b.sph('tlStone', 0.34, q[0], TL_GY + 1.56, q[1] + 0.16, 1, 1, 1);
+    b.box('tlStoneD', 0.30, 0.14, 0.12, q[0], TL_GY + 1.58, q[1] + 0.44);
+    b.box('tlStoneD', 0.12, 0.10, 0.10, q[0] - 0.11, TL_GY + 1.66, q[1] + 0.40);
+    b.box('tlStoneD', 0.12, 0.10, 0.10, q[0] + 0.11, TL_GY + 1.66, q[1] + 0.40);
+  });
+  /* 东侧竹林 */
+  for (let i = 0; i < 26; i++) {
+    const x = 17.0 + tlR(i * 3.1) * 4.2, z = -12.0 + tlR(i * 5.7) * 24.0;
+    const h = 4.0 + tlR(i * 7.3) * 3.0;
+    b.cyl('tlBamboo', 0.06, 0.07, h, 6, x, TL_GY + h / 2, z);
+    for (let j = 0; j < 4; j++) {
+      const a = tlR(i * 11.7 + j * 3.1) * Math.PI * 2;
+      b.box('tlLeaf1', 0.55, 0.04, 0.12, x + Math.cos(a) * 0.28, TL_GY + h * (0.62 + j * 0.08), z + Math.sin(a) * 0.28, 0, -a, 0.34);
+    }
+  }
+  /* 西侧菜地：畦 + 菜叶点 */
+  for (let i = 0; i < 5; i++) {
+    b.box('tlSoilD', 2.2, 0.16, 1.1, -17.6, TL_GY + 0.08, -10.0 + i * 2.0);
+    for (let j = 0; j < 8; j++) {
+      b.sph('tlLeaf3', 0.18, -18.4 + j * 0.55, TL_GY + 0.24, -10.0 + i * 2.0 + (tlR(j * 3.1 + i) - 0.5) * 0.5, 1.2, 0.8, 1.1);
+    }
+  }
+  /* 柴垛：两堆 */
+  [[-13.2, 12.6], [-14.4, 11.0]].forEach(function (q) {
+    for (let i = 0; i < 7; i++) {
+      b.cyl('tlStraw', 0.10, 0.10, 1.9, 6, q[0] + (i % 3) * 0.22, TL_GY + 0.30 + Math.floor(i / 3) * 0.20, q[1], 0, 0, Math.PI / 2);
+    }
+  });
+  /* 老樟树：东南 */
+  const tx = 13.6, tz = 15.2;
+  b.cyl('tlBark', 0.65, 0.95, 4.6, 12, tx, TL_GY + 2.3, tz);
+  for (let i = 0; i < 5; i++) {
+    const a = i / 5 * Math.PI * 2;
+    b.sph('tlLeaf2', 2.0 - i * 0.15, tx + Math.cos(a) * 1.7, TL_GY + 5.2 + (i % 2) * 0.7, tz + Math.sin(a) * 1.7, 1.15, 0.72, 1.1);
+  }
+  b.sph('tlLeaf2', 1.6, tx, TL_GY + 6.2, tz, 1.1, 0.7, 1.1);
+  /* 院外散石与草丛 */
+  for (let i = 0; i < 14; i++) {
+    const a = tlR(i * 3.7) * Math.PI * 2, r = 18.0 + tlR(i * 5.1) * 3.0;
+    b.sph('tlGrassL', 0.24 + tlR(i * 7.3) * 0.18, Math.cos(a) * r, TL_GY + 0.14, Math.sin(a) * r, 1.3, 0.6, 1.2);
+  }
+}
+
+/* ---------------- 人物 ---------------- */
+function tlPeople(b) {
+  const base = { skin: 'tlSkin', hair: 'tlHair', ink: 'tlInk', belt: 'tlBelt', shoe: 'tlShoe', hat: 'none' };
+  function F(o) {
+    const q = {};
+    for (const k in base) q[k] = base[k];
+    for (const k in o) q[k] = o[k];
+    q.b = b;
+    buildFig(q);
+  }
+  const FY = TL_GY + 0.65;
+  /* 门口晒太阳的老人与挑担汉子 */
+  F({ x: -1.9, y: TL_GY + 0.62, z: 17.6, ry: 0.35, s: 0.95, coat: 'tlRobeA', hat: 'cap', hatKey: 'tlHat' });
+  F({ x: 2.4, y: TL_GY + 0.62, z: 18.6, ry: 2.9, s: 1.0, pose: 'walk', coat: 'tlRobeC' });
+  /* 院内：小孩追鸡、妇人在井边、两人在石桌旁 */
+  F({ x: 5.4, y: FY, z: 4.4, ry: -1.2, s: 0.72, coat: 'tlRobeB' });
+  F({ x: 3.5, y: FY, z: 3.4, ry: 1.9, s: 0.95, coat: 'tlRobeC', hat: 'bun', hatKey: 'tlHair' });
+  F({ x: -3.6, y: FY, z: 3.0, ry: 2.5, s: 0.96, pose: 'sit', coat: 'tlRobeA' });
+  F({ x: -4.8, y: FY, z: 1.6, ry: 0.6, s: 0.96, pose: 'sit', coat: 'tlRobeD' });
+  /* 二层廊上倚栏的妇人 */
+  F({ x: -6.2, y: TL_GY + 0.55 + 3.0 + 0.12, z: 10.2, ry: 0.8, s: 0.92, coat: 'tlRobeB', hat: 'bun', hatKey: 'tlHair' });
+  /* 菜地里的人 */
+  F({ x: -16.8, y: TL_GY + 0.10, z: -3.0, ry: 1.5, s: 0.94, coat: 'tlRobeD' });
+  /* 祠堂前上香 */
+  F({ x: 0.8, y: FY, z: -0.4, ry: 3.1, s: 0.95, coat: 'tlRobeA', hat: 'cap', hatKey: 'tlHat' });
+}
+
+/* ---------------- 匾额 / 灯光 / 总装 ---------------- */
+function tlTextTex(txt) {
+  return canvasTex(512, 128, function (c, w, h) {
+    c.clearRect(0, 0, w, h);
+    c.fillStyle = '#e6c978';
+    c.font = 'bold 78px "KaiTi","STKaiti","Microsoft YaHei",serif';
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    c.fillText(txt, w / 2, h / 2 + 2);
+  });
+}
+
+function tlPlaque(g, txt, x, y, z, w, h) {
+  const tex = tlTextTex(txt);
+  const m = new T.Mesh(new T.PlaneGeometry(w, h), new T.MeshBasicMaterial({
+    map: tex, transparent: true, depthWrite: false
+  }));
+  m.position.set(x, y, z);
+  g.add(m);
+}
+
+function tlLights() {
+  const L = [
+    [0, TL_GY + 5.4, 6.0, 6.5, 12.0],
+    [0, TL_GY + 4.0, 16.0, 4.5, 8.0],
+    [0, TL_GY + 1.6, -3.4, 3.0, 7.0],
+    [9.0, TL_GY + 1.6, 6.0, 2.6, 7.0],
+    [-9.0, TL_GY + 1.6, 6.0, 2.6, 7.0]
+  ];
+  L.forEach(function (q) {
+    const lp = new T.PointLight(0xffd9a8, q[3], q[4], 2);
+    lp.position.set(q[0], q[1], q[2]);
+    scene.add(lp);
+  });
+}
+
+function buildTlAll() {
+  const g = new T.Group();
+  scene.add(g);
+  const b = new Builder();
+
+  tlBase(b);
+  tlOuterWall(b);
+  tlRoof(b, g);
+  tlCloister(b);
+  tlGate(b);
+  tlWindows(b);
+  tlCourtyard(b);
+  tlHalfPond(b);
+  tlOutdoor(b);
+  tlPeople(b);
+
+  b.build(g, {
+    noOutline: ['tlGrass', 'tlGrassL', 'tlLeaf1', 'tlLeaf2', 'tlLeaf3', 'tlFlower',
+      'tlFoam', 'tlChicken', 'tlJar']
+  });
+
+  tlPlaque(g, '承启楼', 0, TL_GY + 0.55 + 4.05, TL_R + 0.37, 2.3, 0.52);
+  tlPlaque(g, '祖堂', 0, TL_GY + 0.65 + 3.55, -3.4 + 2.5 + 0.23, 1.7, 0.42);
+
+  tlLights();
+}
+
   /* ================= 组装 ================= */
   const TOWER = !!PS.tower;
   const STORE = !!PS.store;
   const CLUB = !!PS.club;
   const WRH = !!PS.wh;
-  if (GD) {
+  if (TL) {
+    buildTlAll();
+  } else if (GD) {
     buildGdAll();
   } else if (ML) {
     buildMlAll();
@@ -18637,7 +19110,9 @@ function buildGdAll() {
 
   /* 室内暖光 */
   const LAMPK = cfg(PS.lampK, 1);
-  if (GD) {
+  if (TL) {
+    /* 土楼的暖点光已在 buildTlAll() 内按位置布好 */
+  } else if (GD) {
     /* 园林的暖点光已在 buildGdAll() 内按位置布好 */
   } else if (ML) {
     /* 磨坊的室内暖光已在 buildMlAll() 内按灯位布好 */
@@ -18829,23 +19304,23 @@ function buildGdAll() {
   }
 
   const VEG = PS.veg || {};
-  const willowPos = cfg(VEG.willows, (STORE || CLUB || JD || CYB || KFC || RL || LN || RW || SEC || DK || TV || ML || GD) ? [] : [[4.0, -4.35, 0.95], [-6.5, 1.95, 0.72]]);
+  const willowPos = cfg(VEG.willows, (STORE || CLUB || JD || CYB || KFC || RL || LN || RW || SEC || DK || TV || ML || GD || TL) ? [] : [[4.0, -4.35, 0.95], [-6.5, 1.95, 0.72]]);
   for (let i = 0; i < willowPos.length; i++) {
     scene.add(willow(willowPos[i][0], willowPos[i][1], willowPos[i][2]));
   }
 
-  if (!STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW && !SEC && !DK && !TV && !ML && !GD) {
+  if (!STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW && !SEC && !DK && !TV && !ML && !GD && !TL) {
     boatGroup = buildBoat(5.9, 1.15, Math.PI / 2 + 0.05);
     scene.add(boatGroup);
   }
 
-  const bamPos = cfg(VEG.bamboo, (STORE || CLUB || WRH || JD || CYB || KFC || RL || LN || RW || SEC || DK || TV || ML || GD) ? [] : [[-7.0, -4.6, 1.0], [-6.9, 6.9, 0.75]]);
+  const bamPos = cfg(VEG.bamboo, (STORE || CLUB || WRH || JD || CYB || KFC || RL || LN || RW || SEC || DK || TV || ML || GD || TL) ? [] : [[-7.0, -4.6, 1.0], [-6.9, 6.9, 0.75]]);
   for (let i = 0; i < bamPos.length; i++) scene.add(bamboo(bamPos[i][0], bamPos[i][1], bamPos[i][2]));
-  const potPos = cfg(VEG.pots, (STORE || CLUB || WRH || JD || CYB || KFC || RL || LN || RW || SEC || DK || TV || ML || GD) ? [] : [[1.85, 2.35], [2.1, -2.55]]);
+  const potPos = cfg(VEG.pots, (STORE || CLUB || WRH || JD || CYB || KFC || RL || LN || RW || SEC || DK || TV || ML || GD || TL) ? [] : [[1.85, 2.35], [2.1, -2.55]]);
   for (let i = 0; i < potPos.length; i++) scene.add(pot(potPos[i][0], potPos[i][1]));
 
   /* ================= 招牌 / 布幡 / 晾布 ================= */
-  if (!STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW && !SEC && !DK && !TV && !ML && !GD) {
+  if (!STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW && !SEC && !DK && !TV && !ML && !GD && !TL) {
   const plaqueMat = new T.MeshBasicMaterial({ map: TEX.plaque });
   const psz = cfg(PS.plaqueSize, [1.55, 0.46]);
   const plaque = new T.Mesh(new T.PlaneGeometry(psz[0], psz[1]), plaqueMat);
@@ -18869,7 +19344,7 @@ function buildGdAll() {
     'uniform sampler2D map; varying vec2 vUv;\n' +
     'void main(){ gl_FragColor = texture2D(map, vUv); }';
 
-  if (!TOWER && !STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW && !SEC && !DK && !TV && !ML && !GD) {
+  if (!TOWER && !STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW && !SEC && !DK && !TV && !ML && !GD && !TL) {
   const bannerMat = new T.ShaderMaterial({
     uniforms: { uTime: bannerUni.uTime, uAmp: { value: 0.11 }, map: { value: TEX.banner } },
     vertexShader: clothVert, fragmentShader: clothFrag, side: T.DoubleSide
@@ -18897,14 +19372,14 @@ function buildGdAll() {
     vertexShader: clothVert, fragmentShader: clothFrag, side: T.DoubleSide
   });
   const cloths = [];
-  if (!TOWER && !STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW && !SEC && !DK && !TV && !ML && !GD) for (let i = 0; i < 2; i++) {
+  if (!TOWER && !STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW && !SEC && !DK && !TV && !ML && !GD && !TL) for (let i = 0; i < 2; i++) {
     const c = new T.Mesh(new T.PlaneGeometry(0.7, 1.05, 4, 6), clothMat);
     c.position.set(2.62 + i * 0.86, 1.5 - i * 0.05, -1.95);
     c.rotation.y = -0.04 + i * 0.08;
     scene.add(c);
     cloths.push(c);
   }
-  if (!TOWER && !STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW && !SEC && !DK && !TV && !ML && !GD) (function () {
+  if (!TOWER && !STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW && !SEC && !DK && !TV && !ML && !GD && !TL) (function () {
     const b = new Builder();
     const g = new T.Group();
     b.cyl('woodDark', 0.055, 0.065, 2.15, 6, 2.24, 1.07, -1.95);
@@ -18925,7 +19400,7 @@ function buildGdAll() {
   /* ================= 屋檐铜铃 ================= */
   const bells = [];
   (function () {
-    const pos = (STORE || CLUB || JD || CYB || KFC || RL || LN || RW || SEC || DK || TV || ML || GD) ? [] : cfg(PS.bellPos, [[2.78, 5.86, 3.08], [2.78, 5.86, -3.86], [-5.98, 5.86, 3.08], [-5.98, 5.86, -3.86]]);
+    const pos = (STORE || CLUB || JD || CYB || KFC || RL || LN || RW || SEC || DK || TV || ML || GD || TL) ? [] : cfg(PS.bellPos, [[2.78, 5.86, 3.08], [2.78, 5.86, -3.86], [-5.98, 5.86, 3.08], [-5.98, 5.86, -3.86]]);
     for (let i = 0; i < pos.length; i++) {
       const g = new T.Group();
       g.position.set(pos[i][0], pos[i][1], pos[i][2]);
@@ -18956,7 +19431,7 @@ function buildGdAll() {
     patches.push({ m: p, base: op, x0: x, z0: z });
     return p;
   }
-  if (STORE || CLUB || KFC || RL || LN || RW || SEC || DK || TV || ML || GD) {
+  if (STORE || CLUB || KFC || RL || LN || RW || SEC || DK || TV || ML || GD || TL) {
     // 玻璃幕面，不做木格窗光斑
   } else if (TOWER) {
     addPatch(4.4, 4.4, -2.05 + 3.2, 1.24, -0.2, 0.1, 0.18);
@@ -19020,7 +19495,7 @@ function buildGdAll() {
     smokes.push(new Smoke(-3.10, 2.20, 6.10, 0.70, 5));
   } else if (JD) {
     smokes.push(new Smoke(DHCX + 0.30, DH_RG + 0.92, DW1 - 0.62, 1.15, 7));
-  } else if (!TOWER && !STORE && !CLUB && !WRH && !CYB && !KFC && !RL && !LN && !RW && !SEC && !DK && !TV && !ML && !GD) {
+  } else if (!TOWER && !STORE && !CLUB && !WRH && !CYB && !KFC && !RL && !LN && !RW && !SEC && !DK && !TV && !ML && !GD && !TL) {
     smokes.push(new Smoke(-1.62, FL + 0.88, 0.73, 1.0, 6));
     smokes.push(new Smoke(-3.55, FL + 0.66, -2.3, 1.2, 7));
     smokes.push(new Smoke(2.3, F2 + 0.8, -0.5, 0.9, 5));
