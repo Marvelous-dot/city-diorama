@@ -17249,21 +17249,40 @@ function gdWall(b, key, axis, at, a0, a1, y0, y1, holes, th) {
   return b.add(key, g);
 }
 
-/* 四坡顶（庑殿/歇山近似）：四棱锥 + 正脊 + 檐口。比自定义几何稳，法线不出错 */
+/* 四坡顶：四块薄坡板 + 瓦垄细线。原来是实心四棱锥，檐口厚得像块糕，压得天井透不过气 */
 function gdHipRoof(b, key, keyD, cx, cz, w, d, ye, yr) {
-  const g = new T.CylinderGeometry(0.03, 1, 1, 4, 1);
-  g.rotateY(Math.PI / 4);
-  g.scale(w * 0.74, yr - ye, d * 0.74);
-  g.translate(cx, (ye + yr) / 2, cz);
-  b.add(key, g);
+  const hw = w / 2, hd = d / 2, rise = yr - ye;
+  const slopeD = Math.hypot(hd, rise), angD = Math.atan2(rise, hd);
+  const slopeW = Math.hypot(hw, rise), angW = Math.atan2(rise, hw);
+  /* 前后两坡（沿 x 长） */
+  [-1, 1].forEach(function (s) {
+    b.box(key, w, 0.13, slopeD, cx, ye + rise / 2, cz + s * hd / 2, s * angD, 0, 0);
+    /* 瓦垄：沿坡向的细线，间距 0.34 */
+    const n = Math.max(8, Math.round(w / 0.34));
+    for (let i = 0; i < n; i++) {
+      const x = -w / 2 + (i + 0.5) * w / n;
+      b.box(keyD, 0.035, 0.05, slopeD, cx + x, ye + rise / 2 + 0.07, cz + s * hd / 2, s * angD, 0, 0);
+    }
+  });
+  /* 左右两坡（沿 z 长） */
+  [-1, 1].forEach(function (s) {
+    b.box(key, slopeW, 0.13, d, cx + s * hw / 2, ye + rise / 2, cz, 0, 0, -s * angW);
+    const n = Math.max(6, Math.round(d / 0.34));
+    for (let i = 0; i < n; i++) {
+      const z = -d / 2 + (i + 0.5) * d / n;
+      b.box(keyD, slopeW, 0.05, 0.035, cx + s * hw / 2, ye + rise / 2 + 0.07, cz + z, 0, 0, -s * angW);
+    }
+  });
+  /* 正脊 */
   const alongX = w >= d;
   const len = (alongX ? w : d) * 0.40;
   if (alongX) b.box(keyD, len, 0.17, 0.22, cx, yr + 0.06, cz);
   else b.box(keyD, 0.22, 0.17, len, cx, yr + 0.06, cz);
-  /* 四角起翘：四个檐角各压一小段斜瓦，远看才有江南屋角的味道 */
-  [[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(function (s) {
-    b.box(keyD, 0.55, 0.10, 0.16, cx + s[0] * (w / 2 - 0.18), ye + 0.10, cz + s[1] * (d / 2 - 0.10), 0, s[0] * s[1] * 0.62, 0);
-  });
+  /* 檐口一圈薄压边：代替原来那四根「刀片状」不起翘 */
+  b.box(keyD, w + 0.12, 0.07, 0.16, cx, ye - 0.02, cz - hd);
+  b.box(keyD, w + 0.12, 0.07, 0.16, cx, ye - 0.02, cz + hd);
+  b.box(keyD, 0.16, 0.07, d + 0.12, cx - hw, ye - 0.02, cz);
+  b.box(keyD, 0.16, 0.07, d + 0.12, cx + hw, ye - 0.02, cz);
 }
 
 /* 双坡顶（硬山）：两块斜板 + 正脊，用在门厅、小院 */
@@ -17275,11 +17294,21 @@ function gdGableRoof(b, key, keyD, cx, cz, w, d, ye, yr, axis) {
   if (axis === 'z') {
     [-1, 1].forEach(function (s) {
       b.box(key, w + 0.5, 0.12, slope + 0.15, cx, (ye + yr) / 2, cz + s * span / 4, s * ang, 0, 0);
+      const n = Math.max(6, Math.round((w + 0.5) / 0.34));
+      for (let i = 0; i < n; i++) {
+        b.box(keyD, 0.035, 0.05, slope + 0.15, cx - (w + 0.5) / 2 + (i + 0.5) * (w + 0.5) / n,
+          (ye + yr) / 2 + 0.07, cz + s * span / 4, s * ang, 0, 0);
+      }
     });
     b.box(keyD, w + 0.6, 0.16, 0.22, cx, yr + 0.05, cz);
   } else {
     [-1, 1].forEach(function (s) {
       b.box(key, slope + 0.15, 0.12, d + 0.5, cx + s * span / 4, (ye + yr) / 2, cz, 0, 0, -s * ang);
+      const n = Math.max(6, Math.round((d + 0.5) / 0.34));
+      for (let i = 0; i < n; i++) {
+        b.box(keyD, slope + 0.15, 0.05, 0.035, cx + s * span / 4,
+          (ye + yr) / 2 + 0.07, cz - (d + 0.5) / 2 + (i + 0.5) * (d + 0.5) / n, 0, 0, -s * ang);
+      }
     });
     b.box(keyD, 0.22, 0.16, d + 0.6, cx, yr + 0.05, cz);
   }
@@ -17882,11 +17911,18 @@ function gdGateHall(b) {
 
 /* ---------------- 假山：太湖石（顶点扰动的二十面体） ---------------- */
 function gdRock(b, x, y, z, sx, sy, sz, seed) {
+  /* 细分 2 + 位置相关的连续噪声：细分 3 会变「灰棉花糖」，
+     低模的多面体反而更像石头；噪声按位置连续，才不会撒噪点 */
   const g = new T.IcosahedronGeometry(1, 2);
   const p = g.attributes.position;
   for (let i = 0; i < p.count; i++) {
-    const k = 0.86 + gdR(seed * 7.1 + i * 3.3) * 0.26;
-    p.setXYZ(i, p.getX(i) * k, p.getY(i) * k, p.getZ(i) * k);
+    const vx = p.getX(i), vy = p.getY(i), vz = p.getZ(i);
+    const ang = Math.atan2(vz, vx);
+    const k = 0.90
+      + 0.10 * Math.sin(vx * 6.1 + vy * 4.7 + vz * 6.9 + seed)
+      + 0.06 * Math.sin(vx * 12.7 - vz * 10.9 + seed * 2.1)
+      + 0.035 * Math.cos(ang * 5.0 + seed) * (0.35 + 0.65 * Math.abs(vy));
+    p.setXYZ(i, vx * k, vy * k, vz * k);
   }
   g.computeVertexNormals();
   g.scale(sx, sy, sz);
@@ -17925,29 +17961,40 @@ function gdCave(b, x, y, z, r) {
   b.sph('gdRockD', r * 0.62, x, y, z, 1, 0.80, 0.45);
 }
 function gdHills(b) {
-  /* 四块整石：少而大。多点叠加会露内壁，整块变形又会拉成石柱，四块是最稳的折中 */
+  /* 主峰用「扁平叠石」：六块横向扁石层层收进，
+     这是传统园林叠假山的做法，比一个大球更像太湖石 */
   const HX = -4.5, cz = 12.6;
-  gdRock(b, HX + 2.4, GD_GY + 0.34, cz, 2.30, 0.52, 2.00, 5);
-  gdRock(b, HX + 2.4, GD_GY + 1.62, cz, 1.55, 2.55, 1.35, 1);
-  gdRock(b, HX + 0.3, GD_GY + 0.90, cz + 0.7, 1.60, 1.05, 1.45, 2);
-  gdRock(b, HX + 4.4, GD_GY + 0.85, cz - 0.5, 1.50, 1.00, 1.40, 3);
-  gdRock(b, HX + 2.5, GD_GY + 4.05, cz + 0.1, 0.58, 1.28, 0.52, 4);
-  /* 洞壑：深色凹陷贴在石面上，读出「透」 */
-  gdCave(b, HX + 1.5, GD_GY + 1.10, cz + 1.35, 0.38);
-  gdCave(b, HX + 3.4, GD_GY + 1.55, cz + 1.10, 0.26);
+  [
+    [HX + 2.4, 0.55, cz + 0.05, 2.45, 0.55, 2.05, 1],
+    [HX + 2.1, 1.28, cz + 0.18, 2.05, 0.50, 1.72, 2],
+    [HX + 2.7, 1.98, cz - 0.10, 1.72, 0.48, 1.42, 3],
+    [HX + 2.3, 2.60, cz + 0.12, 1.32, 0.44, 1.12, 4],
+    [HX + 2.6, 3.18, cz - 0.05, 0.92, 0.40, 0.80, 5],
+    [HX + 2.4, 3.68, cz + 0.02, 0.56, 0.38, 0.50, 6]
+  ].forEach(function (q) {
+    gdRock(b, q[0], GD_GY + q[1], q[2], q[3], q[4], q[5], q[6]);
+  });
+  /* 洞壑：扁石之间留缝，缝口压深色 */
+  gdCave(b, HX + 1.6, GD_GY + 0.95, cz + 1.55, 0.36);
+  gdCave(b, HX + 3.3, GD_GY + 1.45, cz + 1.20, 0.24);
+  /* 苔藓 */
   for (let i = 0; i < 10; i++) {
     const a = gdR(i * 3.1) * Math.PI * 2;
-    const r = 0.5 + gdR(i * 5.7) * 1.4;
+    const r = 0.5 + gdR(i * 5.7) * 1.3;
     b.sph('gdGrassL', 0.30 + gdR(i * 7.3) * 0.22,
-      HX + 2.4 + Math.cos(a) * r, GD_GY + 2.1 + gdR(i * 9.1) * 1.6,
-      cz + Math.sin(a) * r * 0.7, 1.3, 0.30, 1.1);
+      HX + 2.4 + Math.cos(a) * r, GD_GY + 1.7 + gdR(i * 9.1) * 1.8,
+      cz + Math.sin(a) * r * 0.7, 1.3, 0.28, 1.1);
   }
+  /* 上山步道 */
   for (let i = 0; i < 6; i++) {
     b.box('gdStoneL', 0.95, 0.16, 0.52,
-      0.9 - i * 0.26, GD_GY + 0.28 + i * 0.40, 11.0 + i * 0.26, 0, -0.55, 0);
+      0.9 - i * 0.24, GD_GY + 0.28 + i * 0.38, 11.0 + i * 0.26, 0, -0.55, 0);
   }
-  gdRock(b, -9.0, GD_GY + 0.85, 1.0, 1.30, 1.05, 1.10, 11);
-  gdRock(b, -8.5, GD_GY + 1.85, 0.7, 0.70, 0.95, 0.62, 12);
+  /* 次峰：三块扁石 */
+  gdRock(b, -9.0, GD_GY + 0.55, 1.0, 1.45, 0.55, 1.20, 11);
+  gdRock(b, -8.8, GD_GY + 1.15, 0.9, 1.00, 0.45, 0.85, 12);
+  gdRock(b, -8.9, GD_GY + 1.68, 1.0, 0.62, 0.40, 0.55, 13);
+  /* 池边立峰 */
   gdRock(b, -4.8, GD_GY + 1.30, 10.0, 0.60, 1.30, 0.55, 21);
   gdRock(b, 13.2, GD_GY + 1.00, 11.2, 0.52, 1.00, 0.48, 22);
   gdRock(b, -4.3, GD_GY + 1.05, -6.4, 0.48, 1.10, 0.46, 23);
@@ -17991,7 +18038,8 @@ function gdHall(b, cx, cz, w, d, h) {
   b.box('gdWall', 0.28, h, d, cx - w / 2 + 0.14, FY + h / 2, cz);
   b.box('gdWall', 0.28, h, d, cx + w / 2 - 0.14, FY + h / 2, cz);
   gdScreen(b, cx, FY, cz + d / 2 - 0.05, w - 0.8, h - 0.6, 0);
-  if (w >= 7.0) gdHipRoof(b, 'gdTile', 'gdRidge', cx, cz, w + 0.9, d + 0.9, FY + h, FY + h + 2.1);
+  /* 正厅靠「更高的脊 + 更宽的檐」突出主次；四坡薄板在角部会叠出双坡 */
+  if (w >= 7.0) gdGableRoof(b, 'gdTile', 'gdRidge', cx, cz, w + 1.0, d + 1.0, FY + h, FY + h + 2.2, 'z');
   else gdGableRoof(b, 'gdTile', 'gdRidge', cx, cz, w + 0.7, d + 0.7, FY + h, FY + h + 1.5, 'z');
   b.box('gdSignBox', 1.6, 0.42, 0.10, cx, FY + h - 0.45, cz + d / 2 + 0.12);
   b.box('gdWoodD', Math.min(2.6, w - 1.2), 0.12, 0.9, cx, FY + 0.76, cz - d / 2 + 0.9);
@@ -18367,8 +18415,8 @@ function gdPlants(b) {
   gdPlum(b, 15.2, 1.2, 0.95);
   gdPlum(b, 15.4, 7.4, 0.88);
   gdPlum(b, 13.2, 12.6, 0.80);
-  /* 假山顶一株黑松 */
-  gdPine(b, -0.4, 11.9, 1.05);
+  /* 黑松种在假山东侧地面，别插进山体 */
+  gdPine(b, 2.4, 10.2, 0.95);
   /* 荷花：岛周与池北，成簇不成排 */
   for (let i = 0; i < 26; i++) {
     const a = gdR(i * 2.9) * Math.PI * 2;
@@ -18398,10 +18446,10 @@ function gdPlants(b) {
     b.box(i % 3 ? 'gdGrassL' : 'gdGrass', 0.16 + gdR(i * 5.1) * 0.12, 0.14, 0.16,
       x, GD_GY + 0.07, z, 0, gdR(i * 7.3) * 1.2, 0);
   }
-  /* 南岸与东院的点景石 */
-  for (let i = 0; i < 8; i++) {
-    gdRock(b, -8.0 + gdR(i * 3.1) * 4.0, GD_GY + 0.24, 12.2 + gdR(i * 5.7) * 1.8,
-      0.42 + gdR(i * 7.3) * 0.30, 0.30 + gdR(i * 9.1) * 0.24, 0.40, 30 + i);
+  /* 池西南岸的点景石：贴着岸线放，不要散在假山脚下 */
+  for (let i = 0; i < 4; i++) {
+    gdRock(b, -7.2 - i * 0.9, GD_GY + 0.20, 9.6 - i * 0.7,
+      0.38 + gdR(i * 7.3) * 0.22, 0.26 + gdR(i * 9.1) * 0.18, 0.34, 30 + i);
   }
   gdRock(b, 13.6, GD_GY + 0.80, 3.4, 0.55, 1.10, 0.52, 44);
   gdRock(b, 15.4, GD_GY + 0.55, 10.4, 0.42, 0.75, 0.40, 45);
