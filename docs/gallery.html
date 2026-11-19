@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>城市微缩 · 在线演示</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --ink: #e9efe9;
+    --dim: #93a39a;
+    --line: rgba(160, 200, 180, 0.16);
+    --card: rgba(18, 30, 26, 0.72);
+    --gold: #d8b35e;
+  }
+  html { background: #08110e; }
+  body {
+    min-height: 100vh;
+    font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    color: var(--ink);
+    background:
+      radial-gradient(120% 80% at 18% 0%, #17302a 0%, #0d1a16 42%, #08110e 100%),
+      #08110e;
+    padding: 56px 28px 72px;
+  }
+  body::before {
+    content: "";
+    position: fixed; inset: 0; pointer-events: none;
+    background-image:
+      linear-gradient(var(--line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--line) 1px, transparent 1px);
+    background-size: 64px 64px;
+    mask-image: radial-gradient(90% 70% at 50% 30%, #000 0%, transparent 78%);
+    opacity: 0.55;
+  }
+  .wrap { position: relative; max-width: 1180px; margin: 0 auto; }
+  header { margin-bottom: 40px; }
+  .kicker {
+    font-size: 12px; letter-spacing: 0.34em; color: var(--gold);
+    text-transform: uppercase; margin-bottom: 14px;
+  }
+  h1 {
+    font-size: clamp(28px, 4vw, 46px); font-weight: 600; letter-spacing: 0.02em;
+    line-height: 1.24;
+  }
+  h1 em { font-style: normal; color: var(--gold); }
+  .lede {
+    margin-top: 14px; max-width: 640px; color: var(--dim);
+    font-size: 15px; line-height: 1.8;
+  }
+  .grid {
+    display: grid; gap: 22px;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  }
+  a.card {
+    display: block; text-decoration: none; color: inherit;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 14px; overflow: hidden;
+    backdrop-filter: blur(6px);
+    transition: transform .28s ease, border-color .28s ease, box-shadow .28s ease;
+  }
+  a.card:hover {
+    transform: translateY(-5px);
+    border-color: rgba(216, 179, 94, 0.55);
+    box-shadow: 0 18px 42px rgba(0, 0, 0, 0.5);
+  }
+  .shot {
+    position: relative; aspect-ratio: 16 / 10; overflow: hidden;
+    background: #0d1a16;
+  }
+  .shot img {
+    width: 100%; height: 100%; object-fit: cover; display: block;
+    transition: transform .5s ease;
+  }
+  a.card:hover .shot img { transform: scale(1.035); }
+  .shot::after {
+    content: ""; position: absolute; inset: 0;
+    background: linear-gradient(to top, rgba(8, 17, 14, 0.75), transparent 46%);
+  }
+  .meta { padding: 16px 18px 18px; }
+  .meta h2 { font-size: 17px; font-weight: 600; letter-spacing: 0.01em; }
+  .meta p { margin-top: 7px; font-size: 13px; line-height: 1.7; color: var(--dim); }
+  .tags { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; }
+  .tags span {
+    font-size: 11px; letter-spacing: 0.06em; color: #a9c0b4;
+    border: 1px solid rgba(169, 192, 180, 0.26); border-radius: 999px;
+    padding: 3px 9px;
+  }
+  footer {
+    margin-top: 46px; padding-top: 20px; border-top: 1px solid var(--line);
+    color: var(--dim); font-size: 12.5px; line-height: 1.9;
+  }
+  footer a { color: var(--gold); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="kicker">Miniature Scenes · 21 套形制 / 12 个在线演示</div>
+    <h1>城市微缩<br><em>一砖一瓦，都有来处</em></h1>
+    <p class="lede">
+      单文件 HTML 生成的 3D 微缩场景：从江南园林、福建土楼、丽江古城，到霓虹横丁与工厂废墟。
+      每个都是自包含页面，可拖拽旋转、滚轮缩放，没有外部依赖。
+    </p>
+  </header>
+
+  <main class="grid">
+    <a class="card" href="garden.html">
+      <div class="shot"><img src="screenshots/garden.png" alt="苏州园林"></div>
+      <div class="meta">
+        <h2>苏州园林 · 一池三山</h2>
+        <p>68×52 米大宅园：西花园、主园池亭、东宅四进、东路花厅、北后园与南前庭。</p>
+        <div class="tags"><span>九景区</span><span>薄屋顶瓦垄</span><span>扁石叠峰</span></div>
+      </div>
+    </a>
+
+    <a class="card" href="tulou.html">
+      <div class="shot"><img src="screenshots/tulou.png" alt="福建土楼"></div>
+      <div class="meta">
+        <h2>福建土楼 · 承启楼</h2>
+        <p>外径 30.4 米的圆形夯土巨构：四层 36 开间环廊、环形双坡瓦顶、内院祠堂与半月池。</p>
+        <div class="tags"><span>圆形巨构</span><span>四层环廊</span><span>环形瓦顶</span></div>
+      </div>
+    </a>
+
+    <a class="card" href="lijiang.html">
+      <div class="shot"><img src="screenshots/lijiang.png" alt="丽江古城"></div>
+      <div class="meta">
+        <h2>丽江古城 · 四方街</h2>
+        <p>56×44 米河街并行：玉河贯城、三座石桥、骑楼店铺、木府三进、双水车与垂柳。</p>
+        <div class="tags"><span>街区尺度</span><span>河街并行</span><span>五花石</span></div>
+      </div>
+    </a>
+
+    <a class="card" href="tavern.html">
+      <div class="shot"><img src="screenshots/tavern.png" alt="醉仙楼"></div>
+      <div class="meta">
+        <h2>醉仙楼 · 三层酒肆</h2>
+        <p>临街三层木楼，剖开一面墙看进去：柜台、酒坛、楼梯与二楼雅座。</p>
+        <div class="tags"><span>剖切</span><span>三层楼</span><span>市井</span></div>
+      </div>
+    </a>
+
+    <a class="card" href="mill.html">
+      <div class="shot"><img src="screenshots/mill.png" alt="水车磨坊"></div>
+      <div class="meta">
+        <h2>水车磨坊 · 溪畔</h2>
+        <p>溪边木构磨坊与转动的水车，齿轮、石磨与水槽都能看清。</p>
+        <div class="tags"><span>机械</span><span>水景</span><span>转动</span></div>
+      </div>
+    </a>
+
+    <a class="card" href="lantern.html">
+      <div class="shot"><img src="screenshots/lantern.png" alt="上元灯会"></div>
+      <div class="meta">
+        <h2>千灯 · 上元灯会</h2>
+        <p>上元夜的灯街与石桥，数百盏灯连成暖色长廊，水面映着灯影。</p>
+        <div class="tags"><span>夜景</span><span>灯会</span><span>倒影</span></div>
+      </div>
+    </a>
+
+    <a class="card" href="ruin.html">
+      <div class="shot"><img src="screenshots/ruin.png" alt="废墟春回"></div>
+      <div class="meta">
+        <h2>废墟 · 春回</h2>
+        <p>塌了半边的厂房，钢筋外露、野花从裂缝里长出来，时间感很强。</p>
+        <div class="tags"><span>废墟</span><span>叙事</span><span>植被</span></div>
+      </div>
+    </a>
+
+    <a class="card" href="section.html">
+      <div class="shot"><img src="screenshots/section.png" alt="城市剖面"></div>
+      <div class="meta">
+        <h2>城市剖面</h2>
+        <p>一栋楼纵向剖开：每层的房间、楼道、家具与生活痕迹一次看穿。</p>
+        <div class="tags"><span>剖面</span><span>多层</span><span>生活切片</span></div>
+      </div>
+    </a>
+
+    <a class="card" href="desk.html">
+      <div class="shot"><img src="screenshots/desk.png" alt="桌面上的世界"></div>
+      <div class="meta">
+        <h2>桌面上的世界</h2>
+        <p>把一座小城放在书桌上：显示器、键盘、咖啡杯之间，藏着一片街区。</p>
+        <div class="tags"><span>奇趣</span><span>尺度反差</span><span>室内</span></div>
+      </div>
+    </a>
+
+    <a class="card" href="rainlake.html">
+      <div class="shot"><img src="screenshots/rainlake.png" alt="寒江雪"></div>
+      <div class="meta">
+        <h2>寒江雪 · 孤舟独钓</h2>
+        <p>水墨式的雪江：一叶孤舟、一件蓑衣、两岸留白，最省笔墨的一张。</p>
+        <div class="tags"><span>水墨</span><span>雪景</span><span>极简</span></div>
+      </div>
+    </a>
+
+    <a class="card" href="kfc.html">
+      <div class="shot"><img src="screenshots/kfc.png" alt="得来速"></div>
+      <div class="meta">
+        <h2>肯德基 · 得来速店</h2>
+        <p>现代商业建筑微缩：红色招牌、车道雨棚、停车场与外卖窗口。</p>
+        <div class="tags"><span>现代</span><span>商业</span><span>夜景</span></div>
+      </div>
+    </a>
+
+    <a class="card" href="index.html">
+      <div class="shot"><img src="screenshots/city.png" alt="霓虹日本街"></div>
+      <div class="meta">
+        <h2>霓虹 · 日本街</h2>
+        <p>竖向霓虹街：密集招牌、雨棚、电线与湿漉漉的路面，赛博感最重的一张。</p>
+        <div class="tags"><span>霓虹</span><span>竖向街</span><span>雨夜</span></div>
+      </div>
+    </a>
+  </main>
+
+  <footer>
+    21 套形制全部由 <code>src/presets.js</code> 的参数驱动，跑 <code>node build.js &lt;id&gt;</code> 生成单文件 HTML。<br>
+    源码与构建方式见 <a href="https://github.com/Marvelous-dot/city-diorama">GitHub 仓库</a>。
+  </footer>
+</div>
+</body>
+</html>

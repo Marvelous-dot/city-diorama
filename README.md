@@ -46,6 +46,8 @@
 >
 > 水车磨坊 · 溪畔：`https://marvelous-dot.github.io/city-diorama/mill.html`
 >
+> 总览（12 个在线演示）：`https://marvelous-dot.github.io/city-diorama/gallery.html`
+>
 > 苏州园林 · 一池三山：`https://marvelous-dot.github.io/city-diorama/garden.html`
 >
 > 福建土楼 · 承启楼：`https://marvelous-dot.github.io/city-diorama/tulou.html`
