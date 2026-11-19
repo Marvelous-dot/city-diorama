@@ -1452,6 +1452,52 @@
       },
       veg: { willows: [], bamboo: [], pots: [] },
       cam: { theta: 0.95, phi: 1.06, dist: 68, target: [-3.00, 3.50, 0.00] }
+    },
+
+    /* ---------------------------------------------------------
+       悬空寺 · 恒山（第 22 套：垂直崖壁 + 贴壁楼阁，56×40 米）
+       --------------------------------------------------------- */
+    xuankong: {
+      id: 'xuankong',
+      title: '悬空寺 · 恒山',
+      xuankong: true,
+      figStyle: 'voxel',
+      emis: 1.0,
+      lampK: 1.0,
+      sky: ['#eef2ee', '#dbe4dc', '#c5d0c6', '#93a08e'],
+      vig: 'rgba(40,50,44,0.24)',
+      shadowSpan: 30.0,
+      shadowFar: 180,
+      palette: {
+        /* 岩壁：三阶暖灰 + 裂缝 + 苔 */
+        xsRock: 0x7f7566, xsRockD: 0x5e564b, xsRockL: 0x968b7b, xsCrack: 0x38332c,
+        xsMoss: 0x4a6b3a, xsPine: 0x3f5c33, xsGrass: 0x5c7f3c, xsBark: 0x5e4a34,
+        /* 土 / 石 */
+        xsSoil: 0x8d7556, xsSoilD: 0x63513c, xsBaseD: 0x4a4236,
+        xsGravel: 0xa89c88, xsPath: 0xb3a795,
+        xsStone: 0xa9a496, xsStoneD: 0x7d796c, xsStoneL: 0xc9c4b4,
+        /* 木作 / 瓦 / 墙 */
+        xsWood: 0x9a7048, xsWoodD: 0x63432a, xsWoodR: 0x8e3f2e, xsBeam: 0x5a3c26,
+        xsTile: 0x5a625e, xsTileD: 0x3f4744, xsRidge: 0x333a37,
+        xsWall: 0xe8e2d4, xsDoor: 0x6d4528, xsLattice: 0x6a4526,
+        /* 匾 / 灯 / 铜 */
+        xsSign: 0x241a12, xsGold: 0xd8b35e, xsLantern: 0xc04a26, xsBronze: 0x6b6a4a,
+        /* 水 */
+        xsRiverBed: 0x3a4a46, xsWaterD: 0x4a7a72, xsFoam: 0xeef9f3,
+        /* 积木人 */
+        xsSkin: 0xe8bd9a, xsHair: 0x2e2823, xsInk: 0x241f1a,
+        xsBelt: 0x4a4238, xsShoe: 0x332c24, xsHat: 0x2a241e,
+        xsRobeA: 0x4e6b78, xsRobeB: 0x9a4638, xsRobeC: 0x6f6a8c, xsRobeD: 0x3f5a48
+      },
+      emit: {},
+      light: {
+        sun:  { color: 0xfff4e0, i: 1.70, pos: [22.0, 34.0, 18.0] },
+        fill: { color: 0xb8cfe0, i: 0.62, pos: [-20.0, 16.0, -14.0] },
+        hemi: { sky: 0xe8ecdf, ground: 0x5c6a4c, i: 0.68 },
+        amb:  { color: 0xb0b8b0, i: 0.30 }
+      },
+      veg: { willows: [], bamboo: [], pots: [] },
+      cam: { theta: 0.72, phi: 1.10, dist: 66, target: [0.00, 11.00, -5.00] }
     }
   };
 });
