@@ -19295,46 +19295,103 @@ function ljHouse(b, x, z, ry) {
   b.cyl('ljStoneD', 0.40, 0.36, 0.62, 12, pj[0], FY + 0.31, pj[1]);
 }
 
-/* ---------------- 木府：三进院落 + 牌坊 ---------------- */
+/* ---------------- 木府：牌坊 + 三进院落 + 东西廊 ---------------- */
 function ljMansion(b) {
   const CX = -16.0, FY = LJ_GY + 0.30;
-  /* 牌坊（最南） */
-  b.box('ljStoneL', 5.4, 0.30, 2.2, CX, LJ_GY + 0.15, 16.6);
-  [-2.4, 2.4].forEach(function (s) {
-    b.cyl('ljWoodD', 0.20, 0.22, 5.2, 8, CX + s, FY + 2.6, 16.6);
+
+  /* 牌坊：单间两柱，重檐瓦顶（三间四柱在低模下接不实） */
+  const PZ = 18.6;
+  [-2.6, 2.6].forEach(function (dx) {
+    b.cyl('ljStoneD', 0.36, 0.42, 0.52, 8, CX + dx, LJ_GY + 0.26, PZ);
+    b.cyl('ljWoodD', 0.26, 0.28, 5.0, 8, CX + dx, LJ_GY + 2.98, PZ);
+    /* 抱鼓石 */
+    b.box('ljStoneL', 0.55, 0.45, 0.95, CX + dx, LJ_GY + 0.24, PZ + 0.55);
   });
-  b.box('ljWoodD', 5.6, 0.26, 0.26, CX, FY + 4.9, 16.6);
-  b.box('ljTile', 6.4, 0.14, 1.2, CX, FY + 5.10, 16.6);
-  b.box('ljRidge', 6.5, 0.12, 0.18, CX, FY + 5.24, 16.6);
-  b.box('ljSign', 2.6, 0.52, 0.12, CX, FY + 4.30, 16.6 + 0.16);
-  /* 三进厅堂 */
-  function hall(cz, w, d, h) {
-    b.box('ljStoneL', w + 1.0, 0.34, d + 1.0, CX, LJ_GY + 0.17, cz);
-    b.box('ljStoneL', w + 0.9, 0.06, d + 0.9, CX, LJ_GY + 0.37, cz);
+  b.box('ljWoodD', 6.0, 0.30, 0.34, CX, LJ_GY + 5.32, PZ);
+  b.box('ljWoodD', 5.2, 0.16, 0.26, CX, LJ_GY + 4.74, PZ);
+  /* 双坡瓦顶 */
+  /* 牌坊顶直接调硬山函数：手拼双坡的尺寸/角度很难一次对准 */
+  gdGableRoof(b, 'ljTile', 'ljRidge', CX, PZ, 7.0, 2.5, LJ_GY + 4.75, LJ_GY + 5.75, 'z');
+  b.box('ljSign', 2.6, 0.62, 0.12, CX, LJ_GY + 4.90, PZ + 0.19);
+  b.box('ljGold', 2.72, 0.05, 0.14, CX, LJ_GY + 5.22, PZ + 0.19);
+  /* 石狮 */
+  [[-4.4, 17.9], [4.4, 17.9]].forEach(function (q) {
+    b.box('ljStoneL', 0.78, 0.46, 0.92, CX + q[0], LJ_GY + 0.25, q[1]);
+    b.box('ljStone', 0.50, 0.70, 0.70, CX + q[0], LJ_GY + 0.83, q[1] + 0.04);
+    b.sph('ljStone', 0.30, CX + q[0], LJ_GY + 1.31, q[1] + 0.15, 1, 1, 1);
+  });
+
+  /* 厅堂：门厅低、仪门中、正殿高，间距 7 米 */
+  function hall(cz, w, d, h, tier) {
+    const base = LJ_GY + 0.14 * tier;
+    b.box('ljStoneL', w + 1.0, 0.34, d + 1.0, CX, base + 0.17, cz);
+    b.box('ljStoneL', w + 0.92, 0.06, d + 0.92, CX, base + 0.37, cz);
+    const FYh = base + 0.40;
     [[-w / 2, -d / 2], [w / 2, -d / 2], [-w / 2, d / 2], [w / 2, d / 2]].forEach(function (q) {
-      b.cyl('ljWoodD', 0.15, 0.16, h, 8, CX + q[0], FY + h / 2, cz + q[1]);
+      b.cyl('ljWoodD', 0.16, 0.17, h, 8, CX + q[0], FYh + h / 2, cz + q[1]);
+      b.cyl('ljStoneD', 0.24, 0.26, 0.16, 8, CX + q[0], FYh + 0.08, cz + q[1]);
     });
-    b.box('ljWall', w, h, 0.30, CX, FY + h / 2, cz - d / 2 + 0.15);
-    b.box('ljWall', 0.30, h, d, CX - w / 2 + 0.15, FY + h / 2, cz);
-    b.box('ljWall', 0.30, h, d, CX + w / 2 - 0.15, FY + h / 2, cz);
+    /* 三面墙 */
+    b.box('ljWall', w, h, 0.30, CX, FYh + h / 2, cz - d / 2 + 0.15);
+    b.box('ljWall', 0.30, h, d, CX - w / 2 + 0.15, FYh + h / 2, cz);
+    b.box('ljWall', 0.30, h, d, CX + w / 2 - 0.15, FYh + h / 2, cz);
+    /* 前檐格扇：三间 */
     for (let i = 0; i < 3; i++) {
-      b.box('ljLattice', w / 3 - 0.28, h - 0.9, 0.08, CX - w / 2 + (i + 0.5) * w / 3, FY + (h - 0.9) / 2 + 0.2, cz + d / 2 - 0.08);
+      b.box('ljLattice', w / 3 - 0.28, h - 0.9, 0.08,
+        CX - w / 2 + (i + 0.5) * w / 3, FYh + (h - 0.9) / 2 + 0.15, cz + d / 2 - 0.08);
+      b.box('ljWoodD', w / 3 - 0.28, 0.10, 0.12,
+        CX - w / 2 + (i + 0.5) * w / 3, FYh + h - 0.72, cz + d / 2 - 0.08);
     }
-    gdGableRoof(b, 'ljTile', 'ljRidge', CX, cz, w + 0.7, d + 0.7, FY + h, FY + h + 1.7, 'z');
-    b.box('ljSign', w * 0.42, 0.48, 0.10, CX, FY + h - 0.55, cz + d / 2 + 0.16);
+    /* 额枋 */
+    b.box('ljWoodD', w + 0.15, 0.24, 0.22, CX, FYh + h - 0.12, cz + d / 2);
+    /* 屋顶：正殿（tier 2）脊更高 */
+    gdGableRoof(b, 'ljTile', 'ljRidge', CX, cz, w + 0.7, d + 0.7, FYh + h, FYh + h + (tier === 2 ? 2.1 : 1.5), 'z');
+    /* 匾 */
+    b.box('ljSign', w * 0.36, 0.44, 0.10, CX, FYh + h - 0.52, cz + d / 2 + 0.14);
+    /* 台阶三级 */
+    for (let i = 0; i < 3; i++) {
+      b.box('ljStoneL', 3.2, 0.15, 0.42, CX, base + 0.30 - i * 0.13, cz + d / 2 + 0.85 + i * 0.40);
+    }
+    return FYh;
   }
-  hall(12.6, 8.0, 4.4, 4.0);    // 大门厅
-  hall(6.6, 9.0, 4.8, 4.6);     // 仪门
-  hall(-0.6, 10.0, 5.4, 5.2);   // 正殿
-  /* 后院小园 */
-  b.box('ljStoneD', 6.0, 0.30, 4.2, CX, LJ_GY - 0.12, -7.4);
-  b.box('ljWaterD', 5.6, 0.06, 3.8, CX, LJ_WY, -7.4);
-  b.sph('ljLeaf2', 1.1, CX - 2.6, FY + 1.6, -8.6, 1.2, 0.8, 1.1);
-  b.sph('ljLeaf2', 0.9, CX + 2.4, FY + 1.4, -6.4, 1.1, 0.75, 1.0);
-  /* 院墙：东西两道 */
-  [-6.4, 6.4].forEach(function (dx) {
-    b.box('ljWall', 0.26, 3.2, 22.0, CX + dx, LJ_GY + 1.6, 4.0);
+  hall(13.8, 8.0, 4.0, 3.6, 0);
+  hall(6.0, 8.6, 4.4, 4.2, 1);
+  hall(-2.0, 10.0, 5.2, 5.2, 2);
+
+  /* 东西廊：连接三进，单坡顶 */
+  [-1, 1].forEach(function (s) {
+    const x = CX + s * 5.6;
+    b.box('ljStoneL', 2.2, 0.24, 13.0, x, LJ_GY + 0.12, 5.6);
+    for (let i = 0; i < 7; i++) {
+      b.cyl('ljWoodD', 0.12, 0.13, 2.9, 8, x + s * 0.8, LJ_GY + 1.45, -0.6 + i * 2.1);
+    }
+    b.box('ljTile', 1.8, 0.12, 13.2, x, LJ_GY + 3.05, 5.6, 0, 0, s * 0.11);
+    b.box('ljWoodR', 0.10, 0.06, 13.0, x - s * 0.95, LJ_GY + 1.30, 5.6);
   });
+
+  /* 院墙 + 月洞门：两进之间 */
+  [[9.9, 1.15], [2.3, 1.05]].forEach(function (q) {
+    const cz = q[0], r = q[1];
+    b.box('ljWall', 12.0, 3.0, 0.26, CX, LJ_GY + 1.50, cz - 2.2, 0, 0, 0);
+    b.box('ljWall', 12.0, 3.0, 0.26, CX, LJ_GY + 1.50, cz + 2.2, 0, 0, 0);
+    b.box('ljWall', 2.6, 1.30, 0.26, CX - 4.7, LJ_GY + 0.65, cz);
+    b.box('ljWall', 2.6, 1.30, 0.26, CX + 4.7, LJ_GY + 0.65, cz);
+    b.box('ljWall', 2.6, 0.95, 0.26, CX - 4.7, LJ_GY + 2.52, cz);
+    b.box('ljWall', 2.6, 0.95, 0.26, CX + 4.7, LJ_GY + 2.52, cz);
+    b.box('ljTile', 12.4, 0.12, 0.46, CX, LJ_GY + 3.06, cz);
+  });
+
+  /* 后院：水池 + 石桥 + 小亭 */
+  b.box('ljStoneD', 6.4, 0.32, 4.6, CX, LJ_GY - 0.13, -8.6);
+  b.box('ljWaterD', 6.0, 0.06, 4.2, CX, LJ_GY + 0.12, -8.6);
+  b.box('ljStoneL', 1.2, 0.16, 4.6, CX, LJ_GY + 0.20, -8.6);
+  b.cyl('ljStoneL', 1.3, 1.4, 0.34, 8, CX - 3.4, LJ_GY + 0.17, -10.6);
+  for (let i = 0; i < 4; i++) {
+    const a = i / 4 * Math.PI * 2 + Math.PI / 4;
+    b.cyl('ljWoodD', 0.09, 0.10, 2.0, 6, CX - 3.4 + Math.cos(a) * 1.0, LJ_GY + 1.34, -10.6 + Math.sin(a) * 1.0);
+  }
+  b.box('ljTile', 2.6, 0.12, 2.6, CX - 3.4, LJ_GY + 2.40, -10.6);
+  b.sph('ljLeaf2', 0.95, CX + 3.6, LJ_GY + 1.5, -10.2, 1.15, 0.8, 1.1);
 }
 
 /* ---------------- 大水车：两座，可转 ---------------- */
