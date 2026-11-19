@@ -18554,7 +18554,7 @@ function gdPaving(g) {
 function gdTextTex(txt) {
   return canvasTex(512, 128, function (c, w, h) {
     c.clearRect(0, 0, w, h);
-    c.fillStyle = '#e6c978';
+    c.fillStyle = '#f2d88e';
     c.font = 'bold 82px "KaiTi","STKaiti","Microsoft YaHei",serif';
     c.textAlign = 'center';
     c.textBaseline = 'middle';
@@ -19078,7 +19078,7 @@ function tlPeople(b) {
 function tlTextTex(txt) {
   return canvasTex(512, 128, function (c, w, h) {
     c.clearRect(0, 0, w, h);
-    c.fillStyle = '#e6c978';
+    c.fillStyle = '#f2d88e';
     c.font = 'bold 78px "KaiTi","STKaiti","Microsoft YaHei",serif';
     c.textAlign = 'center';
     c.textBaseline = 'middle';
@@ -19444,9 +19444,9 @@ function ljMansion(b) {
   b.box('ljWoodD', 5.2, 0.16, 0.26, CX, LJ_GY + 4.74, PZ);
   /* 双坡瓦顶 */
   /* 牌坊顶直接调硬山函数：手拼双坡的尺寸/角度很难一次对准 */
-  gdGableRoof(b, 'ljTile', 'ljRidge', CX, PZ, 7.0, 2.5, LJ_GY + 4.75, LJ_GY + 5.75, 'z');
-  b.box('ljSign', 2.6, 0.62, 0.12, CX, LJ_GY + 4.90, PZ + 0.19);
-  b.box('ljGold', 2.72, 0.05, 0.14, CX, LJ_GY + 5.22, PZ + 0.19);
+  gdGableRoof(b, 'ljTile', 'ljRidge', CX, PZ, 7.0, 2.5, LJ_GY + 5.15, LJ_GY + 6.15, 'z');
+  b.box('ljSign', 2.9, 0.66, 0.12, CX, LJ_GY + 4.18, PZ + 0.20);
+  b.box('ljGold', 3.02, 0.05, 0.14, CX, LJ_GY + 4.48, PZ + 0.20);
   /* 石狮 */
   [[-4.4, 17.9], [4.4, 17.9]].forEach(function (q) {
     b.box('ljStoneL', 0.78, 0.46, 0.92, CX + q[0], LJ_GY + 0.25, q[1]);
@@ -19592,23 +19592,29 @@ function ljPeople(b) {
 /* ---------------- 匾额 / 灯光 / 总装 ---------------- */
 function ljTextTex(txt) {
   return canvasTex(512, 128, function (c, w, h) {
-    c.clearRect(0, 0, w, h);
-    c.fillStyle = '#e6c978';
-    c.font = 'bold 76px "KaiTi","STKaiti","Microsoft YaHei",serif';
+    /* 不透明深底 + 金框 + 金字：透明底在 headless 下容易整块不见 */
+    c.fillStyle = '#17110c';
+    c.fillRect(0, 0, w, h);
+    c.strokeStyle = '#d8b35e';
+    c.lineWidth = 7;
+    c.strokeRect(10, 10, w - 20, h - 20);
+    c.fillStyle = '#f2d88e';
+    c.font = 'bold 88px "Microsoft YaHei","SimHei",sans-serif';
     c.textAlign = 'center';
     c.textBaseline = 'middle';
-    c.fillText(txt, w / 2, h / 2 + 2);
+    c.fillText(txt, w / 2, h / 2 + 3);
   });
 }
 
 function ljPlaque(g, txt, x, y, z, w, h, ry) {
   const tex = ljTextTex(txt);
+  tex.needsUpdate = true;
   const m = new T.Mesh(new T.PlaneGeometry(w, h), new T.MeshBasicMaterial({
-    map: tex, transparent: true, depthWrite: false
+    map: tex, side: T.DoubleSide
   }));
   m.position.set(x, y, z);
   m.rotation.y = ry || 0;
-  g.add(m);
+    g.add(m);
 }
 
 function ljLights() {
@@ -19668,7 +19674,11 @@ function buildLjAll() {
   ljPaving(g);
 
   ljPlaque(g, '四方街', -7.0, LJ_GY + 3.30, -7.45, 1.6, 0.40, 0);
-  ljPlaque(g, '木府', -16.0, LJ_GY + 0.30 + 4.30, 16.78, 1.9, 0.44, 0);
+  /* 牌坊匾：往外挪 11 厘米，避开瓦顶檐影 */
+  ljPlaque(g, '木府', -16.0, LJ_GY + 4.20, 18.6 + 0.55, 3.6, 0.80, 0);
+  /* 仪门与正殿各挂一块 */
+  ljPlaque(g, '仪门', -16.0, 4.72, 6.0 + 2.2 + 0.16, 2.4, 0.56, 0);
+  ljPlaque(g, '议事厅', -16.0, 5.86, -2.0 + 2.6 + 0.16, 3.0, 0.68, 0);
 
   /* 沿河六棵垂柳：独立组才能摆 */
   const willows = [];
