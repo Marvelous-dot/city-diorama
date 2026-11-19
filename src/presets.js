@@ -1406,6 +1406,52 @@
       },
       veg: { willows: [], bamboo: [], pots: [] },
       cam: { theta: 0.85, phi: 1.05, dist: 54, target: [0.00, 5.50, 0.00] }
+    },
+
+    /* ---------------------------------------------------------
+       丽江古城 · 四方街（第 21 套：河街并行街区，56×44 米）
+       --------------------------------------------------------- */
+    lijiang: {
+      id: 'lijiang',
+      title: '丽江古城 · 四方街',
+      lijiang: true,
+      figStyle: 'voxel',
+      emis: 1.0,
+      lampK: 1.0,
+      sky: ['#eaf2f4', '#d6e4e4', '#bccfd0', '#8fa4a6'],
+      vig: 'rgba(48,60,58,0.20)',
+      shadowSpan: 30.0,
+      shadowFar: 140,
+      palette: {
+        /* 土 / 石 */
+        ljSoil: 0x8d7556, ljSoilD: 0x63513c, ljBaseD: 0x4a4236,
+        ljGravel: 0x8f8371, ljRiverBed: 0x3a4a46,
+        ljStone: 0xa9a496, ljStoneD: 0x7d796c, ljStoneL: 0xc9c4b4,
+        /* 木作 / 瓦 / 墙 */
+        ljWood: 0x9a7048, ljWoodD: 0x63432a, ljWoodR: 0x8e3f2e,
+        ljTile: 0x5a625e, ljTileD: 0x3f4744, ljRidge: 0x333a37,
+        ljWall: 0xe8e2d4,
+        /* 门窗 / 招牌 / 灯笼 */
+        ljDoor: 0x6d4528, ljDoorD: 0x4a2f1c, ljLattice: 0x6a4526,
+        ljSign: 0x241a12, ljGold: 0xd8b35e, ljLantern: 0xc04a26, ljCloth: 0xb8503a,
+        /* 草 / 水 */
+        ljGrass: 0x42662f, ljGrassL: 0x5c7f3c, ljWaterD: 0x4a7a72, ljFoam: 0xeef9f3,
+        /* 植物 / 马 */
+        ljBark: 0x5e4a34, ljLeaf1: 0x5c8046, ljLeaf2: 0x3d5a30, ljHorse: 0x6b4f36,
+        /* 积木人 */
+        ljSkin: 0xe8bd9a, ljHair: 0x2e2823, ljInk: 0x241f1a,
+        ljBelt: 0x4a4238, ljShoe: 0x332c24, ljHat: 0x2a241e,
+        ljRobeA: 0x4e6b78, ljRobeB: 0x9a4638, ljRobeC: 0x6f6a8c, ljRobeD: 0x3f5a48
+      },
+      emit: {},
+      light: {
+        sun:  { color: 0xfff6e2, i: 1.85, pos: [26.0, 30.0, 22.0] },
+        fill: { color: 0xb8cfe0, i: 0.60, pos: [-22.0, 14.0, -20.0] },
+        hemi: { sky: 0xe8eede, ground: 0x5c6a4c, i: 0.70 },
+        amb:  { color: 0xb0b8b0, i: 0.28 }
+      },
+      veg: { willows: [], bamboo: [], pots: [] },
+      cam: { theta: 0.95, phi: 1.06, dist: 68, target: [-3.00, 3.50, 0.00] }
     }
   };
 });
