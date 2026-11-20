@@ -1498,6 +1498,54 @@
       },
       veg: { willows: [], bamboo: [], pots: [] },
       cam: { theta: 0.72, phi: 1.10, dist: 66, target: [0.00, 11.00, -5.00] }
+    },
+    /* ---------------------------------------------------------
+       敦煌莫高窟（第 23 套：砾岩崖壁 + 窟门阵列，60×40 米）
+       --------------------------------------------------------- */
+    mogao: {
+      id: 'mogao',
+      title: '敦煌莫高窟',
+      mogao: true,
+      figStyle: 'voxel',
+      emis: 1.0,
+      lampK: 1.0,
+      sky: ['#f4f1e4', '#e4e9ea', '#cbd7dc', '#95a8b1'],
+      vig: 'rgba(72,60,42,0.18)',
+      shadowSpan: 32.0,
+      shadowFar: 170,
+      palette: {
+        /* 砾岩四阶 + 沙 */
+        mgRock: 0xa8875f, mgRockD: 0x7f6543, mgRockL: 0xc4a678, mgCrack: 0x4a3a26,
+        mgSand: 0xd6bd8f, mgSandD: 0xbfa374, mgGravel: 0xc9b38a,
+        mgSoil: 0xb08e63, mgSoilD: 0x86694a, mgBaseD: 0x5a4632,
+        /* 石 / 木 / 瓦 */
+        mgStone: 0xa9a496, mgStoneD: 0x7d796c, mgStoneL: 0xc9c4b4,
+        mgWood: 0x9a7048, mgWoodD: 0x63432a, mgWoodR: 0x8e3f2e, mgBeam: 0x5a3c26,
+        mgTile: 0x5a625e, mgTileD: 0x3f4744, mgRidge: 0x333a37,
+        /* 窟门 / 壁画三色 */
+        mgCave: 0x16100b, mgArch: 0xb99b6e, mgDoor: 0x4a3220, mgLattice: 0x6a4a2c,
+        mgMural1: 0x8c3b2e, mgMural2: 0x3f6a6e, mgMural3: 0xc9a45e,
+        /* 匾 / 灯 / 塔 */
+        mgSign: 0x241a12, mgGold: 0xd8b35e, mgLantern: 0xc04a26,
+        mgStupa: 0xe4dcc8, mgStupaD: 0xc2b69c,
+        /* 水 / 植物 */
+        mgRiverBed: 0xa89572, mgWaterD: 0x4a7a72, mgFoam: 0xeef9f3,
+        mgBark: 0x5e4a34, mgPoplar: 0x6f8c45, mgGrass: 0x7a8c58,
+        /* 积木人 */
+        mgSkin: 0xe8bd9a, mgHair: 0x2e2823, mgInk: 0x241f1a,
+        mgBelt: 0x4a4238, mgShoe: 0x332c24, mgHat: 0x2a241e,
+        mgRobeA: 0x4e6b78, mgRobeB: 0x9a4638, mgRobeC: 0x6f6a8c, mgRobeD: 0x3f5a48
+      },
+      emit: {},
+      light: {
+        sun:  { color: 0xfff2d6, i: 1.92, pos: [24.0, 32.0, 20.0] },
+        fill: { color: 0xc6d6de, i: 0.55, pos: [-22.0, 14.0, -16.0] },
+        hemi: { sky: 0xeae6d2, ground: 0x7a6448, i: 0.72 },
+        amb:  { color: 0xb8b4a4, i: 0.30 }
+      },
+      veg: { willows: [], bamboo: [], pots: [] },
+      cam: { theta: 0.80, phi: 1.08, dist: 68, target: [0.00, 11.00, -4.00] }
     }
   };
+
 });

@@ -15182,6 +15182,7 @@ const GD = !!PS.garden;
 const TL = !!PS.tulou;
 const LJ = !!PS.lijiang;
 const XS = !!PS.xuankong;
+const MG = !!PS.mogao;
 
 const TV_X0 = -6.20, TV_X1 = 2.60;    // 进深 8.80（正面 +X）
 const TV_Z0 = -5.60, TV_Z1 = 5.60;    // 面阔 11.20
@@ -19938,12 +19939,366 @@ function buildXsAll() {
   xsLights();
 }
 
+  /* ================= 第 23 套：敦煌莫高窟（mogao / MG） =================
+   砾岩崖壁上的洞窟群：三层窟门阵列、九层楼、之字栈道、塔林与宕泉河。
+   崖壁在北（-z），展台 60×40 米。
+   ==================================================================== */
+const MG_X0 = -30.0, MG_X1 = 30.0;
+const MG_Z0 = -20.0, MG_Z1 = 20.0;
+const MG_GY = 0.55, MG_BB = -1.60;
+const MG_CZ = -12.0;          // 崖壁南面
+const MG_CT = 26.0;           // 崖顶
+
+function mgR(n) { const s = Math.sin(n * 12.9898) * 43758.5453; return s - Math.floor(s); }
+
+/* ---------------- 展台：沙砾地 + 宕泉河床 ---------------- */
+function mgBase(b) {
+  const w = MG_X1 - MG_X0, d = MG_Z1 - MG_Z0;
+  const layers = [
+    ['mgSoil', MG_GY, MG_GY - 0.52],
+    ['mgSoilD', MG_GY - 0.52, MG_GY - 1.12],
+    ['mgBaseD', MG_GY - 1.12, MG_BB]
+  ];
+  layers.forEach(function (q) {
+    const hh = q[1] - q[2], yy = (q[1] + q[2]) / 2;
+    b.box(q[0], w - 0.02, hh, 0.03, 0, yy, MG_Z1 - 0.015);
+    b.box(q[0], w - 0.02, hh, 0.03, 0, yy, MG_Z0 + 0.015);
+    b.box(q[0], 0.03, hh, d - 0.02, MG_X1 - 0.015, yy, 0);
+    b.box(q[0], 0.03, hh, d - 0.02, MG_X0 + 0.015, yy, 0);
+  });
+  /* 砂砾地：整片沙色，加碎石与沙纹 */
+  b.box('mgSand', w - 0.1, 0.10, MG_Z1 - MG_CZ - 0.1, 0, MG_GY + 0.04, (MG_CZ + MG_Z1) / 2);
+  for (let i = 0; i < 46; i++) {
+    b.box(i % 3 ? 'mgGravel' : 'mgRockL', 0.5, 0.10, 0.9,
+      MG_X0 + 2 + mgR(i * 3.1) * 56, MG_GY + 0.12, MG_CZ + 1.5 + mgR(i * 5.7) * 26,
+      0, mgR(i * 7.3) * 2.0, 0);
+  }
+  /* 宕泉河：干河床 + 一线残水（水必须高于地面，否则被埋） */
+  b.box('mgRiverBed', 44.0, 0.16, 4.2, 0, MG_GY + 0.06, 7.0);
+  b.box('mgWaterD', 43.0, 0.05, 1.4, 0, MG_GY + 0.16, 6.6);
+  for (let i = 0; i < 26; i++) {
+    b.box(i % 2 ? 'mgGravel' : 'mgRockL', 0.6 + mgR(i * 3.7) * 0.6, 0.26, 0.7,
+      -20 + i * 1.6, MG_GY + 0.18, 7.0 + (mgR(i * 5.1) - 0.5) * 3.4, 0, mgR(i * 7.7) * 1.4, 0.1);
+  }
+  /* 河岸杨树行 */
+  for (let i = 0; i < 7; i++) {
+    const x = -18 + i * 6.2;
+    const pz = 10.4 + (i % 2) * 1.4;
+    b.cyl('mgBark', 0.17, 0.23, 7.2, 8, x, MG_GY + 3.6, pz);
+    b.sph('mgPoplar', 1.05, x, MG_GY + 6.6, pz, 0.80, 1.45, 0.80);
+    b.sph('mgPoplar', 0.85, x + 0.22, MG_GY + 8.1, pz, 0.75, 1.35, 0.75);
+    b.sph('mgPoplar', 0.62, x - 0.16, MG_GY + 9.3, pz, 0.72, 1.15, 0.72);
+  }
+}
+
+/* ---------------- 低模岩山（可传 y0） ---------------- */
+function mgRockHill(b, cx, czBase, R, H, seed, key, y0) {
+  const g = new T.IcosahedronGeometry(1, 2);
+  const p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) {
+    const vx = p.getX(i), vy = p.getY(i), vz = p.getZ(i);
+    const k = 0.88
+      + 0.16 * Math.sin(vx * 3.7 + vy * 2.9 + vz * 3.1 + seed)
+      + 0.09 * Math.sin(vx * 7.3 - vz * 6.1 + seed * 1.7)
+      + 0.05 * Math.cos(Math.atan2(vz, vx) * 5.0 + seed) * (0.3 + 0.7 * Math.abs(vy));
+    p.setXYZ(i, vx * k * R, vy * k * H * 0.5 + H * 0.42, vz * k * R * 1.1);
+  }
+  g.computeVertexNormals();
+  g.translate(cx, (y0 === undefined ? MG_GY : y0), czBase);
+  b.add(key || 'mgRock', g);
+}
+
+/* ---------------- 崖壁：平壁贴窟 + 两侧岩山 + 沙脊 ---------------- */
+function mgCliff(b) {
+  /* 中间平壁：窟门要贴平面 */
+  b.box('mgRock', 40.0, 24.0, 7.0, 0, MG_GY + 12.0, MG_CZ - 3.5);
+  /* 竖凿痕：砾岩的「水蚀沟」 */
+  for (let i = 0; i < 34; i++) {
+    const x = -19.2 + i * 1.16;
+    const hh = 6 + mgR(i * 3.1) * 16;
+    b.box('mgRockD', 0.14 + mgR(i * 5.7) * 0.10, hh, 0.06, x,
+      MG_GY + 1.6 + mgR(i * 7.3) * 14, MG_CZ + 0.03, 0, 0, (mgR(i * 9.1) - 0.5) * 0.05);
+  }
+  /* 横向岩层：每 3.4 米一道浅槽 */
+  for (let i = 0; i < 7; i++) {
+    b.box('mgRockD', 39.6, 0.16, 0.09, 0, MG_GY + 2.4 + i * 3.4, MG_CZ + 0.02);
+  }
+
+  /* 两侧低模岩山 */
+  [[-25.0, 18.0, 5.0, 1.3], [-22.0, 21.0, 4.2, 2.7], [-27.0, 12.0, 4.6, 4.1],
+   [25.0, 17.0, 4.8, 5.3], [22.0, 20.5, 4.0, 6.7], [27.0, 11.0, 4.2, 8.1]]
+    .forEach(function (q, k) {
+      mgRockHill(b, q[0], MG_CZ - q[2] * 0.5, q[2], q[1], q[3], 'mgRock');
+    });
+
+  /* 沙脊：把平顶盖成起伏的沙丘线 */
+  for (let i = 0; i < 13; i++) {
+    const x = -22 + i * 3.8;
+    const hh = 2.4 + mgR(i * 3.1) * 2.4 + Math.sin(x * 0.26) * 1.0;
+    mgRockHill(b, x, MG_CZ - 1.4, 2.8 + mgR(i * 5.7) * 1.1, hh, 30 + i,
+      i % 3 ? 'mgSand' : 'mgSandD', MG_GY + 23.8);
+  }
+  /* 崖顶胡杨两棵 */
+  [[-9.0, MG_GY + 25.4], [10.5, MG_GY + 25.8]].forEach(function (q) {
+    b.cyl('mgBark', 0.26, 0.32, 2.6, 8, q[0], q[1] + 1.3, MG_CZ - 2.8);
+    b.sph('mgPoplar', 1.3, q[0], q[1] + 3.1, MG_CZ - 2.8, 1.1, 0.75, 1.05);
+  });
+}
+
+/* ---------------- 三层窟门阵列 ---------------- */
+function mgCaves(b) {
+  const rows = [
+    { y: 5.6, n: 13, w: 1.05, h: 1.7 },
+    { y: 11.0, n: 12, w: 1.15, h: 1.9 },
+    { y: 16.4, n: 11, w: 1.05, h: 1.7 }
+  ];
+  rows.forEach(function (r, ri) {
+    for (let i = 0; i < r.n; i++) {
+      const x = -18.0 + (i + 0.5) * (36.0 / r.n) + (mgR(i * 3.7 + ri * 5.1) - 0.5) * 0.55;
+      /* 中间留给九层楼（|x|<4.2） */
+      if (Math.abs(x) < 4.2) continue;
+      /* 窟内暗部 */
+      const yy = r.y + (mgR(i * 7.3 + ri) - 0.5) * 0.30;
+      b.box('mgCave', r.w, r.h, 0.55, x, yy + r.h / 2, MG_CZ - 0.24);
+      /* 门套：两侧土坯壁 + 门楣 */
+      [-1, 1].forEach(function (s) {
+        b.box('mgArch', 0.16, r.h + 0.22, 0.30, x + s * (r.w / 2 + 0.08), yy + r.h / 2, MG_CZ + 0.05);
+      });
+      b.box('mgArch', r.w + 0.5, 0.18, 0.32, x, yy + r.h + 0.10, MG_CZ + 0.05);
+      /* 拱顶：三块小砖砌出半圆 */
+      for (let k = 0; k < 3; k++) {
+        const ang = -0.5 + k * 0.5;
+        b.box('mgArch', 0.30, 0.18, 0.26, x + Math.sin(ang) * (r.w / 2 + 0.05),
+          yy + r.h + 0.26 + Math.cos(ang) * 0.22, MG_CZ + 0.06, 0, 0, -ang * 0.5);
+      }
+      /* 窟内壁画色块：赭、青、朱三色暗示 */
+      const mk = ['mgMural1', 'mgMural2', 'mgMural3'][i % 3];
+      b.box(mk, r.w * 0.52, r.h * 0.42, 0.03, x, yy + r.h * 0.66, MG_CZ - 0.02);
+      /* 窟檐：有的窟前有木檐 */
+      if (i % 3 === 0) {
+        b.box('mgWoodD', r.w + 0.9, 0.10, 0.75, x, yy + r.h + 0.42, MG_CZ + 0.42);
+        [-1, 1].forEach(function (s) {
+          b.cyl('mgWoodD', 0.07, 0.08, r.h * 0.9, 6, x + s * (r.w / 2 + 0.32), yy + r.h * 0.45, MG_CZ + 0.72);
+        });
+      }
+      /* 洞窟编号小牌 */
+      if (i % 2 === 0) {
+        b.box('mgSign', 0.26, 0.16, 0.04, x - r.w / 2 - 0.18, yy + r.h - 0.10, MG_CZ + 0.10);
+      }
+    }
+  });
+}
+
+/* ---------------- 九层楼（第 96 窟）：九层檐口贴崖而上 ---------------- */
+function mgNine(b) {
+  const W = 7.2, D = 3.4, H = 3.00, N = 9;
+  /* 台基与台阶 */
+  b.box('mgStoneL', W + 1.8, 0.62, D + 2.2, 0, MG_GY + 0.31, MG_CZ + D / 2 + 0.5);
+  b.box('mgStoneL', W + 1.2, 0.30, D + 1.6, 0, MG_GY + 0.76, MG_CZ + D / 2 + 0.3);
+  for (let i = 0; i < 4; i++) {
+    b.box('mgStoneL', 3.0, 0.16, 0.46, 0, MG_GY + 0.60 - i * 0.15, MG_CZ + D + 1.2 + i * 0.42);
+  }
+  for (let f = 0; f < N; f++) {
+    const y = MG_GY + 0.9 + f * H;
+    const ww = W - f * 0.10;
+    /* 楼板 */
+    b.box('mgWood', ww, 0.20, D, 0, y, MG_CZ + D / 2);
+    b.box('mgWoodD', ww, 0.10, D, 0, y - 0.14, MG_CZ + D / 2);
+    /* 四柱 */
+    for (let i = 0; i < 4; i++) {
+      const px = -ww / 2 + 0.26 + i * (ww - 0.52) / 3;
+      b.cyl('mgWoodD', 0.11, 0.12, H - 0.30, 8, px, y + H / 2 - 0.12, MG_CZ + D - 0.26);
+    }
+    /* 格窗 / 中间开门 */
+    b.box(f < 2 ? 'mgDoor' : 'mgLattice', ww * 0.62, H * 0.56, 0.07, 0, y + H * 0.48, MG_CZ + D - 0.24);
+    [-1, 1].forEach(function (s) {
+      b.box('mgLattice', ww * 0.14, H * 0.50, 0.06, s * ww * 0.40, y + H * 0.46, MG_CZ + D - 0.24);
+    });
+    /* 栏杆 */
+    b.box('mgWoodR', ww - 0.1, 0.07, 0.10, 0, y + 0.78, MG_CZ + D + 0.12);
+    b.box('mgWoodR', ww - 0.1, 0.06, 0.08, 0, y + 0.42, MG_CZ + D + 0.12);
+    for (let i = 0; i < 9; i++) {
+      b.box('mgWoodR', 0.05, 0.36, 0.05, -ww / 2 + 0.3 + i * (ww - 0.6) / 8, y + 0.60, MG_CZ + D + 0.12);
+    }
+    /* 檐口：薄板 + 瓦垄 + 檐下椽头 */
+    const ey = y + H - 0.20;
+    b.box('mgTile', ww + 1.3, 0.13, D + 1.5, 0, ey, MG_CZ + D / 2 + 0.05);
+    const tn = Math.floor((ww + 1.2) / 0.32);
+    for (let i = 0; i < tn; i++) {
+      b.box('mgTileD', 0.035, 0.05, D + 1.5,
+        -(ww + 1.2) / 2 + (i + 0.5) * (ww + 1.2) / tn, ey + 0.07, MG_CZ + D / 2 + 0.05);
+    }
+    b.box('mgRidge', ww + 1.3, 0.12, 0.18, 0, ey + 0.10, MG_CZ + D + 0.80);
+    for (let i = 0; i < 7; i++) {
+      b.box('mgWoodD', 0.10, 0.10, 0.45, -ww / 2 + 0.2 + i * (ww - 0.4) / 6, ey - 0.12, MG_CZ + D + 0.30);
+    }
+    /* 每层两只小灯笼 */
+    [-1, 1].forEach(function (s) {
+      b.cyl('mgLantern', 0.12, 0.14, 0.28, 10, s * (ww / 2 - 0.35), ey - 0.34, MG_CZ + D + 0.40);
+    });
+  }
+  /* 顶层攒尖 */
+  const ty = MG_GY + 0.9 + N * H;
+  gdHipRoof(b, 'mgTile', 'mgRidge', 0, MG_CZ + D / 2, W + 1.4, D + 1.7, ty, ty + 2.2);
+  b.cyl('mgGold', 0.10, 0.14, 1.0, 8, 0, ty + 2.7, MG_CZ + D / 2);
+  b.sph('mgGold', 0.16, 0, ty + 3.3, MG_CZ + D / 2, 1, 1.3, 1);
+}
+
+/* ---------------- 三层之字栈道 ---------------- */
+function mgWalk(b) {
+  const levels = [5.35, 10.75, 16.15];
+  levels.forEach(function (y, k) {
+    b.box('mgWood', 38.0, 0.16, 1.5, 0, y, MG_CZ + 0.78);
+    b.box('mgWoodD', 38.0, 0.09, 0.24, 0, y - 0.12, MG_CZ + 1.5);
+    /* 栏杆 */
+    b.box('mgWoodR', 38.0, 0.07, 0.09, 0, y + 0.86, MG_CZ + 1.48);
+    for (let i = 0; i < 38; i++) {
+      b.box('mgWoodR', 0.06, 0.50, 0.06, -18.6 + i * 1.0, y + 0.60, MG_CZ + 1.48);
+    }
+    /* 斜撑：插入崖壁的短木 */
+    for (let i = 0; i < 10; i++) {
+      const x = -17.0 + i * 3.8;
+      b.cyl('mgBeam', 0.09, 0.10, 1.9, 6, x, y - 0.55, MG_CZ + 0.55, 0.72, 0, 0);
+    }
+    /* 楼梯：连接上一层，左右各一处之字 */
+    if (k < 2) {
+      /* 每层一处窄梯，贴着崖壁上下 */
+      const sx = -12.6;
+      const steps = 8;
+      for (let i = 0; i < steps; i++) {
+        const t = i / (steps - 1);
+        b.box('mgWoodD', 0.72, 0.09, 0.56,
+          sx + t * 0.9, y + 0.35 + t * (levels[k + 1] - y - 0.35), MG_CZ + 0.95);
+      }
+      b.cyl('mgWoodD', 0.045, 0.045, 3.4, 6,
+        sx + 0.45, y + (levels[k + 1] - y) / 2 + 0.6, MG_CZ + 1.22, Math.PI / 2 - 0.60, 0, 0);
+    }
+  });
+}
+
+/* ---------------- 塔林：五座覆钵塔 ---------------- */
+function mgStupas(b) {
+  [[17.5, 3.0, 1.55], [21.0, 5.4, 1.30], [24.6, 2.4, 1.15], [19.2, 8.2, 1.10], [23.2, 7.8, 0.95]]
+    .forEach(function (q, k) {
+      const x = q[0], z = q[1], s = q[2];
+      b.box('mgStupa', 2.4 * s, 0.42 * s, 2.4 * s, x, MG_GY + 0.21 * s, z);
+      b.box('mgStupaD', 1.9 * s, 0.36 * s, 1.9 * s, x, MG_GY + 0.60 * s, z);
+      b.box('mgStupa', 1.5 * s, 1.0 * s, 1.5 * s, x, MG_GY + 1.28 * s, z);
+      b.sph('mgStupa', 0.86 * s, x, MG_GY + 2.05 * s, z, 1, 0.95, 1);
+      b.cyl('mgStupaD', 0.30 * s, 0.24 * s, 0.55 * s, 8, x, MG_GY + 2.70 * s, z);
+      b.cyl('mgGold', 0.06 * s, 0.09 * s, 0.85 * s, 6, x, MG_GY + 3.35 * s, z);
+      b.sph('mgGold', 0.11 * s, x, MG_GY + 3.82 * s, z, 1, 1.2, 1);
+    });
+}
+
+/* ---------------- 入口牌坊 + 石碑 ---------------- */
+function mgGate(b) {
+  const gz = 15.0;
+  [-3.2, 3.2].forEach(function (dx) {
+    b.cyl('mgStoneD', 0.34, 0.38, 0.50, 8, dx, MG_GY + 0.25, gz);
+    b.cyl('mgWoodD', 0.24, 0.26, 4.4, 8, dx, MG_GY + 2.70, gz);
+  });
+  b.box('mgWoodD', 6.8, 0.28, 0.32, 0, MG_GY + 4.70, gz);
+  gdGableRoof(b, 'mgTile', 'mgRidge', 0, gz, 7.4, 2.6, MG_GY + 4.4, MG_GY + 5.4, 'z');
+  b.box('mgSign', 2.8, 0.60, 0.12, 0, MG_GY + 4.15, gz + 0.20);
+  /* 石碑： UNESCO 碑 */
+  b.box('mgStoneL', 1.4, 0.30, 1.0, -6.4, MG_GY + 0.15, 13.4);
+  b.box('mgStone', 1.1, 1.8, 0.30, -6.4, MG_GY + 1.20, 13.4);
+  b.box('mgGold', 0.8, 0.10, 0.32, -6.4, MG_GY + 1.80, 13.41);
+}
+
+/* ---------------- 人物 ---------------- */
+function mgPeople(b) {
+  const base = { skin: 'mgSkin', hair: 'mgHair', ink: 'mgInk', belt: 'mgBelt', shoe: 'mgShoe', hat: 'none' };
+  function F(o) {
+    const q = {};
+    for (const k in base) q[k] = base[k];
+    for (const k in o) q[k] = o[k];
+    q.b = b;
+    buildFig(q);
+  }
+  const G = MG_GY + 0.12;
+  F({ x: -2.0, y: 5.52, z: MG_CZ + 1.2, ry: 0.4, s: 0.95, coat: 'mgRobeC', hat: 'cap', hatKey: 'mgHat' });
+  F({ x: 6.4, y: 10.92, z: MG_CZ + 1.1, ry: 2.9, s: 0.94, coat: 'mgRobeB' });
+  F({ x: -9.4, y: 16.32, z: MG_CZ + 1.0, ry: 1.2, s: 0.93, coat: 'mgRobeA' });
+  F({ x: 1.8, y: G, z: 2.0, ry: 3.0, s: 0.97, coat: 'mgRobeD', hat: 'cap', hatKey: 'mgHat' });
+  F({ x: -5.2, y: G, z: 4.6, ry: 1.4, s: 0.95, pose: 'walk', coat: 'mgRobeA' });
+  F({ x: 9.0, y: G, z: 7.6, ry: -1.0, s: 0.94, pose: 'walk', coat: 'mgRobeC' });
+  F({ x: -13.0, y: G, z: 9.0, ry: 0.3, s: 0.93, coat: 'mgRobeB' });
+  F({ x: 2.4, y: G, z: 13.2, ry: 3.1, s: 0.96, coat: 'mgRobeD' });
+}
+
+/* ---------------- 匾额 / 灯光 / 总装 ---------------- */
+function mgTextTex(txt) {
+  return canvasTex(512, 128, function (c, w, h) {
+    c.fillStyle = '#1a120c';
+    c.fillRect(0, 0, w, h);
+    c.strokeStyle = '#d8b35e';
+    c.lineWidth = 7;
+    c.strokeRect(10, 10, w - 20, h - 20);
+    c.fillStyle = '#f2d88e';
+    c.font = 'bold 66px "Microsoft YaHei","SimHei",sans-serif';
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    c.fillText(txt, w / 2, h / 2 + 3);
+  });
+}
+
+function mgPlaque(g, txt, x, y, z, w, h) {
+  const tex = mgTextTex(txt);
+  tex.needsUpdate = true;
+  const m = new T.Mesh(new T.PlaneGeometry(w, h), new T.MeshBasicMaterial({ map: tex, side: T.DoubleSide }));
+  m.position.set(x, y, z);
+  g.add(m);
+}
+
+function mgLights() {
+  const L = [
+    [0, 6.0, MG_CZ + 5.0, 5.0, 12.0],
+    [0, 18.0, MG_CZ + 4.0, 4.0, 12.0],
+    [-11, 3.0, MG_CZ + 3.0, 2.6, 8.0],
+    [11, 3.0, MG_CZ + 3.0, 2.6, 8.0],
+    [0, 3.0, 12.0, 2.4, 9.0]
+  ];
+  L.forEach(function (q) {
+    const lp = new T.PointLight(0xffd9a8, q[3], q[4], 2);
+    lp.position.set(q[0], q[1], q[2]);
+    scene.add(lp);
+  });
+}
+
+function buildMgAll() {
+  const g = new T.Group();
+  scene.add(g);
+  const b = new Builder();
+
+  mgBase(b);
+  mgCliff(b);
+  mgCaves(b);
+  mgNine(b);
+  mgWalk(b);
+  mgStupas(b);
+  mgGate(b);
+  mgPeople(b);
+
+  b.build(g, {
+    noOutline: ['mgPoplar', 'mgGrass', 'mgFoam']
+  });
+
+  mgPlaque(g, '莫高窟', 0, MG_GY + 4.15, 15.28, 2.6, 0.56);
+  mgPlaque(g, '九层楼', 0, MG_GY + 3.4, MG_CZ + 3.9, 1.9, 0.44);
+
+  mgLights();
+}
+
   /* ================= 组装 ================= */
   const TOWER = !!PS.tower;
   const STORE = !!PS.store;
   const CLUB = !!PS.club;
   const WRH = !!PS.wh;
-  if (XS) {
+  if (MG) {
+    buildMgAll();
+  } else if (XS) {
     buildXsAll();
   } else if (LJ) {
     buildLjAll();
@@ -20049,7 +20404,9 @@ function buildXsAll() {
 
   /* 室内暖光 */
   const LAMPK = cfg(PS.lampK, 1);
-  if (XS) {
+  if (MG) {
+    /* 莫高窟的暖点光已在 buildMgAll() 内按位置布好 */
+  } else if (XS) {
     /* 悬空寺的暖点光已在 buildXsAll() 内按位置布好 */
   } else if (LJ) {
     /* 丽江的暖点光已在 buildLjAll() 内按位置布好 */
@@ -20247,23 +20604,23 @@ function buildXsAll() {
   }
 
   const VEG = PS.veg || {};
-  const willowPos = cfg(VEG.willows, (STORE || CLUB || JD || CYB || KFC || RL || LN || RW || SEC || DK || TV || ML || GD || TL || LJ || XS) ? [] : [[4.0, -4.35, 0.95], [-6.5, 1.95, 0.72]]);
+  const willowPos = cfg(VEG.willows, (STORE || CLUB || JD || CYB || KFC || RL || LN || RW || SEC || DK || TV || ML || GD || TL || LJ || XS || MG) ? [] : [[4.0, -4.35, 0.95], [-6.5, 1.95, 0.72]]);
   for (let i = 0; i < willowPos.length; i++) {
     scene.add(willow(willowPos[i][0], willowPos[i][1], willowPos[i][2]));
   }
 
-  if (!STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW && !SEC && !DK && !TV && !ML && !GD && !TL && !LJ && !XS) {
+  if (!STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW && !SEC && !DK && !TV && !ML && !GD && !TL && !LJ && !XS && !MG) {
     boatGroup = buildBoat(5.9, 1.15, Math.PI / 2 + 0.05);
     scene.add(boatGroup);
   }
 
-  const bamPos = cfg(VEG.bamboo, (STORE || CLUB || WRH || JD || CYB || KFC || RL || LN || RW || SEC || DK || TV || ML || GD || TL || LJ || XS) ? [] : [[-7.0, -4.6, 1.0], [-6.9, 6.9, 0.75]]);
+  const bamPos = cfg(VEG.bamboo, (STORE || CLUB || WRH || JD || CYB || KFC || RL || LN || RW || SEC || DK || TV || ML || GD || TL || LJ || XS || MG) ? [] : [[-7.0, -4.6, 1.0], [-6.9, 6.9, 0.75]]);
   for (let i = 0; i < bamPos.length; i++) scene.add(bamboo(bamPos[i][0], bamPos[i][1], bamPos[i][2]));
-  const potPos = cfg(VEG.pots, (STORE || CLUB || WRH || JD || CYB || KFC || RL || LN || RW || SEC || DK || TV || ML || GD || TL || LJ || XS) ? [] : [[1.85, 2.35], [2.1, -2.55]]);
+  const potPos = cfg(VEG.pots, (STORE || CLUB || WRH || JD || CYB || KFC || RL || LN || RW || SEC || DK || TV || ML || GD || TL || LJ || XS || MG) ? [] : [[1.85, 2.35], [2.1, -2.55]]);
   for (let i = 0; i < potPos.length; i++) scene.add(pot(potPos[i][0], potPos[i][1]));
 
   /* ================= 招牌 / 布幡 / 晾布 ================= */
-  if (!STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW && !SEC && !DK && !TV && !ML && !GD && !TL && !LJ && !XS) {
+  if (!STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW && !SEC && !DK && !TV && !ML && !GD && !TL && !LJ && !XS && !MG) {
   const plaqueMat = new T.MeshBasicMaterial({ map: TEX.plaque });
   const psz = cfg(PS.plaqueSize, [1.55, 0.46]);
   const plaque = new T.Mesh(new T.PlaneGeometry(psz[0], psz[1]), plaqueMat);
@@ -20287,7 +20644,7 @@ function buildXsAll() {
     'uniform sampler2D map; varying vec2 vUv;\n' +
     'void main(){ gl_FragColor = texture2D(map, vUv); }';
 
-  if (!TOWER && !STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW && !SEC && !DK && !TV && !ML && !GD && !TL && !LJ && !XS) {
+  if (!TOWER && !STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW && !SEC && !DK && !TV && !ML && !GD && !TL && !LJ && !XS && !MG) {
   const bannerMat = new T.ShaderMaterial({
     uniforms: { uTime: bannerUni.uTime, uAmp: { value: 0.11 }, map: { value: TEX.banner } },
     vertexShader: clothVert, fragmentShader: clothFrag, side: T.DoubleSide
@@ -20315,14 +20672,14 @@ function buildXsAll() {
     vertexShader: clothVert, fragmentShader: clothFrag, side: T.DoubleSide
   });
   const cloths = [];
-  if (!TOWER && !STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW && !SEC && !DK && !TV && !ML && !GD && !TL && !LJ && !XS) for (let i = 0; i < 2; i++) {
+  if (!TOWER && !STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW && !SEC && !DK && !TV && !ML && !GD && !TL && !LJ && !XS && !MG) for (let i = 0; i < 2; i++) {
     const c = new T.Mesh(new T.PlaneGeometry(0.7, 1.05, 4, 6), clothMat);
     c.position.set(2.62 + i * 0.86, 1.5 - i * 0.05, -1.95);
     c.rotation.y = -0.04 + i * 0.08;
     scene.add(c);
     cloths.push(c);
   }
-  if (!TOWER && !STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW && !SEC && !DK && !TV && !ML && !GD && !TL && !LJ && !XS) (function () {
+  if (!TOWER && !STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW && !SEC && !DK && !TV && !ML && !GD && !TL && !LJ && !XS && !MG) (function () {
     const b = new Builder();
     const g = new T.Group();
     b.cyl('woodDark', 0.055, 0.065, 2.15, 6, 2.24, 1.07, -1.95);
@@ -20343,7 +20700,7 @@ function buildXsAll() {
   /* ================= 屋檐铜铃 ================= */
   const bells = [];
   (function () {
-    const pos = (STORE || CLUB || JD || CYB || KFC || RL || LN || RW || SEC || DK || TV || ML || GD || TL || LJ || XS) ? [] : cfg(PS.bellPos, [[2.78, 5.86, 3.08], [2.78, 5.86, -3.86], [-5.98, 5.86, 3.08], [-5.98, 5.86, -3.86]]);
+    const pos = (STORE || CLUB || JD || CYB || KFC || RL || LN || RW || SEC || DK || TV || ML || GD || TL || LJ || XS || MG) ? [] : cfg(PS.bellPos, [[2.78, 5.86, 3.08], [2.78, 5.86, -3.86], [-5.98, 5.86, 3.08], [-5.98, 5.86, -3.86]]);
     for (let i = 0; i < pos.length; i++) {
       const g = new T.Group();
       g.position.set(pos[i][0], pos[i][1], pos[i][2]);
@@ -20374,7 +20731,7 @@ function buildXsAll() {
     patches.push({ m: p, base: op, x0: x, z0: z });
     return p;
   }
-  if (STORE || CLUB || KFC || RL || LN || RW || SEC || DK || TV || ML || GD || TL || LJ || XS) {
+  if (STORE || CLUB || KFC || RL || LN || RW || SEC || DK || TV || ML || GD || TL || LJ || XS || MG) {
     // 玻璃幕面，不做木格窗光斑
   } else if (TOWER) {
     addPatch(4.4, 4.4, -2.05 + 3.2, 1.24, -0.2, 0.1, 0.18);
@@ -20438,7 +20795,7 @@ function buildXsAll() {
     smokes.push(new Smoke(-3.10, 2.20, 6.10, 0.70, 5));
   } else if (JD) {
     smokes.push(new Smoke(DHCX + 0.30, DH_RG + 0.92, DW1 - 0.62, 1.15, 7));
-  } else if (!TOWER && !STORE && !CLUB && !WRH && !CYB && !KFC && !RL && !LN && !RW && !SEC && !DK && !TV && !ML && !GD && !TL && !LJ && !XS) {
+  } else if (!TOWER && !STORE && !CLUB && !WRH && !CYB && !KFC && !RL && !LN && !RW && !SEC && !DK && !TV && !ML && !GD && !TL && !LJ && !XS && !MG) {
     smokes.push(new Smoke(-1.62, FL + 0.88, 0.73, 1.0, 6));
     smokes.push(new Smoke(-3.55, FL + 0.66, -2.3, 1.2, 7));
     smokes.push(new Smoke(2.3, F2 + 0.8, -0.5, 0.9, 5));
