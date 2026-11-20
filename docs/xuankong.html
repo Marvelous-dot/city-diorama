@@ -19742,59 +19742,78 @@ function xsBase(b) {
   }
 }
 
-/* ---------------- 崖壁：五段岩体错落 + 层理 + 裂缝 ---------------- */
+/* ---------------- 崖壁：中间平壁贴楼阁，两侧与崖顶是低模岩山 ---------------- */
+function xsRockHill(b, cx, czBase, R, H, seed, key, y0) {
+  const g = new T.IcosahedronGeometry(1, 2);
+  const p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) {
+    const vx = p.getX(i), vy = p.getY(i), vz = p.getZ(i);
+    /* 位置相关的连续噪声，避免撒点；vy 加权让上部更碎 */
+    const k = 0.88
+      + 0.16 * Math.sin(vx * 3.7 + vy * 2.9 + vz * 3.1 + seed)
+      + 0.09 * Math.sin(vx * 7.3 - vz * 6.1 + seed * 1.7)
+      + 0.05 * Math.cos(Math.atan2(vz, vx) * 5.0 + seed) * (0.3 + 0.7 * Math.abs(vy));
+    p.setXYZ(i, vx * k * R, vy * k * H * 0.5 + H * 0.42, vz * k * R * 1.15);
+  }
+  g.computeVertexNormals();
+  g.translate(cx, (y0 === undefined ? XS_GY : y0), czBase);
+  b.add(key || 'xsRock', g);
+}
+
 function xsCliff(b) {
-  /* 每段：主块（下）+ 台坎（上），正面统一 XS_CZ，两侧段落前后错开 */
-  const segs = [
-    { x: -23.0, w: 10.0, h: 21.0, zf: XS_CZ - 0.9, zb: XS_Z0 },
-    { x: -13.5, w: 9.0, h: 25.0, zf: XS_CZ - 0.4, zb: XS_Z0 },
-    { x: -3.0, w: 12.0, h: 27.0, zf: XS_CZ, zb: XS_Z0 },
-    { x: 8.5, w: 11.0, h: 24.0, zf: XS_CZ - 0.5, zb: XS_Z0 },
-    { x: 20.0, w: 12.0, h: 20.0, zf: XS_CZ - 1.0, zb: XS_Z0 }
-  ];
-  segs.forEach(function (q, k) {
-    const d = q.zf - q.zb;
-    b.box(k % 2 ? 'xsRock' : 'xsRockL', q.w, q.h, d, q.x, XS_GY + q.h / 2, (q.zf + q.zb) / 2);
-    /* 上部台坎：比主块窄、略前，形成崖壁的「肩」 */
-    b.box('xsRockD', q.w * 0.78, 3.2, d * 0.55, q.x + (k % 2 ? 0.4 : -0.4),
-      XS_GY + q.h + 1.4, (q.zf + q.zb) / 2 + 0.4);
-    /* 层理：每 2.8 米一道，别做成货架 */
-    const n = Math.floor(q.h / 2.8);
-    for (let i = 0; i < n; i++) {
-      const yy = XS_GY + 1.4 + i * 2.8;
-      b.box('xsRockD', q.w * (0.86 + xsR(i * 3.1 + k) * 0.12),
-        0.16 + xsR(i * 5.7) * 0.10, 0.20, q.x,
-        yy + xsR(i * 7.3 + k) * 0.6, q.zf + 0.02);
-    }
-    /* 凸岩块：贴面几块，破掉方盒子的直边 */
-    for (let i = 0; i < 4; i++) {
-      const bw = 1.2 + xsR(i * 3.7 + k) * 1.6;
-      const bh = 1.4 + xsR(i * 5.9 + k) * 2.2;
-      b.box(i % 2 ? 'xsRock' : 'xsRockL', bw, bh, 0.55 + xsR(i * 7.1) * 0.5,
-        q.x - q.w / 2 + 1.0 + i * (q.w - 2.0) / 3, XS_GY + 3.0 + xsR(i * 9.3 + k) * (q.h - 8),
-        q.zf + 0.28, 0, (xsR(i * 11.7) - 0.5) * 0.2, 0);
-    }
-    /* 裂缝：竖向深带 */
-    for (let i = 0; i < 5; i++) {
-      const cx = q.x - q.w / 2 + 0.8 + xsR(i * 4.3 + k * 2.1) * (q.w - 1.6);
-      const hh = 2.5 + xsR(i * 6.1 + k) * 7.0;
-      b.box('xsCrack', 0.14 + xsR(i * 8.7) * 0.16, hh, 0.08,
-        cx, XS_GY + 2.0 + xsR(i * 9.3 + k) * (q.h - 6), q.zf + 0.04);
-    }
-    /* 崖顶植被：每段两三丛 */
+  /* 中间平壁：楼阁必须贴平面（真实悬空寺也是贴在较平整的凹龛里） */
+  b.box('xsRock', 30.0, 23.0, 6.0, 0, XS_GY + 11.5, XS_CZ - 3.0);
+  /* 平壁上凿竖痕：不让它读成混凝土 */
+  for (let i = 0; i < 22; i++) {
+    const x = -14.4 + i * 1.35;
+    const hh = 7 + xsR(i * 3.1) * 12;
+    b.box('xsRockD', 0.16 + xsR(i * 5.7) * 0.12, hh, 0.08, x,
+      XS_GY + 2.0 + xsR(i * 7.3) * 12, XS_CZ + 0.04, 0, 0, (xsR(i * 9.1) - 0.5) * 0.04);
+  }
+  /* 平壁上的凹龛：楼阁之间与楼阁下方 */
+  [[-3.6, 10.6, 1.2, 5.5], [3.6, 10.6, 1.2, 5.5], [0, 5.4, 6.0, 2.4]].forEach(function (q) {
+    b.box('xsCrack', q[2], q[3], 0.9, q[0], XS_GY + q[1], XS_CZ - 0.45);
+  });
+
+  /* 两侧：低模岩山，高度向谷底递减 */
+  [
+    [-22.0, 19.0, 5.6, 1.3], [-17.0, 22.0, 4.6, 2.7], [-26.4, 13.0, 4.2, 4.1],
+    [22.0, 18.0, 5.2, 5.3], [17.0, 21.5, 4.4, 6.7], [26.4, 12.0, 4.0, 8.1]
+  ].forEach(function (q, k) {
+    xsRockHill(b, q[0], XS_CZ - q[2] * 0.55, q[2], q[1], q[3], k % 2 ? 'xsRockL' : 'xsRock');
+  });
+
+  /* 平顶盖：五块小岩山压在平壁顶上，藏掉直角 */
+  for (let i = 0; i < 6; i++) {
+    xsRockHill(b, -13.0 + i * 5.2, XS_CZ - 2.2, 3.4 + xsR(i * 3.3) * 1.2, 4.6 + xsR(i * 5.1) * 2.2,
+      60 + i, i % 2 ? 'xsRock' : 'xsRockL', XS_GY + 21.0);
+  }
+  /* 崖顶山脊：一串小岩山压天际线 */
+  for (let i = 0; i < 13; i++) {
+    const x = -24 + i * 4.0;
+    const hh = 2.6 + xsR(i * 3.1) * 3.4 + Math.sin(x * 0.24) * 1.2;
+    xsRockHill(b, x, XS_CZ - 2.6, 2.6 + xsR(i * 5.7) * 1.2, hh, 20 + i, i % 3 ? 'xsRock' : 'xsRockL');
+  }
+
+  /* 崖脚：向谷底过渡的碎石坡 */
+  [[-20.0, 6.2, 7.0], [20.5, 5.6, 6.4]].forEach(function (q, k) {
     for (let i = 0; i < 3; i++) {
-      const tx = q.x - q.w / 3 + i * (q.w / 3) + 0.6;
-      const ty = XS_GY + q.h + 0.2;
-      b.sph('xsPine', 0.55 + xsR(i * 5.1 + k) * 0.35, tx, ty + 0.55, q.zf - 1.2, 1.2, 0.7, 1.1);
-      b.cyl('xsBark', 0.10, 0.13, 1.1, 6, tx, ty + 0.55, q.zf - 1.2);
+      xsRockHill(b, q[0] + (k ? 1 : -1) * i * 1.6, XS_CZ - 3.4 + i * 1.0,
+        q[1] * (1 - i * 0.22), q[2] * (1 - i * 0.3), 40 + i + k * 5, 'xsRockL');
     }
   });
-  /* 崖顶平台与栏杆（观景处） */
-  b.box('xsRockL', 10.0, 0.26, 2.2, 0, XS_GY + XS_CT + 0.13, XS_CZ - 1.6);
-  for (let i = 0; i < 9; i++) {
-    b.box('xsWoodD', 0.10, 0.75, 0.10, -6.4 + i * 1.6, XS_GY + XS_CT + 0.68, XS_CZ - 0.30);
+
+  /* 崖顶平台 + 栏杆 + 松 */
+  b.box('xsRockL', 9.0, 0.26, 2.2, 0, XS_GY + 23.30, XS_CZ - 1.8);
+  for (let i = 0; i < 7; i++) {
+    b.box('xsWoodD', 0.10, 0.72, 0.10, -4.8 + i * 1.6, XS_GY + 23.80, XS_CZ - 0.55);
   }
-  b.box('xsWoodD', 13.4, 0.09, 0.09, 0, XS_GY + XS_CT + 1.02, XS_CZ - 0.30);
+  b.box('xsWoodD', 9.8, 0.09, 0.09, 0, XS_GY + 24.14, XS_CZ - 0.55);
+  for (let i = 0; i < 5; i++) {
+    const x = -18 + xsR(i * 3.3) * 36;
+    b.sph('xsPine', 0.7 + xsR(i * 5.1) * 0.4, x, XS_GY + 24.10, XS_CZ - 2.2, 1.2, 0.7, 1.1);
+    b.cyl('xsBark', 0.12, 0.15, 1.0, 6, x, XS_GY + 23.65, XS_CZ - 2.2);
+  }
 }
 
 /* ---------------- 贴壁楼阁：三层木构，后墙由崖壁充当 ---------------- */
@@ -19895,10 +19914,10 @@ function xsWalkway(b) {
 function xsValley(b) {
   const cz = 7.0;
   /* 溪流：做成地面上的石砌水渠，水面必须高于地面（0.55），否则被整块地面埋掉 */
-  b.box('xsRiverBed', 40.0, 0.14, 3.4, 0, XS_GY + 0.07, cz);
-  b.box('xsWaterD', 39.4, 0.05, 3.0, 0, XS_GY + 0.16, cz);
+  b.box('xsRiverBed', 28.0, 0.14, 3.4, 0, XS_GY + 0.07, cz);
+  b.box('xsWaterD', 27.4, 0.05, 3.0, 0, XS_GY + 0.16, cz);
   [-1, 1].forEach(function (s) {
-    b.box('xsStoneL', 40.0, 0.26, 0.42, 0, XS_GY + 0.14, cz + s * 1.85);
+    b.box('xsStoneL', 28.0, 0.26, 0.42, 0, XS_GY + 0.14, cz + s * 1.85);
     for (let i = 0; i < 26; i++) {
       b.box(i % 3 ? 'xsStone' : 'xsRock', 0.55, 0.30, 0.5,
         -19 + i * 1.5, XS_GY + 0.22, cz + s * 2.2, 0, xsR(i * 3.1 + s) * 1.2, 0.08);
@@ -19908,6 +19927,14 @@ function xsValley(b) {
     b.box('xsFoam', 0.3 + xsR(i * 7.3) * 0.4, 0.02, 0.05,
       -18 + xsR(i * 3.1) * 36, XS_GY + 0.20, cz + (xsR(i * 5.7) - 0.5) * 2.2);
   }
+  /* 渠中石矶：打断直水的「泳道感」 */
+  [[-7.6, 0.4], [5.8, -0.5]].forEach(function (q) {
+    for (let i = 0; i < 4; i++) {
+      b.box(i % 2 ? 'xsRock' : 'xsRockL', 1.1 + xsR(i * 3.1) * 0.8, 0.5,
+        0.9, q[0] + i * 0.9, XS_GY + 0.24, cz + q[1] + (xsR(i * 5.7) - 0.5) * 1.2,
+        0, xsR(i * 7.3) * 1.2, 0.1);
+    }
+  });
   /* 石桥：桥面 + 桥拱 + 两级石阶 */
   b.box('xsStoneL', 2.6, 0.22, 4.4, 0, XS_GY + 0.42, cz);
   [-1, 1].forEach(function (s) {
