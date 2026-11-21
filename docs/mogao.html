@@ -20289,18 +20289,27 @@ function mgNine(b) {
 function mgWalk(b) {
   const levels = [5.35, 10.75, 16.15];
   levels.forEach(function (y, k) {
-    b.box('mgWood', 38.0, 0.16, 1.5, 0, y, MG_CZ + 0.78);
-    b.box('mgWoodD', 38.0, 0.09, 0.24, 0, y - 0.12, MG_CZ + 1.5);
-    /* 栏杆 */
-    b.box('mgWoodR', 38.0, 0.07, 0.09, 0, y + 0.86, MG_CZ + 1.48);
-    for (let i = 0; i < 38; i++) {
-      b.box('mgWoodR', 0.06, 0.50, 0.06, -18.6 + i * 1.0, y + 0.60, MG_CZ + 1.48);
-    }
-    /* 斜撑：插入崖壁的短木 */
-    for (let i = 0; i < 10; i++) {
-      const x = -17.0 + i * 3.8;
-      b.cyl('mgBeam', 0.09, 0.10, 1.9, 6, x, y - 0.55, MG_CZ + 0.55, 0.72, 0, 0);
-    }
+    /* 栈道分两段，楼前断开（真实是绕楼，不穿楼身） */
+    [[-18.9, -4.5], [4.5, 18.9]].forEach(function (rng) {
+      const len = rng[1] - rng[0], cx = (rng[0] + rng[1]) / 2;
+      b.box('mgWood', len, 0.16, 1.5, cx, y, MG_CZ + 0.78);
+      b.box('mgWoodD', len, 0.09, 0.24, cx, y - 0.12, MG_CZ + 1.5);
+      b.box('mgWoodR', len, 0.07, 0.09, cx, y + 0.86, MG_CZ + 1.48);
+      const n = Math.max(4, Math.round(len / 1.0));
+      for (let i = 0; i <= n; i++) {
+        b.box('mgWoodR', 0.06, 0.50, 0.06, rng[0] + i * len / n, y + 0.60, MG_CZ + 1.48);
+      }
+      /* 斜撑：插入崖壁的短木 */
+      for (let i = 0; i <= n; i += 3) {
+        b.cyl('mgBeam', 0.09, 0.10, 1.9, 6, rng[0] + i * len / n, y - 0.55, MG_CZ + 0.55, 0.72, 0, 0);
+      }
+    });
+    /* 楼前收头：两段栈道贴着九层楼台基终止，加一根端柱 */
+    [-4.5, 4.5].forEach(function (ex) {
+      b.box('mgWoodD', 0.14, 1.05, 0.14, ex, y + 0.50, MG_CZ + 1.42);
+      /* 连接踏板：栈道端头接到楼板，断口才有交代 */
+      b.box('mgWood', 0.95, 0.10, 1.55, ex + (ex < 0 ? 0.47 : -0.47), y + 0.02, MG_CZ + 0.85);
+    });
     /* 楼梯：连接上一层，左右各一处之字 */
     if (k < 2) {
       /* 每层一处窄梯，贴着崖壁上下 */
