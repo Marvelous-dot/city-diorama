@@ -46,7 +46,7 @@
 >
 > 水车磨坊 · 溪畔：`https://marvelous-dot.github.io/city-diorama/mill.html`
 >
-> 总览（14 个在线演示）：`https://marvelous-dot.github.io/city-diorama/gallery.html`
+> 总览（15 个在线演示）：`https://marvelous-dot.github.io/city-diorama/gallery.html`
 >
 > 苏州园林 · 一池三山：`https://marvelous-dot.github.io/city-diorama/garden.html`
 >
@@ -57,6 +57,8 @@
 > 悬空寺 · 恒山：`https://marvelous-dot.github.io/city-diorama/xuankong.html`
 >
 > 敦煌莫高窟：`https://marvelous-dot.github.io/city-diorama/mogao.html`
+>
+> 欢乐游乐园：`https://marvelous-dot.github.io/city-diorama/park.html`
 
 ## 预设
 
@@ -85,6 +87,7 @@
 | `lijiang` | 丽江古城 · 四方街 | 日景 / 河街街区 | 56×44 米：玉河贯南、三座石桥、四方街与骑楼店铺、木府三进与牌坊、两岸三坊一照壁民居、双水车与垂柳 |
 | `xuankong` | 悬空寺 · 恒山 | 日景 / 崖壁贴壁 | 56×40 米：崖壁（中间平壁贴楼阁 + 两侧低模岩山 + 山脊）、三层楼阁悬挑、栈道与斜撑、谷底石渠与山门 |
 | `mogao` | 敦煌莫高窟 | 日景 / 崖壁洞窟 | 60×40 米：砾岩崖壁、三层窟门阵列（拱券 + 壁画色块）、九层楼、三层之字栈道（楼前断开绕行）、塔林五座、宕泉河 |
+| `park` | 欢乐游乐园 | 黄昏 / **全动** | 64×44 米：摩天轮（转 + 座舱竖直）、过山车（闭合轨道 + 3 节车厢）、旋转木马、海盗船、飞椅、小火车 |
 
 ## 快速开始
 
@@ -520,6 +523,23 @@ CT_ANIM.push(function (t) {
 - **宕泉河**：干河床 + 一线残水（水面必须高于地面，否则被埋）。
 
 定稿 91 mesh / 53515 三角，`magenta:[] / errors:[]`；23 套全量回归全绿。
+### 游乐园：六项设施怎么同时动起来
+
+`park` 是第 24 套，也是唯一「全员动画」的一套。核心难点不是建模，是**合批与独立动画的边界**。
+
+- **静态**（地面、入口、摊位、喷泉、鬼屋、人群）走 `Builder` 合批，1 个 mesh。
+- **动态部件**必须单独建 `T.Group`，不能进合批：摩天轮的轮组、12 个座舱、过山车的 3 节车厢、
+  旋转木马的转盘、海盗船的摆臂、飞椅的转盘、小火车 3 节。
+- 动画统一 `CT_ANIM.push(function (t) { ... })`，`t` 是秒。
+
+三个关键做法：
+1. **摩天轮座舱不能挂在轮组下**：挂上去会跟着转、人倒过来。座舱是独立 Group，每帧按角度
+   算 `position`（`cx + cos(a+rot)*R`），`rotation.z = 0` 保持竖直。
+2. **过山车轨道用 `CatmullRomCurve3`（closed）**：`TubeGeometry` 出主梁，再用切线偏移
+   ±0.42 生成两条护栏管；车厢 `curve.getPointAt(u)` + `lookAt(切线)`，三节用 `off` 错开。
+3. **旋转木马的顶棚别做放射长条**：一圈长条会变成「太阳盘」。用圆锥 + 一圈短垂帘（0.4×0.55）。
+
+定稿 337 mesh / 77701 三角，`magenta:[] / errors:[]`；24 套全量回归全绿。
 ### 人物：刻意几何化的积木人
 
 拟真路线（球头 + 锥台躯干 + 分段圆柱四肢）在这套 toon + 描边风格里
@@ -578,7 +598,7 @@ NVIDIA 开源库（`simready-foundation` / SimReady Central，CC BY 4.0）里**�
 
 ```
 build.js            构建器：预设 + 场景模板 + three.js → 单文件 HTML
-src/presets.js      二十三个预设：调色板、灯光、相机、天空、文案
+src/presets.js      二十四个预设：调色板、灯光、相机、天空、文案
 src/scene.js        场景生成器（约 17800 行，全部程序化几何，含统一积木人物工厂 buildFig）
 src/kfc_assets.js   三件 SimReady 资产的紧凑量化几何（构建时内联）
 src/three.min.js    three.js（构建时内联进产物）
@@ -601,7 +621,7 @@ tools/              USD / OBJ → 三渲二 的实验脚本（非构建必需）
 ## 已知取舍
 
 - **单个产物约 1.4~1.5 MB**：three.js 占 630 KB，KFC 另带 74 KB 的 SimReady 资产。换来的是「双击就能看、断网也能看」，这个交换在演示场景里是划算的。
-- **全量预设有 23 个产物约 33 MB**：所以 `dist/` 不进版本库，`docs/` 只放十四个在线演示。
+- **全量预设有 24 个产物约 35 MB**：所以 `dist/` 不进版本库，`docs/` 只放十五个在线演示。
 - **软件渲染下帧率很低**：无 GPU 的截图环境约 3 fps，真机 GPU 上是满帧。
 - **旗舰预设机位拉到 232 米**：外环扩到 134×124 后，相机 `far` 提到 1000、雾推到 130~520，否则远处新区会被裁掉。
 

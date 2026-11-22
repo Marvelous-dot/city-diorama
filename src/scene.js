@@ -15183,6 +15183,7 @@ const TL = !!PS.tulou;
 const LJ = !!PS.lijiang;
 const XS = !!PS.xuankong;
 const MG = !!PS.mogao;
+const YL = !!PS.park;
 
 const TV_X0 = -6.20, TV_X1 = 2.60;    // 进深 8.80（正面 +X）
 const TV_Z0 = -5.60, TV_Z1 = 5.60;    // 面阔 11.20
@@ -20300,12 +20301,585 @@ function buildMgAll() {
   mgLights();
 }
 
+  /* ================= 第 24 套：游乐园（park / YL） =================
+   大型游乐园：摩天轮、环绕全园的过山车、旋转木马、海盗船、飞椅、小火车，全部在动。
+   展台 64×44 米，入口朝南（+z）。
+   ==================================================================== */
+const YL_X0 = -32.0, YL_X1 = 32.0;
+const YL_Z0 = -22.0, YL_Z1 = 22.0;
+const YL_GY = 0.55, YL_BB = -1.60;
+
+function ylR(n) { const s = Math.sin(n * 12.9898) * 43758.5453; return s - Math.floor(s); }
+
+/* ---------------- 展台：草坪 + 环形主路 + 放射支路 ---------------- */
+function ylBase(b) {
+  const w = YL_X1 - YL_X0, d = YL_Z1 - YL_Z0;
+  const layers = [
+    ['ylSoil', YL_GY, YL_GY - 0.52],
+    ['ylSoilD', YL_GY - 0.52, YL_GY - 1.12],
+    ['ylBaseD', YL_GY - 1.12, YL_BB]
+  ];
+  layers.forEach(function (q) {
+    const hh = q[1] - q[2], yy = (q[1] + q[2]) / 2;
+    b.box(q[0], w - 0.02, hh, 0.03, 0, yy, YL_Z1 - 0.015);
+    b.box(q[0], w - 0.02, hh, 0.03, 0, yy, YL_Z0 + 0.015);
+    b.box(q[0], 0.03, hh, d - 0.02, YL_X1 - 0.015, yy, 0);
+    b.box(q[0], 0.03, hh, d - 0.02, YL_X0 + 0.015, yy, 0);
+  });
+  b.box('ylGrass', w - 0.1, 0.10, d - 0.1, 0, YL_GY + 0.04, 0);
+  /* 环形主路：八边形环（用 8 段 box 拼，省一个 Shape） */
+  const R = 13.0, w2 = 4.2;
+  for (let i = 0; i < 8; i++) {
+    const a0 = i / 8 * Math.PI * 2, a1 = (i + 1) / 8 * Math.PI * 2;
+    const x0 = Math.cos(a0) * R, z0 = Math.sin(a0) * R;
+    const x1 = Math.cos(a1) * R, z1 = Math.sin(a1) * R;
+    const len = Math.hypot(x1 - x0, z1 - z0) + 0.6;
+    b.box('ylPath', len, 0.08, w2, (x0 + x1) / 2, YL_GY + 0.10, (z0 + z1) / 2,
+      0, -Math.atan2(z1 - z0, x1 - x0), 0);
+  }
+  /* 放射支路：从主环路通向各项目 */
+  [[0, 1, 8.5], [Math.PI / 4, 1, 9.0], [Math.PI / 2, 1, 7.5], [3 * Math.PI / 4, 1, 8.0],
+   [Math.PI, 1, 9.0], [-Math.PI / 4, 1, 8.0], [-Math.PI / 2, 1, 8.0]]
+    .forEach(function (q) {
+      const len = q[2] + 5.0;
+      b.box('ylPath', len, 0.08, 2.6, Math.cos(q[0]) * (R + len / 2 - 1.0),
+        YL_GY + 0.10, Math.sin(q[0]) * (R + len / 2 - 1.0), 0, -q[0], 0);
+    });
+  /* 中心广场 */
+  b.cyl('ylPath', 7.4, 7.6, 0.10, 32, 0, YL_GY + 0.11, 0);
+  b.cyl('ylPathD', 7.5, 7.7, 0.06, 32, 0, YL_GY + 0.08, 0);
+}
+
+/* ---------------- 入口：拱门 + 售票亭 ---------------- */
+function ylGate(b) {
+  const gz = 20.4;
+  [-5.2, 5.2].forEach(function (dx) {
+    b.box('ylSteelD', 1.0, 0.5, 1.0, dx, YL_GY + 0.25, gz);
+    b.cyl('ylSteel', 0.26, 0.30, 6.2, 8, dx, YL_GY + 3.35, gz);
+  });
+  /* 拱：五段折线 */
+  for (let i = 0; i < 5; i++) {
+    const t0 = i / 5, t1 = (i + 1) / 5;
+    const a0 = Math.PI * t0, a1 = Math.PI * t1;
+    const x0 = Math.cos(a0) * 5.2, y0 = Math.sin(a0) * 2.4;
+    const x1 = Math.cos(a1) * 5.2, y1 = Math.sin(a1) * 2.4;
+    const len = Math.hypot(x1 - x0, y1 - y0);
+    b.box('ylSteel', len + 0.1, 0.42, 0.42, (x0 + x1) / 2, YL_GY + 6.4 + (y0 + y1) / 2, gz,
+      0, 0, Math.atan2(y1 - y0, x1 - x0));
+  }
+  /* 招牌底板与彩灯 */
+  b.box('ylSign', 7.6, 1.5, 0.30, 0, YL_GY + 7.6, gz + 0.10);
+  for (let i = 0; i < 9; i++) {
+    b.sph('ylBulb', 0.14, -3.4 + i * 0.85, YL_GY + 8.36, gz + 0.20, 1, 1, 1);
+  }
+  /* 售票亭两间 */
+  [-8.6, 8.6].forEach(function (dx) {
+    b.box('ylCream', 3.0, 2.6, 2.4, dx, YL_GY + 1.30, gz - 0.6);
+    b.box('ylStripeA', 3.3, 0.16, 2.7, dx, YL_GY + 2.70, gz - 0.6);
+    b.box('ylDark', 1.4, 0.9, 0.10, dx, YL_GY + 1.85, gz + 0.62);
+    b.box('ylWood', 2.2, 0.14, 0.5, dx, YL_GY + 1.20, gz + 0.75);
+  });
+  /* 入口地面 */
+  b.box('ylPath', 16.0, 0.08, 3.0, 0, YL_GY + 0.10, gz + 0.6);
+}
+
+/* ---------------- 条纹布蓬摊位 ---------------- */
+function ylStall(b, x, z, ry, keyA) {
+  const W = 3.2, D = 2.4;
+  b.box('ylWood', W, 0.5, D, x, YL_GY + 0.25, z, 0, ry, 0);
+  [-1, 1].forEach(function (s) {
+    b.box('ylWoodD', 0.12, 2.1, 0.12, x + Math.cos(ry) * s * (W / 2 - 0.2), YL_GY + 1.55,
+      z - Math.sin(ry) * s * (W / 2 - 0.2), 0, ry, 0);
+  });
+  /* 条纹顶：四条交替色 */
+  for (let i = 0; i < 4; i++) {
+    b.box(i % 2 ? keyA : 'ylWhite', W / 4, 0.12, D + 0.5,
+      x + Math.cos(ry) * (-W / 2 + (i + 0.5) * W / 4), YL_GY + 2.66,
+      z - Math.sin(ry) * (-W / 2 + (i + 0.5) * W / 4), 0.18, ry, 0);
+  }
+  /* 柜台 + 货 */
+  b.box('ylWoodD', W - 0.5, 0.66, 0.5, x, YL_GY + 0.60, z + Math.cos(ry) * 0.9, 0, ry, 0);
+  for (let i = 0; i < 4; i++) {
+    b.sph(i % 2 ? 'ylPink' : 'ylYellow', 0.16, x - 0.9 + i * 0.6, YL_GY + 1.00, z + Math.cos(ry) * 0.9, 1, 1, 1);
+  }
+  /* 气球束 */
+  for (let i = 0; i < 3; i++) {
+    b.sph(i === 1 ? 'ylBlue' : 'ylRed', 0.20, x + 1.5 + i * 0.1, YL_GY + 2.4 + i * 0.3, z + 0.4, 1, 1.25, 1);
+  }
+  b.cyl('ylSteel', 0.015, 0.015, 2.0, 4, x + 1.55, YL_GY + 1.4, z + 0.4);
+}
+
+/* ---------------- 鬼屋 ---------------- */
+function ylHaunted(b, x, z) {
+  b.box('ylStoneD', 6.4, 0.4, 5.2, x, YL_GY + 0.20, z);
+  b.box('ylDarkWall', 6.0, 3.6, 4.8, x, YL_GY + 2.0, z);
+  /* 破屋顶：两块斜板 + 缺口 */
+  b.box('ylDark', 6.6, 0.16, 3.0, x, YL_GY + 4.0, z - 1.0, 0.26, 0, 0);
+  b.box('ylDark', 3.0, 0.16, 3.2, x + 1.7, YL_GY + 4.2, z + 1.3, -0.22, 0.1, 0);
+  /* 门洞与两扇歪门 */
+  b.box('ylCaveDark', 1.4, 2.2, 0.12, x, YL_GY + 1.15, z + 2.42);
+  [-1, 1].forEach(function (s) {
+    b.box('ylWoodD', 0.7, 2.1, 0.08, x + s * 0.75, YL_GY + 1.10, z + 2.55, 0, s * 0.35, 0);
+  });
+  /* 招牌：南瓜脸 */
+  b.box('ylSign', 2.4, 0.8, 0.12, x, YL_GY + 3.3, z + 2.55);
+  [-0.6, 0.6].forEach(function (dx) {
+    b.box('ylYellow', 0.22, 0.22, 0.06, x + dx, YL_GY + 3.40, z + 2.63);
+  });
+  b.box('ylYellow', 0.7, 0.14, 0.06, x, YL_GY + 3.14, z + 2.63);
+  /* 枯树两棵 */
+  [[-3.6, 1.6], [3.4, -1.8]].forEach(function (q) {
+    b.cyl('ylBarkDead', 0.14, 0.20, 3.0, 6, x + q[0], YL_GY + 1.5, z + q[1]);
+    b.cyl('ylBarkDead', 0.06, 0.09, 1.4, 5, x + q[0] + 0.4, YL_GY + 2.4, z + q[1], 0, 0, 0.6);
+  });
+}
+
+/* ---------------- 中央喷泉 ---------------- */
+function ylFountain(b) {
+  b.cyl('ylStoneL', 4.2, 4.4, 0.55, 28, 0, YL_GY + 0.28, 0);
+  b.cyl('ylWaterD', 3.9, 3.9, 0.10, 28, 0, YL_GY + 0.52, 0);
+  b.cyl('ylStone', 0.7, 0.9, 1.5, 12, 0, YL_GY + 1.30, 0);
+  b.cyl('ylStoneL', 1.6, 1.3, 0.24, 16, 0, YL_GY + 2.00, 0);
+  b.cyl('ylWaterD', 1.2, 1.2, 0.06, 16, 0, YL_GY + 2.14, 0);
+  /* 水柱与散落水珠（静态示意，动画在 yl2） */
+  for (let i = 0; i < 10; i++) {
+    const a = i / 10 * Math.PI * 2;
+    b.box('ylFoam', 0.10, 0.05, 0.10, Math.cos(a) * 1.4, YL_GY + 2.24, Math.sin(a) * 1.4);
+  }
+}
+
+/* ---------------- 灯柱、长椅、树、垃圾桶 ---------------- */
+function ylProps(b) {
+  const R = 13.0;
+  for (let i = 0; i < 10; i++) {
+    const a = i / 10 * Math.PI * 2 + 0.3;
+    const x = Math.cos(a) * (R + 3.4), z = Math.sin(a) * (R + 3.4);
+    b.cyl('ylSteelD', 0.09, 0.11, 3.6, 8, x, YL_GY + 1.8, z);
+    b.sph('ylBulb', 0.26, x, YL_GY + 3.78, z, 1, 1.1, 1);
+    b.cyl('ylSteel', 0.04, 0.04, 0.2, 6, x, YL_GY + 3.98, z);
+  }
+  /* 长椅 */
+  for (let i = 0; i < 6; i++) {
+    const a = i / 6 * Math.PI * 2 + 0.5;
+    const x = Math.cos(a) * (R + 4.6), z = Math.sin(a) * (R + 4.6);
+    b.box('ylWood', 1.7, 0.10, 0.52, x, YL_GY + 0.48, z, 0, -a, 0);
+    b.box('ylWood', 1.7, 0.42, 0.09, x, YL_GY + 0.68, z - 0.24, 0, -a, 0);
+    [-1, 1].forEach(function (s) {
+      b.box('ylSteelD', 0.08, 0.45, 0.08, x + Math.cos(a) * s * 0.7, YL_GY + 0.24,
+        z + Math.sin(a) * s * 0.7);
+    });
+  }
+  /* 树 */
+  for (let i = 0; i < 9; i++) {
+    const a = i / 9 * Math.PI * 2 + 1.1;
+    const r = 18.0 + (i % 3) * 2.2;
+    const x = Math.cos(a) * r, z = Math.sin(a) * r;
+    b.cyl('ylBark', 0.24, 0.32, 3.4, 8, x, YL_GY + 1.7, z);
+    b.sph('ylLeaf', 1.5, x, YL_GY + 4.2, z, 1.1, 0.85, 1.1);
+    b.sph('ylLeafD', 1.1, x + 0.5, YL_GY + 5.0, z - 0.3, 1.0, 0.8, 1.0);
+  }
+  /* 垃圾桶 */
+  for (let i = 0; i < 5; i++) {
+    const a = i / 5 * Math.PI * 2 + 0.9;
+    b.cyl('ylDark', 0.28, 0.30, 0.75, 8, Math.cos(a) * (R - 2.6), YL_GY + 0.38, Math.sin(a) * (R - 2.6));
+  }
+}
+
+/* ---------------- 人群 ---------------- */
+function ylPeople(b) {
+  const base = { skin: 'ylSkin', hair: 'ylHair', ink: 'ylInk', belt: 'ylBelt', shoe: 'ylShoe', hat: 'none' };
+  function F(o) {
+    const q = {};
+    for (const k in base) q[k] = base[k];
+    for (const k in o) q[k] = o[k];
+    q.b = b;
+    buildFig(q);
+  }
+  const G = YL_GY + 0.12;
+  const spots = [
+    [-2.0, 18.0, 3.0, 'ylRobeA'], [1.4, 17.2, 2.6, 'ylRobeB'], [-9.0, 15.0, 0.4, 'ylRobeC'],
+    [-15.0, 8.0, 1.4, 'ylRobeD'], [-17.4, 2.0, 0.6, 'ylRobeA'], [12.0, 6.0, 2.2, 'ylRobeB'],
+    [16.0, -3.0, -0.8, 'ylRobeC'], [8.6, -9.0, 1.0, 'ylRobeD'], [3.2, -6.0, 2.8, 'ylRobeA'],
+    [-4.0, -8.0, 0.2, 'ylRobeB'], [-11.0, -12.0, 1.8, 'ylRobeC'], [20.0, 9.0, 2.4, 'ylRobeD'],
+    [5.0, 11.0, -1.4, 'ylRobeA'], [-20.0, -2.0, 3.0, 'ylRobeB'], [22.0, 2.0, 0.8, 'ylRobeC']
+  ];
+  spots.forEach(function (q, i) {
+    F({ x: q[0], y: G, z: q[1], ry: q[2], s: 0.88 + (i % 4) * 0.04,
+      pose: i % 3 === 0 ? 'walk' : 'stand', coat: q[3], hat: i % 4 === 0 ? 'cap' : 'none', hatKey: 'ylHat' });
+  });
+  /* 小孩 */
+  [[-1.0, 16.0], [4.2, -3.4], [-13.6, 6.0], [14.0, 1.0]].forEach(function (q) {
+    F({ x: q[0], y: G, z: q[1], ry: 1.0, s: 0.68, coat: 'ylRobeB' });
+  });
+}
+
+/* ================= 动态设施：全部靠 CT_ANIM 驱动 ================= */
+
+/* ---------------- 1. 摩天轮：轮转，座舱保持竖直 ---------------- */
+function ylFerris(g, b) {
+  const cx = 18.0, cz = -10.0, cy = YL_GY + 8.8, R = 7.6;
+  /* 支架：A 字形两组 */
+  [-2.6, 2.6].forEach(function (dz) {
+    [-1, 1].forEach(function (s) {
+      b.cyl('ylSteelD', 0.16, 0.22, 9.6, 8, cx + s * 3.4, YL_GY + 4.8, cz + dz, 0, 0, -s * 0.34);
+    });
+    b.box('ylSteelD', 7.4, 0.26, 0.26, cx, cy - 0.5, cz + dz);
+  });
+  b.cyl('ylSteel', 0.22, 0.22, 5.4, 10, cx, cy, cz, Math.PI / 2, 0, 0);
+  /* 轮组 */
+  const wheel = new T.Group();
+  wheel.position.set(cx, cy, cz);
+  const wb = new Builder();
+  [-0.95, 0.95].forEach(function (dz) {
+    const tor = new T.TorusGeometry(R, 0.13, 6, 44);
+    tor.translate(0, 0, dz);
+    wb.add('ylSteel', tor);
+    for (let i = 0; i < 16; i++) {
+      wb.box('ylSteel', 0.10, R * 2, 0.10, 0, 0, dz, 0, 0, i / 16 * Math.PI);
+    }
+  });
+  /* 轮圈上的彩灯 */
+  for (let i = 0; i < 24; i++) {
+    const a = i / 24 * Math.PI * 2;
+    wb.sph(i % 2 ? 'ylBulb' : 'ylPink', 0.13, Math.cos(a) * R, Math.sin(a) * R, 1.0, 1, 1, 1);
+  }
+  wb.build(wheel, { noOutline: ['ylBulb'] });
+  g.add(wheel);
+
+  /* 12 个座舱：独立 Group，每帧只挪位置不转 */
+  const cabins = [];
+  for (let i = 0; i < 12; i++) {
+    const a = i / 12 * Math.PI * 2;
+    const cg = new T.Group();
+    const cb = new Builder();
+    cb.box(i % 3 === 0 ? 'ylRed' : (i % 3 === 1 ? 'ylYellow' : 'ylBlue'), 1.15, 0.95, 1.15, 0, 0, 0);
+    cb.box('ylWhite', 1.28, 0.16, 1.28, 0, 0.56, 0);
+    cb.box('ylDark', 1.0, 0.28, 1.0, 0, 0.22, 0);
+    cb.cyl('ylSteelD', 0.05, 0.05, 0.55, 5, 0, 0.85, 0);
+    cb.build(cg, { noOutline: [] });
+    g.add(cg);
+    cabins.push({ g: cg, a: a });
+  }
+  CT_ANIM.push(function (t) {
+    const rot = t * 0.20;
+    wheel.rotation.z = rot;
+    cabins.forEach(function (c) {
+      const aa = c.a + rot;
+      c.g.position.set(cx + Math.cos(aa) * R, cy + Math.sin(aa) * R, cz);
+      c.g.rotation.z = 0;
+    });
+  });
+}
+
+/* ---------------- 2. 过山车：环绕全园的闭合轨道 ---------------- */
+function ylCoaster(g, b) {
+  const raw = [
+    [-27.0, 5.2, -15.0], [-12.0, 3.2, -19.0], [4.0, 4.4, -18.5],
+    [18.0, 9.0, -15.0], [27.5, 6.2, -6.0], [28.5, 3.6, 6.0],
+    [20.0, 7.2, 15.5], [6.0, 4.0, 18.5], [-9.0, 8.2, 17.0],
+    [-22.0, 4.0, 11.0], [-28.5, 6.4, 0.0]
+  ];
+  const pts = raw.map(function (p) { return new T.Vector3(p[0], YL_GY + p[1], p[2]); });
+  const curve = new T.CatmullRomCurve3(pts, true, 'catmullrom', 0.5);
+
+  /* 轨道主梁 + 两侧护栏管 */
+  const tube = new T.TubeGeometry(curve, 300, 0.17, 5, true);
+  b.add('ylSteelD', tube);
+  [-0.42, 0.42].forEach(function (side) {
+    const off = [];
+    for (let i = 0; i < 60; i++) {
+      const p = curve.getPointAt(i / 60);
+      const tg = curve.getTangentAt(i / 60);
+      off.push(new T.Vector3(p.x - tg.z * side, p.y + 0.20, p.z + tg.x * side));
+    }
+    const c2 = new T.CatmullRomCurve3(off, true, 'catmullrom', 0.5);
+    b.add('ylSteel', new T.TubeGeometry(c2, 200, 0.05, 4, true));
+  });
+  /* 支撑柱 */
+  for (let i = 0; i < 46; i++) {
+    const p = curve.getPointAt(i / 46);
+    const h = p.y - YL_GY;
+    if (h > 0.5) {
+      b.cyl('ylSteelD', 0.09, 0.11, h, 5, p.x, YL_GY + h / 2, p.z);
+      b.box('ylSteelD', 0.5, 0.10, 0.5, p.x, YL_GY + 0.06, p.z);
+    }
+  }
+  /* 三节车厢 */
+  const cars = [];
+  ['ylRed', 'ylYellow', 'ylBlue'].forEach(function (key, i) {
+    const cg = new T.Group();
+    const cb = new Builder();
+    cb.box(key, 0.95, 0.62, 1.85, 0, 0.36, 0);
+    cb.box('ylDark', 0.82, 0.42, 0.50, 0, 0.74, 0.28);
+    cb.box('ylSteel', 0.72, 0.10, 1.78, 0, 0.02, 0);
+    cb.box('ylDark', 0.10, 0.34, 0.10, 0, 0.62, -0.86);
+    cb.build(cg, { noOutline: [] });
+    g.add(cg);
+    cars.push({ g: cg, off: i * 0.014 });
+  });
+  CT_ANIM.push(function (t) {
+    const base = (t * 0.042) % 1;
+    cars.forEach(function (c) {
+      const u = (base + c.off) % 1;
+      const p = curve.getPointAt(u);
+      const tg = curve.getTangentAt(u);
+      c.g.position.copy(p);
+      c.g.lookAt(p.x + tg.x, p.y + tg.y, p.z + tg.z);
+    });
+  });
+}
+
+/* ---------------- 3. 旋转木马：转盘 + 木马上下 ---------------- */
+function ylCarousel(g, b) {
+  const cx = -17.0, cz = 4.0, R = 4.4;
+  b.cyl('ylStoneL', R + 1.2, R + 1.4, 0.42, 24, cx, YL_GY + 0.21, cz);
+  b.cyl('ylPathD', R + 1.0, R + 1.0, 0.10, 24, cx, YL_GY + 0.47, cz);
+  /* 转盘组：底盘 + 中心柱 + 顶棚 + 8 匹马 */
+  const turn = new T.Group();
+  turn.position.set(cx, YL_GY, cz);
+  const tb = new Builder();
+  tb.cyl('ylWoodD', R + 0.2, R + 0.3, 0.22, 24, 0, 0.58, 0);
+  tb.cyl('ylWood', 0.55, 0.65, 4.2, 12, 0, 2.5, 0);
+  const cone = new T.ConeGeometry(R + 0.25, 1.9, 20);
+  cone.translate(0, 5.3, 0);
+  tb.add('ylStripeA', cone);
+  /* 顶棚垂帘：一圈短布条，别做放射长条（会像太阳盘） */
+  for (let i = 0; i < 20; i++) {
+    const a = i / 20 * Math.PI * 2;
+    tb.box(i % 2 ? 'ylWhite' : 'ylRed', 0.40, 0.55, 0.10,
+      Math.cos(a) * (R + 0.20), 4.02, Math.sin(a) * (R + 0.20), 0, -a + Math.PI / 2, 0);
+  }
+  tb.sph('ylGold', 0.30, 0, 6.5, 0, 1, 1.2, 1);
+  tb.build(turn, { noOutline: [] });
+
+  const horses = [];
+  for (let i = 0; i < 8; i++) {
+    const a = i / 8 * Math.PI * 2;
+    const hg = new T.Group();
+    const hb = new Builder();
+    const body = i % 2 ? 'ylWhite' : 'ylPink';
+    hb.box(body, 0.36, 0.50, 0.98, 0, 1.10, 0);
+    hb.box(body, 0.32, 0.36, 0.36, 0, 1.38, -0.38);
+    hb.box(body, 0.10, 0.12, 0.10, -0.12, 1.56, -0.38);
+    hb.box(body, 0.10, 0.12, 0.10, 0.12, 1.56, -0.38);
+    hb.box('ylGold', 0.05, 0.66, 0.44, 0, 1.20, -0.18);
+    [-0.28, 0.28].forEach(function (dz) {
+      [-0.14, 0.14].forEach(function (dx) {
+        hb.box('ylGold', 0.05, 0.62, 0.05, dx, 0.72, dz);
+      });
+    });
+    hb.build(hg, { noOutline: [] });
+    hg.position.set(Math.cos(a) * R, 0, Math.sin(a) * R);
+    hg.rotation.y = -a;
+    turn.add(hg);
+    horses.push({ g: hg, ph: i * 0.85 });
+  }
+  g.add(turn);
+  CT_ANIM.push(function (t) {
+    turn.rotation.y = t * 0.52;
+    horses.forEach(function (h) {
+      h.g.position.y = Math.sin(t * 2.4 + h.ph) * 0.30;
+    });
+  });
+}
+
+/* ---------------- 4. 海盗船：摆动 ---------------- */
+function ylShip(g, b) {
+  const cx = -21.0, cz = -12.5;
+  [-2.6, 2.6].forEach(function (dz) {
+    [-1, 1].forEach(function (s) {
+      b.cyl('ylSteelD', 0.20, 0.26, 8.2, 8, cx + s * 2.6, YL_GY + 4.1, cz + dz, 0, 0, -s * 0.40);
+    });
+    /* A 字横撑 */
+    b.box('ylSteelD', 4.6, 0.16, 0.16, cx, YL_GY + 4.6, cz + dz);
+  });
+  b.cyl('ylSteel', 0.20, 0.20, 5.4, 10, cx, YL_GY + 7.4, cz, Math.PI / 2, 0, 0);
+  const swing = new T.Group();
+  swing.position.set(cx, YL_GY + 7.4, cz);
+  const sb = new Builder();
+  [-1, 1].forEach(function (s) {
+    sb.cyl('ylSteelD', 0.07, 0.07, 3.2, 5, s * 1.4, -1.6, 0);
+  });
+  sb.box('ylRed', 4.4, 1.05, 1.7, 0, -3.30, 0);
+  sb.box('ylWhite', 4.5, 0.18, 1.8, 0, -2.76, 0);
+  sb.box('ylYellow', 4.2, 0.34, 1.72, 0, -3.84, 0);
+  /* 船头船尾翘起 */
+  [-1, 1].forEach(function (s) {
+    sb.box('ylRed', 0.8, 1.5, 1.6, s * 2.25, -3.10, 0, 0, 0, s * 0.44);
+  });
+  sb.box('ylBlue', 1.7, 1.30, 0.14, 0, -3.25, 0.86);
+  sb.build(swing, { noOutline: [] });
+  g.add(swing);
+  CT_ANIM.push(function (t) { swing.rotation.x = Math.sin(t * 0.82) * 0.58; });
+}
+
+/* ---------------- 5. 旋转飞椅：转动 + 外甩 ---------------- */
+function ylSwingChairs(g, b) {
+  const cx = 14.0, cz = 10.0;
+  b.cyl('ylSteelD', 1.1, 1.4, 0.5, 20, cx, YL_GY + 0.25, cz);
+  b.cyl('ylSteel', 0.22, 0.28, 5.4, 10, cx, YL_GY + 2.7, cz);
+  const turn = new T.Group();
+  turn.position.set(cx, YL_GY + 5.4, cz);
+  const tb = new Builder();
+  const cone = new T.ConeGeometry(1.7, 1.0, 16);
+  cone.translate(0, 0.35, 0);
+  tb.add('ylStripeB', cone);
+  tb.cyl('ylGold', 0.18, 0.24, 0.5, 8, 0, 1.1, 0);
+  tb.build(turn, { noOutline: [] });
+  const chairs = [];
+  for (let i = 0; i < 8; i++) {
+    const a = i / 8 * Math.PI * 2;
+    const cg = new T.Group();
+    const cb = new Builder();
+    cb.cyl('ylSteel', 0.025, 0.025, 2.7, 4, 0, -1.35, 0);
+    cb.box('ylRed', 0.58, 0.12, 0.58, 0, -2.55, 0);
+    cb.box('ylDark', 0.52, 0.55, 0.10, 0, -2.28, -0.26);
+    cb.box('ylYellow', 0.58, 0.10, 0.10, 0, -2.30, 0.28);
+    cb.build(cg, { noOutline: [] });
+    cg.position.set(Math.cos(a) * 2.6, 0, Math.sin(a) * 2.6);
+    turn.add(cg);
+    chairs.push({ g: cg, a: a });
+  }
+  g.add(turn);
+  CT_ANIM.push(function (t) {
+    turn.rotation.y = t * 0.95;
+    const rr = 2.6 + Math.sin(t * 1.7) * 0.32;
+    chairs.forEach(function (c) {
+      c.g.position.set(Math.cos(c.a) * rr, 0, Math.sin(c.a) * rr);
+      c.g.rotation.z = -0.30 - Math.sin(t * 1.7) * 0.10;
+    });
+  });
+}
+
+/* ---------------- 6. 小火车：内环线 ---------------- */
+function ylTrain(g, b) {
+  const pts = [];
+  for (let i = 0; i < 10; i++) {
+    const a = i / 10 * Math.PI * 2;
+    const rr = 8.6 + (i % 2) * 0.7;
+    pts.push(new T.Vector3(Math.cos(a) * rr, YL_GY + 0.55, Math.sin(a) * rr));
+  }
+  const curve = new T.CatmullRomCurve3(pts, true, 'catmullrom', 0.5);
+  /* 轨道：两条细管 + 枕木 */
+  [-0.30, 0.30].forEach(function (side) {
+    const rail = [];
+    for (let i = 0; i < 64; i++) {
+      const p = curve.getPointAt(i / 64);
+      const tg = curve.getTangentAt(i / 64);
+      rail.push(new T.Vector3(p.x - tg.z * side, p.y, p.z + tg.x * side));
+    }
+    const c2 = new T.CatmullRomCurve3(rail, true, 'catmullrom', 0.5);
+    b.add('ylSteelD', new T.TubeGeometry(c2, 160, 0.05, 4, true));
+  });
+  for (let i = 0; i < 40; i++) {
+    const p = curve.getPointAt(i / 40);
+    const tg = curve.getTangentAt(i / 40);
+    b.box('ylWoodD', 0.72, 0.06, 0.16, p.x, p.y - 0.06, p.z, 0, -Math.atan2(tg.z, tg.x) + Math.PI / 2, 0);
+  }
+  /* 车头 + 两节车厢 */
+  const cars = [];
+  const specs = [
+    { key: 'ylRed', len: 1.5, cab: true },
+    { key: 'ylYellow', len: 1.3, cab: false },
+    { key: 'ylBlue', len: 1.3, cab: false }
+  ];
+  specs.forEach(function (sp, i) {
+    const cg = new T.Group();
+    const cb = new Builder();
+    cb.box(sp.key, 0.86, 0.62, sp.len, 0, 0.36, 0);
+    cb.box('ylDark', 0.78, 0.20, sp.len * 0.8, 0, 0.70, 0);
+    if (sp.cab) {
+      cb.box('ylDark', 0.72, 0.55, 0.62, 0, 0.95, 0.28);
+      cb.cyl('ylSteelD', 0.11, 0.13, 0.55, 8, 0, 1.05, -0.38);
+      cb.cyl('ylBulb', 0.09, 0.09, 0.12, 8, 0, 1.10, 0.62);
+    }
+    [-0.28, 0.28].forEach(function (dx) {
+      [-sp.len / 2 + 0.3, sp.len / 2 - 0.3].forEach(function (dz) {
+        cb.cyl('ylDark', 0.16, 0.16, 0.10, 8, dx, 0.16, dz, 0, 0, Math.PI / 2);
+      });
+    });
+    cb.build(cg, { noOutline: [] });
+    g.add(cg);
+    cars.push({ g: cg, off: i * 0.020 });
+  });
+  CT_ANIM.push(function (t) {
+    const base = (t * 0.055) % 1;
+    cars.forEach(function (c) {
+      const u = (base + c.off) % 1;
+      const p = curve.getPointAt(u);
+      const tg = curve.getTangentAt(u);
+      c.g.position.copy(p);
+      c.g.lookAt(p.x + tg.x, p.y + tg.y, p.z + tg.z);
+    });
+  });
+}
+
+/* ---------------- 总装 ---------------- */
+function buildYlAll() {
+  const g = new T.Group();
+  scene.add(g);
+  const b = new Builder();
+
+  ylBase(b);
+  ylGate(b);
+  ylFountain(b);
+  ylProps(b);
+
+  /* 摊位：沿环外侧摆一圈 */
+  ylStall(b, -11.0, 8.6, 0.5, 'ylStripeA');
+  ylStall(b, -6.0, 11.4, 0.9, 'ylStripeB');
+  ylStall(b, 4.0, 12.0, -0.9, 'ylStripeA');
+  ylStall(b, 9.4, 8.4, -0.4, 'ylStripeB');
+  ylStall(b, -12.4, -8.0, 2.3, 'ylStripeB');
+  ylStall(b, 7.6, -9.4, 2.8, 'ylStripeA');
+  ylHaunted(b, -25.0, -5.0);
+  ylPeople(b);
+
+  /* 动态设施 */
+  ylFerris(g, b);
+  ylCoaster(g, b);
+  ylCarousel(g, b);
+  ylShip(g, b);
+  ylSwingChairs(g, b);
+  ylTrain(g, b);
+
+  b.build(g, {
+    noOutline: ['ylBulb', 'ylLeaf', 'ylLeafD', 'ylFoam', 'ylGrass']
+  });
+
+  /* 招牌文字 */
+  const tex = canvasTex(512, 128, function (c, w, h) {
+    c.fillStyle = '#7a1e2a';
+    c.fillRect(0, 0, w, h);
+    c.fillStyle = '#ffe9a8';
+    c.font = 'bold 72px "Microsoft YaHei","SimHei",sans-serif';
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    c.fillText('欢乐游乐园', w / 2, h / 2 + 3);
+  });
+  tex.needsUpdate = true;
+  const m = new T.Mesh(new T.PlaneGeometry(7.0, 1.35), new T.MeshBasicMaterial({ map: tex, side: T.DoubleSide }));
+  m.position.set(0, YL_GY + 7.60, 20.4 + 0.26);
+  g.add(m);
+
+  /* 灯光 */
+  [[0, 6.5, 14.0, 7.0, 22.0], [0, 5.0, 0, 6.0, 20.0], [18, 10.0, -10.0, 5.0, 18.0],
+   [-17, 5.0, 4.0, 4.5, 16.0], [14, 6.0, 10.0, 4.0, 14.0], [-21, 7.0, -12.5, 3.5, 14.0]]
+    .forEach(function (q) {
+      const lp = new T.PointLight(0xffe0b0, q[3], q[4], 2);
+      lp.position.set(q[0], q[1], q[2]);
+      scene.add(lp);
+    });
+}
+
   /* ================= 组装 ================= */
   const TOWER = !!PS.tower;
   const STORE = !!PS.store;
   const CLUB = !!PS.club;
   const WRH = !!PS.wh;
-  if (MG) {
+  if (YL) {
+    buildYlAll();
+  } else if (MG) {
     buildMgAll();
   } else if (XS) {
     buildXsAll();
@@ -20413,7 +20987,9 @@ function buildMgAll() {
 
   /* 室内暖光 */
   const LAMPK = cfg(PS.lampK, 1);
-  if (MG) {
+  if (YL) {
+    /* 游乐园的暖点光已在 buildYlAll() 内按位置布好 */
+  } else if (MG) {
     /* 莫高窟的暖点光已在 buildMgAll() 内按位置布好 */
   } else if (XS) {
     /* 悬空寺的暖点光已在 buildXsAll() 内按位置布好 */
@@ -20613,23 +21189,23 @@ function buildMgAll() {
   }
 
   const VEG = PS.veg || {};
-  const willowPos = cfg(VEG.willows, (STORE || CLUB || JD || CYB || KFC || RL || LN || RW || SEC || DK || TV || ML || GD || TL || LJ || XS || MG) ? [] : [[4.0, -4.35, 0.95], [-6.5, 1.95, 0.72]]);
+  const willowPos = cfg(VEG.willows, (STORE || CLUB || JD || CYB || KFC || RL || LN || RW || SEC || DK || TV || ML || GD || TL || LJ || XS || MG || YL) ? [] : [[4.0, -4.35, 0.95], [-6.5, 1.95, 0.72]]);
   for (let i = 0; i < willowPos.length; i++) {
     scene.add(willow(willowPos[i][0], willowPos[i][1], willowPos[i][2]));
   }
 
-  if (!STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW && !SEC && !DK && !TV && !ML && !GD && !TL && !LJ && !XS && !MG) {
+  if (!STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW && !SEC && !DK && !TV && !ML && !GD && !TL && !LJ && !XS && !MG && !YL) {
     boatGroup = buildBoat(5.9, 1.15, Math.PI / 2 + 0.05);
     scene.add(boatGroup);
   }
 
-  const bamPos = cfg(VEG.bamboo, (STORE || CLUB || WRH || JD || CYB || KFC || RL || LN || RW || SEC || DK || TV || ML || GD || TL || LJ || XS || MG) ? [] : [[-7.0, -4.6, 1.0], [-6.9, 6.9, 0.75]]);
+  const bamPos = cfg(VEG.bamboo, (STORE || CLUB || WRH || JD || CYB || KFC || RL || LN || RW || SEC || DK || TV || ML || GD || TL || LJ || XS || MG || YL) ? [] : [[-7.0, -4.6, 1.0], [-6.9, 6.9, 0.75]]);
   for (let i = 0; i < bamPos.length; i++) scene.add(bamboo(bamPos[i][0], bamPos[i][1], bamPos[i][2]));
-  const potPos = cfg(VEG.pots, (STORE || CLUB || WRH || JD || CYB || KFC || RL || LN || RW || SEC || DK || TV || ML || GD || TL || LJ || XS || MG) ? [] : [[1.85, 2.35], [2.1, -2.55]]);
+  const potPos = cfg(VEG.pots, (STORE || CLUB || WRH || JD || CYB || KFC || RL || LN || RW || SEC || DK || TV || ML || GD || TL || LJ || XS || MG || YL) ? [] : [[1.85, 2.35], [2.1, -2.55]]);
   for (let i = 0; i < potPos.length; i++) scene.add(pot(potPos[i][0], potPos[i][1]));
 
   /* ================= 招牌 / 布幡 / 晾布 ================= */
-  if (!STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW && !SEC && !DK && !TV && !ML && !GD && !TL && !LJ && !XS && !MG) {
+  if (!STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW && !SEC && !DK && !TV && !ML && !GD && !TL && !LJ && !XS && !MG && !YL) {
   const plaqueMat = new T.MeshBasicMaterial({ map: TEX.plaque });
   const psz = cfg(PS.plaqueSize, [1.55, 0.46]);
   const plaque = new T.Mesh(new T.PlaneGeometry(psz[0], psz[1]), plaqueMat);
@@ -20653,7 +21229,7 @@ function buildMgAll() {
     'uniform sampler2D map; varying vec2 vUv;\n' +
     'void main(){ gl_FragColor = texture2D(map, vUv); }';
 
-  if (!TOWER && !STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW && !SEC && !DK && !TV && !ML && !GD && !TL && !LJ && !XS && !MG) {
+  if (!TOWER && !STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW && !SEC && !DK && !TV && !ML && !GD && !TL && !LJ && !XS && !MG && !YL) {
   const bannerMat = new T.ShaderMaterial({
     uniforms: { uTime: bannerUni.uTime, uAmp: { value: 0.11 }, map: { value: TEX.banner } },
     vertexShader: clothVert, fragmentShader: clothFrag, side: T.DoubleSide
@@ -20681,14 +21257,14 @@ function buildMgAll() {
     vertexShader: clothVert, fragmentShader: clothFrag, side: T.DoubleSide
   });
   const cloths = [];
-  if (!TOWER && !STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW && !SEC && !DK && !TV && !ML && !GD && !TL && !LJ && !XS && !MG) for (let i = 0; i < 2; i++) {
+  if (!TOWER && !STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW && !SEC && !DK && !TV && !ML && !GD && !TL && !LJ && !XS && !MG && !YL) for (let i = 0; i < 2; i++) {
     const c = new T.Mesh(new T.PlaneGeometry(0.7, 1.05, 4, 6), clothMat);
     c.position.set(2.62 + i * 0.86, 1.5 - i * 0.05, -1.95);
     c.rotation.y = -0.04 + i * 0.08;
     scene.add(c);
     cloths.push(c);
   }
-  if (!TOWER && !STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW && !SEC && !DK && !TV && !ML && !GD && !TL && !LJ && !XS && !MG) (function () {
+  if (!TOWER && !STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW && !SEC && !DK && !TV && !ML && !GD && !TL && !LJ && !XS && !MG && !YL) (function () {
     const b = new Builder();
     const g = new T.Group();
     b.cyl('woodDark', 0.055, 0.065, 2.15, 6, 2.24, 1.07, -1.95);
@@ -20709,7 +21285,7 @@ function buildMgAll() {
   /* ================= 屋檐铜铃 ================= */
   const bells = [];
   (function () {
-    const pos = (STORE || CLUB || JD || CYB || KFC || RL || LN || RW || SEC || DK || TV || ML || GD || TL || LJ || XS || MG) ? [] : cfg(PS.bellPos, [[2.78, 5.86, 3.08], [2.78, 5.86, -3.86], [-5.98, 5.86, 3.08], [-5.98, 5.86, -3.86]]);
+    const pos = (STORE || CLUB || JD || CYB || KFC || RL || LN || RW || SEC || DK || TV || ML || GD || TL || LJ || XS || MG || YL) ? [] : cfg(PS.bellPos, [[2.78, 5.86, 3.08], [2.78, 5.86, -3.86], [-5.98, 5.86, 3.08], [-5.98, 5.86, -3.86]]);
     for (let i = 0; i < pos.length; i++) {
       const g = new T.Group();
       g.position.set(pos[i][0], pos[i][1], pos[i][2]);
@@ -20740,7 +21316,7 @@ function buildMgAll() {
     patches.push({ m: p, base: op, x0: x, z0: z });
     return p;
   }
-  if (STORE || CLUB || KFC || RL || LN || RW || SEC || DK || TV || ML || GD || TL || LJ || XS || MG) {
+  if (STORE || CLUB || KFC || RL || LN || RW || SEC || DK || TV || ML || GD || TL || LJ || XS || MG || YL) {
     // 玻璃幕面，不做木格窗光斑
   } else if (TOWER) {
     addPatch(4.4, 4.4, -2.05 + 3.2, 1.24, -0.2, 0.1, 0.18);
@@ -20804,7 +21380,7 @@ function buildMgAll() {
     smokes.push(new Smoke(-3.10, 2.20, 6.10, 0.70, 5));
   } else if (JD) {
     smokes.push(new Smoke(DHCX + 0.30, DH_RG + 0.92, DW1 - 0.62, 1.15, 7));
-  } else if (!TOWER && !STORE && !CLUB && !WRH && !CYB && !KFC && !RL && !LN && !RW && !SEC && !DK && !TV && !ML && !GD && !TL && !LJ && !XS && !MG) {
+  } else if (!TOWER && !STORE && !CLUB && !WRH && !CYB && !KFC && !RL && !LN && !RW && !SEC && !DK && !TV && !ML && !GD && !TL && !LJ && !XS && !MG && !YL) {
     smokes.push(new Smoke(-1.62, FL + 0.88, 0.73, 1.0, 6));
     smokes.push(new Smoke(-3.55, FL + 0.66, -2.3, 1.2, 7));
     smokes.push(new Smoke(2.3, F2 + 0.8, -0.5, 0.9, 5));

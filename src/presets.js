@@ -1545,7 +1545,55 @@
       },
       veg: { willows: [], bamboo: [], pots: [] },
       cam: { theta: 0.80, phi: 1.08, dist: 68, target: [0.00, 11.00, -4.00] }
+    },
+    /* ---------------------------------------------------------
+       游乐园（第 24 套：六项动态设施，64×44 米）
+       --------------------------------------------------------- */
+    park: {
+      id: 'park',
+      title: '欢乐游乐园',
+      park: true,
+      figStyle: 'voxel',
+      emis: 1.0,
+      lampK: 1.0,
+      sky: ['#f9e7cf', '#f4cfae', '#dba785', '#8a6a68'],
+      vig: 'rgba(64,42,40,0.24)',
+      shadowSpan: 34.0,
+      shadowFar: 180,
+      palette: {
+        /* 地面 */
+        ylGrass: 0x5c8a3a, ylSoil: 0x8d7556, ylSoilD: 0x63513c, ylBaseD: 0x4a4236,
+        ylPath: 0xd8c9a8, ylPathD: 0xb9a888,
+        /* 钢 / 木 */
+        ylSteel: 0xb8bfc4, ylSteelD: 0x6e767c, ylWood: 0x9a7048, ylWoodD: 0x63432a,
+        /* 糖果色 */
+        ylWhite: 0xf4f1e8, ylRed: 0xd2453c, ylYellow: 0xf0c04a, ylBlue: 0x3f7ec0,
+        ylPink: 0xe88aa6, ylCream: 0xf0e4cc,
+        ylStripeA: 0xd2453c, ylStripeB: 0x3f7ec0,
+        /* 水 / 灯 / 招牌 */
+        ylWaterD: 0x4a8fa0, ylFoam: 0xeaf6f2, ylBulb: 0xfff0b8,
+        ylSign: 0x7a1e2a, ylGold: 0xd8b35e,
+        /* 暗部 */
+        ylDark: 0x2a2622, ylDarkWall: 0x4a4038, ylCaveDark: 0x161210,
+        /* 石 / 树 */
+        ylStone: 0xa9a496, ylStoneD: 0x7d796c, ylStoneL: 0xc9c4b4,
+        ylBark: 0x5e4a34, ylBarkDead: 0x4a4038, ylLeaf: 0x5c8a3a, ylLeafD: 0x44682a,
+        /* 积木人 */
+        ylSkin: 0xe8bd9a, ylHair: 0x2e2823, ylInk: 0x241f1a,
+        ylBelt: 0x4a4238, ylShoe: 0x332c24, ylHat: 0x2a241e,
+        ylRobeA: 0x4e6b78, ylRobeB: 0x9a4638, ylRobeC: 0x6f6a8c, ylRobeD: 0x3f5a48
+      },
+      emit: {},
+      light: {
+        sun:  { color: 0xffd0a0, i: 1.48, pos: [-24.0, 18.0, 12.0] },
+        fill: { color: 0x9ec0e0, i: 0.55, pos: [20.0, 16.0, -14.0] },
+        hemi: { sky: 0xf0d8bc, ground: 0x5c6a4c, i: 0.60 },
+        amb:  { color: 0xb0a090, i: 0.32 }
+      },
+      veg: { willows: [], bamboo: [], pots: [] },
+      cam: { theta: 0.88, phi: 1.00, dist: 82, target: [0.00, 4.50, 0.00] }
     }
   };
+
 
 });
