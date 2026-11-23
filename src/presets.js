@@ -1592,7 +1592,57 @@
       },
       veg: { willows: [], bamboo: [], pots: [] },
       cam: { theta: 0.88, phi: 1.00, dist: 82, target: [0.00, 4.50, 0.00] }
-    }
+    },
+
+    /* 游乐园 · 夜场（同一形制，夜景光照 + 彩灯自发光） */
+    parknight: {
+      id: 'parknight',
+      title: '欢乐游乐园 · 夜场',
+      park: true,
+      figStyle: 'voxel',
+      emis: 1.0,
+      lampK: 1.0,
+      sky: ['#0a1226', '#12203f', '#1b2e52', '#2a4066'],
+      vig: 'rgba(0,0,8,0.44)',
+      shadowSpan: 34.0,
+      shadowFar: 180,
+      palette: {
+        /* 地面 */
+        ylGrass: 0x5c8a3a, ylSoil: 0x8d7556, ylSoilD: 0x63513c, ylBaseD: 0x4a4236,
+        ylPath: 0xd8c9a8, ylPathD: 0xb9a888,
+        /* 钢 / 木 */
+        ylSteel: 0xb8bfc4, ylSteelD: 0x6e767c, ylWood: 0x9a7048, ylWoodD: 0x63432a,
+        /* 糖果色 */
+        ylWhite: 0xf4f1e8, ylRed: 0xd2453c, ylYellow: 0xf0c04a, ylBlue: 0x3f7ec0,
+        ylPink: 0xe88aa6, ylCream: 0xf0e4cc,
+        ylStripeA: 0xd2453c, ylStripeB: 0x3f7ec0,
+        /* 水 / 灯 / 招牌 */
+        ylWaterD: 0x4a8fa0, ylFoam: 0xeaf6f2, ylBulb: 0xfff0b8,
+        ylSign: 0x7a1e2a, ylGold: 0xd8b35e,
+        /* 暗部 */
+        ylDark: 0x2a2622, ylDarkWall: 0x4a4038, ylCaveDark: 0x161210,
+        /* 石 / 树 */
+        ylStone: 0xa9a496, ylStoneD: 0x7d796c, ylStoneL: 0xc9c4b4,
+        ylBark: 0x5e4a34, ylBarkDead: 0x4a4038, ylLeaf: 0x5c8a3a, ylLeafD: 0x44682a,
+        /* 积木人 */
+        ylSkin: 0xe8bd9a, ylHair: 0x2e2823, ylInk: 0x241f1a,
+        ylBelt: 0x4a4238, ylShoe: 0x332c24, ylHat: 0x2a241e,
+        ylRobeA: 0x4e6b78, ylRobeB: 0x9a4638, ylRobeC: 0x6f6a8c, ylRobeD: 0x3f5a48
+      },
+      emit: {
+        ylBulb: { c: 0xfff2c4, e: 0xffc352 },
+        ylWaterD: { c: 0x2f5a66, e: 0x0a1c22 },
+        ylDoor: { c: 0x6d4528, e: 0x201005 }
+      },
+      light: {
+        sun:  { color: 0x9ec4e8, i: 0.34, pos: [-20.0, 26.0, 12.0] },
+        fill: { color: 0x6f8fc0, i: 0.20, pos: [18.0, 14.0, -16.0] },
+        hemi: { sky: 0x2a3e60, ground: 0x1a1e18, i: 0.30 },
+        amb:  { color: 0x40506a, i: 0.18 }
+      },
+      veg: { willows: [], bamboo: [], pots: [] },
+      cam: { theta: 0.88, phi: 1.00, dist: 82, target: [0.00, 4.50, 0.00] }
+    },
   };
 
 

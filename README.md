@@ -46,7 +46,7 @@
 >
 > 水车磨坊 · 溪畔：`https://marvelous-dot.github.io/city-diorama/mill.html`
 >
-> 总览（15 个在线演示）：`https://marvelous-dot.github.io/city-diorama/gallery.html`
+> 总览（16 个在线演示）：`https://marvelous-dot.github.io/city-diorama/gallery.html`
 >
 > 苏州园林 · 一池三山：`https://marvelous-dot.github.io/city-diorama/garden.html`
 >
@@ -59,6 +59,8 @@
 > 敦煌莫高窟：`https://marvelous-dot.github.io/city-diorama/mogao.html`
 >
 > 欢乐游乐园：`https://marvelous-dot.github.io/city-diorama/park.html`
+>
+> 游乐园夜场：`https://marvelous-dot.github.io/city-diorama/parknight.html`
 
 ## 预设
 
@@ -88,6 +90,7 @@
 | `xuankong` | 悬空寺 · 恒山 | 日景 / 崖壁贴壁 | 56×40 米：崖壁（中间平壁贴楼阁 + 两侧低模岩山 + 山脊）、三层楼阁悬挑、栈道与斜撑、谷底石渠与山门 |
 | `mogao` | 敦煌莫高窟 | 日景 / 崖壁洞窟 | 60×40 米：砾岩崖壁、三层窟门阵列（拱券 + 壁画色块）、九层楼、三层之字栈道（楼前断开绕行）、塔林五座、宕泉河 |
 | `park` | 欢乐游乐园 | 黄昏 / **全动** | 64×44 米：摩天轮（转 + 座舱竖直）、过山车（闭合轨道 + 3 节车厢）、旋转木马、海盗船、飞椅、小火车 |
+| `parknight` | 欢乐游乐园 · 夜场 | 夜景 / **全动** | 同 `park` 形制，深蓝天空 + 月光冷调；`emit` 给 `ylBulb` 自发光，摩天轮灯串整圈点亮 |
 
 ## 快速开始
 
@@ -598,7 +601,7 @@ NVIDIA 开源库（`simready-foundation` / SimReady Central，CC BY 4.0）里**�
 
 ```
 build.js            构建器：预设 + 场景模板 + three.js → 单文件 HTML
-src/presets.js      二十四个预设：调色板、灯光、相机、天空、文案
+src/presets.js      二十五个预设：调色板、灯光、相机、天空、文案
 src/scene.js        场景生成器（约 17800 行，全部程序化几何，含统一积木人物工厂 buildFig）
 src/kfc_assets.js   三件 SimReady 资产的紧凑量化几何（构建时内联）
 src/three.min.js    three.js（构建时内联进产物）
@@ -621,7 +624,7 @@ tools/              USD / OBJ → 三渲二 的实验脚本（非构建必需）
 ## 已知取舍
 
 - **单个产物约 1.4~1.5 MB**：three.js 占 630 KB，KFC 另带 74 KB 的 SimReady 资产。换来的是「双击就能看、断网也能看」，这个交换在演示场景里是划算的。
-- **全量预设有 24 个产物约 35 MB**：所以 `dist/` 不进版本库，`docs/` 只放十五个在线演示。
+- **全量预设有 25 个产物约 37 MB**：所以 `dist/` 不进版本库，`docs/` 只放十六个在线演示。
 - **软件渲染下帧率很低**：无 GPU 的截图环境约 3 fps，真机 GPU 上是满帧。
 - **旗舰预设机位拉到 232 米**：外环扩到 134×124 后，相机 `far` 提到 1000、雾推到 130~520，否则远处新区会被裁掉。
 
