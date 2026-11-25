@@ -46,7 +46,7 @@
 >
 > 水车磨坊 · 溪畔：`https://marvelous-dot.github.io/city-diorama/mill.html`
 >
-> 总览（16 个在线演示）：`https://marvelous-dot.github.io/city-diorama/gallery.html`
+> 总览（17 个在线演示）：`https://marvelous-dot.github.io/city-diorama/gallery.html`
 >
 > 苏州园林 · 一池三山：`https://marvelous-dot.github.io/city-diorama/garden.html`
 >
@@ -61,6 +61,8 @@
 > 欢乐游乐园：`https://marvelous-dot.github.io/city-diorama/park.html`
 >
 > 游乐园夜场：`https://marvelous-dot.github.io/city-diorama/parknight.html`
+>
+> 海岛灯塔：`https://marvelous-dot.github.io/city-diorama/lighthouse.html`
 
 ## 预设
 
@@ -91,6 +93,7 @@
 | `mogao` | 敦煌莫高窟 | 日景 / 崖壁洞窟 | 60×40 米：砾岩崖壁、三层窟门阵列（拱券 + 壁画色块）、九层楼、三层之字栈道（楼前断开绕行）、塔林五座、宕泉河 |
 | `park` | 欢乐游乐园 | 黄昏 / **全动** | 64×44 米：摩天轮（转 + 座舱竖直）、过山车（闭合轨道 + 3 节车厢）、旋转木马、海盗船、飞椅、小火车 |
 | `parknight` | 欢乐游乐园 · 夜场 | 夜景 / **全动** | 同 `park` 形制，深蓝天空 + 月光冷调；`emit` 给 `ylBulb` 自发光，摩天轮灯串整圈点亮 |
+| `lighthouse` | 海岛灯塔 | 黄昏 / 海面 | 64×44 米：外延海面收进木边展台、分层岛体（海底基座/沙滩环/草地台地）、10 组低模礁石、木栈桥与船、白色灯塔 + 三道红带 + 旋转光束 |
 
 ## 快速开始
 
@@ -543,6 +546,21 @@ CT_ANIM.push(function (t) {
 3. **旋转木马的顶棚别做放射长条**：一圈长条会变成「太阳盘」。用圆锥 + 一圈短垂帘（0.4×0.55）。
 
 定稿 337 mesh / 77701 三角，`magenta:[] / errors:[]`；24 套全量回归全绿。
+### 海岛灯塔：海与岛怎么接
+
+`lighthouse` 是第 26 套，第一次以「水面」为主体。
+
+- **岛不需要挖海面的洞**：岛体是实心圆柱（海底基座 → 沙滩环 → 草地台地），从海底直接穿出海面
+  （`LH_SEA = 0.15`），视觉上岛就是从海里长出来的。
+- **海面是独立细分平面**（110×80 段），顶点按「近岛浪高、远处平缓」做正弦叠加；
+  用 `MeshToonMaterial` 直接建 Mesh，不进 `Builder`。
+- **海面尺寸与展台的关系**：先试 120×92（超出视野）→ 岛像漂在无边海上，但失去「微缩」感；
+  最后收到 66×46 + 一圈木侧壁（从 `LH_BB` 到 0.95），像水族箱，微缩感回来了。
+- **灯塔比例**：底 r2.52 → 顶 r1.62、高 20（约 1:8），太粗会读成水塔。
+- **礁石**：用 `mgRockHill`（低模多面体）而不是球——球会读成「煤球」。
+- **沙滩上的碎石**别用深岩色，会像铺了黑瓷砖；用 `lhSandD` + 少量 `lhRockL`，高度压到 0.70。
+
+定稿 104 mesh / 26062 三角，`magenta:[] / errors:[]`；26 套全量回归全绿。
 ### 人物：刻意几何化的积木人
 
 拟真路线（球头 + 锥台躯干 + 分段圆柱四肢）在这套 toon + 描边风格里
@@ -601,7 +619,7 @@ NVIDIA 开源库（`simready-foundation` / SimReady Central，CC BY 4.0）里**�
 
 ```
 build.js            构建器：预设 + 场景模板 + three.js → 单文件 HTML
-src/presets.js      二十五个预设：调色板、灯光、相机、天空、文案
+src/presets.js      二十六个预设：调色板、灯光、相机、天空、文案
 src/scene.js        场景生成器（约 17800 行，全部程序化几何，含统一积木人物工厂 buildFig）
 src/kfc_assets.js   三件 SimReady 资产的紧凑量化几何（构建时内联）
 src/three.min.js    three.js（构建时内联进产物）
@@ -624,7 +642,7 @@ tools/              USD / OBJ → 三渲二 的实验脚本（非构建必需）
 ## 已知取舍
 
 - **单个产物约 1.4~1.5 MB**：three.js 占 630 KB，KFC 另带 74 KB 的 SimReady 资产。换来的是「双击就能看、断网也能看」，这个交换在演示场景里是划算的。
-- **全量预设有 25 个产物约 37 MB**：所以 `dist/` 不进版本库，`docs/` 只放十六个在线演示。
+- **全量预设有 26 个产物约 39 MB**：所以 `dist/` 不进版本库，`docs/` 只放十七个在线演示。
 - **软件渲染下帧率很低**：无 GPU 的截图环境约 3 fps，真机 GPU 上是满帧。
 - **旗舰预设机位拉到 232 米**：外环扩到 134×124 后，相机 `far` 提到 1000、雾推到 130~520，否则远处新区会被裁掉。
 

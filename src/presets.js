@@ -1643,6 +1643,49 @@
       veg: { willows: [], bamboo: [], pots: [] },
       cam: { theta: 0.88, phi: 1.00, dist: 82, target: [0.00, 4.50, 0.00] }
     },
+
+    /* 海岛灯塔（第 26 套：海面 + 分层岛体 + 旋转光束，64×44 米） */
+    lighthouse: {
+      id: 'lighthouse',
+      title: '海岛灯塔',
+      lighthouse: true,
+      figStyle: 'voxel',
+      emis: 1.0,
+      lampK: 1.0,
+      sky: ['#f6e2c8', '#f0c9a8', '#d19a86', '#6f7f96'],
+      vig: 'rgba(52,48,52,0.22)',
+      shadowSpan: 34.0,
+      shadowFar: 180,
+      palette: {
+        /* 岛 */
+        lhSand: 0xd8c49a, lhSandD: 0xbfa87f, lhGrass: 0x5c7f42, lhGrassD: 0x486a32,
+        lhRock: 0x6b6559, lhRockD: 0x4a463d, lhRockL: 0x8a8375,
+        lhSoil: 0x6f5540, lhCrop: 0x6f9c3e, lhPath: 0xc9b795,
+        /* 灯塔 */
+        lhWhite: 0xf2efe6, lhRed: 0xc23a32, lhGlass: 0x8ec4d0, lhGold: 0xd8b35e,
+        lhSteelD: 0x6e767c,
+        /* 木 / 瓦 / 石 */
+        lhWood: 0x9a7048, lhWoodD: 0x63432a, lhRoof: 0xb5463a, lhRoofD: 0x8c342c,
+        lhStone: 0xa9a496, lhStoneD: 0x7d796c, lhStoneL: 0xc9c4b4,
+        /* 水 / 布 */
+        lhFoam: 0xeef6f8, lhCloth: 0x4e7ec0, lhCloth2: 0xd0664a, lhBlue: 0x3f7ec0, lhBlueD: 0x3a5a80,
+        /* 积木人 */
+        lhSkin: 0xe8bd9a, lhHair: 0x2e2823, lhInk: 0x241f1a,
+        lhBelt: 0x4a4238, lhShoe: 0x332c24, lhHat: 0x2a241e,
+        lhRobeA: 0x4e6b78, lhRobeB: 0x9a4638, lhRobeC: 0x6f6a8c, lhRobeD: 0x3f5a48
+      },
+      emit: {
+        lhLamp: { c: 0xfff2c4, e: 0xffc352 }
+      },
+      light: {
+        sun:  { color: 0xffdcb0, i: 1.62, pos: [-26.0, 22.0, 16.0] },
+        fill: { color: 0x9ec0e0, i: 0.55, pos: [22.0, 16.0, -14.0] },
+        hemi: { sky: 0xf0e0c8, ground: 0x3c4a52, i: 0.62 },
+        amb:  { color: 0xb0aca4, i: 0.30 }
+      },
+      veg: { willows: [], bamboo: [], pots: [] },
+      cam: { theta: 0.75, phi: 1.12, dist: 74, target: [0.00, 6.00, -3.00] }
+    },
   };
 
 

@@ -15184,6 +15184,7 @@ const LJ = !!PS.lijiang;
 const XS = !!PS.xuankong;
 const MG = !!PS.mogao;
 const YL = !!PS.park;
+const LH = !!PS.lighthouse;
 
 const TV_X0 = -6.20, TV_X1 = 2.60;    // 进深 8.80（正面 +X）
 const TV_Z0 = -5.60, TV_Z1 = 5.60;    // 面阔 11.20
@@ -20872,12 +20873,320 @@ function buildYlAll() {
     });
 }
 
+  /* ================= 第 26 套：海岛灯塔（lighthouse / LH） =================
+   大片海面 + 分层岛体 + 礁石 + 木栈桥 + 灯塔（光束旋转）。
+   展台 64×44 米，岛在中心偏北。
+   ==================================================================== */
+const LH_X0 = -32.0, LH_X1 = 32.0;
+const LH_Z0 = -22.0, LH_Z1 = 22.0;
+const LH_SEA = 0.15;          // 海平面
+const LH_BB = -1.60;
+const LH_GY = 0.92;           // 岛顶草地
+const LH_CX = 0.0, LH_CZ = -3.0;   // 岛心
+
+function lhR(n) { const s = Math.sin(n * 12.9898) * 43758.5453; return s - Math.floor(s); }
+
+/* ---------------- 海面：细分平面 + 顶点起伏 ---------------- */
+function lhSea(g) {
+  const geo = new T.PlaneGeometry(66.0, 46.0, 110, 80);
+  const p = geo.attributes.position;
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i), z = -p.getY(i);
+    /* 岛附近浪高一点，远处平缓 */
+    const d = Math.hypot(x - LH_CX, z - LH_CZ);
+    const amp = 0.10 + Math.max(0, 1 - d / 18) * 0.16;
+    const h = Math.sin(x * 0.32 + z * 0.21) * amp
+      + Math.sin(x * 0.71 - z * 0.53 + 1.7) * amp * 0.55
+      + Math.sin(x * 1.4 + z * 1.1) * amp * 0.22;
+    p.setZ(i, h);
+  }
+  geo.computeVertexNormals();
+  geo.rotateX(-Math.PI / 2);
+  const mat = new T.MeshToonMaterial({ color: 0x2f6f86, gradientMap: GRAD });
+  const m = new T.Mesh(geo, mat);
+  m.position.set(0, LH_SEA, 0);
+  g.add(m);
+  return m;
+}
+
+/* ---------------- 岛体：海底基座 + 沙滩环 + 草地台地 ---------------- */
+function lhIsland(b) {
+  /* 海底基座：深色岩，从海底长出水面 */
+  b.cyl('lhRockD', 12.2, 13.0, 1.6, 30, LH_CX, -0.55, LH_CZ);
+  b.cyl('lhRock', 11.4, 12.0, 0.7, 30, LH_CX, 0.30, LH_CZ);
+  /* 沙滩环：略高于海面，从东侧铺开 */
+  b.cyl('lhSand', 11.0, 11.5, 0.55, 30, LH_CX + 0.6, 0.62, LH_CZ + 0.6);
+  /* 草地台地：偏西北，留出东南沙滩 */
+  b.cyl('lhGrass', 8.6, 9.2, 0.42, 28, LH_CX - 1.2, 1.00, LH_CZ - 1.0);
+  b.cyl('lhGrassD', 6.4, 7.2, 0.22, 24, LH_CX - 2.0, 1.18, LH_CZ - 2.2);
+  /* 台地边缘：一圈碎石，别让圆柱边太齐 */
+  for (let i = 0; i < 26; i++) {
+    const a = i / 26 * Math.PI * 2;
+    const r = 9.0 + lhR(i * 3.1) * 1.6;
+    b.box(i % 4 === 0 ? 'lhRockL' : 'lhSandD', 0.55 + lhR(i * 5.7) * 0.6, 0.20, 0.45,
+      LH_CX - 1.2 + Math.cos(a) * r, 0.70, LH_CZ - 1.0 + Math.sin(a) * r,
+      0, lhR(i * 7.3) * 1.6, 0);
+  }
+  /* 岛边缘浪花：一圈白泡沫 */
+  for (let i = 0; i < 40; i++) {
+    const a = i / 40 * Math.PI * 2;
+    const r = 11.0 + lhR(i * 3.3) * 0.9;
+    b.box('lhFoam', 0.9 + lhR(i * 5.9) * 1.1, 0.05, 0.5,
+      LH_CX + 0.4 + Math.cos(a) * r, LH_SEA + 0.06, LH_CZ + 0.4 + Math.sin(a) * r,
+      0, a + 1.57, 0);
+  }
+}
+
+/* ---------------- 礁石群：岛周围散落 ---------------- */
+function lhRocks(b) {
+  const spots = [
+    [-10.0, 6.0, 1.5], [-12.0, 3.0, 1.0], [10.5, -8.0, 1.2], [12.0, -4.5, 0.8],
+    [-8.0, -12.0, 1.1], [6.0, -13.0, 0.9], [13.0, 2.0, 0.7], [-13.5, -3.0, 0.75],
+    [8.5, 10.0, 0.6], [-6.0, 11.0, 0.65]
+  ];
+  spots.forEach(function (q, k) {
+    const s = q[2];
+    mgRockHill(b, q[0], q[1], s * 1.6, s * 1.5, k * 7.3, k % 2 ? 'lhRock' : 'lhRockD', LH_SEA - s * 0.45);
+    mgRockHill(b, q[0] + s * 0.7, q[1] + s * 0.5, s * 0.9, s * 0.8, k * 11.1, 'lhRockL', LH_SEA - s * 0.30);
+    /* 礁石边的浪花 */
+    for (let i = 0; i < 4; i++) {
+      const a = i / 4 * Math.PI * 2 + k;
+      b.box('lhFoam', 0.7, 0.04, 0.35, q[0] + Math.cos(a) * s * 1.6, LH_SEA + 0.05,
+        q[1] + Math.sin(a) * s * 1.6, 0, a, 0);
+    }
+  });
+}
+
+/* ---------------- 木栈桥 + 小船 ---------------- */
+function lhPier(b) {
+  const x0 = 7.0, x1 = 19.0, z = 5.6, y = 0.62;
+  /* 栈桥板 */
+  b.box('lhWood', x1 - x0, 0.16, 2.4, (x0 + x1) / 2, y, z);
+  b.box('lhWoodD', x1 - x0, 0.10, 0.28, (x0 + x1) / 2, y - 0.12, z + 1.1);
+  /* 桩柱：两排，插入海床 */
+  for (let i = 0; i < 7; i++) {
+    const px = x0 + i * (x1 - x0) / 6;
+    [-1, 1].forEach(function (s) {
+      b.cyl('lhWoodD', 0.13, 0.16, 1.9, 6, px, y - 0.95, z + s * 1.0);
+    });
+    if (i > 0) b.cyl('lhWoodD', 0.10, 0.11, 0.9, 6, px, y + 0.45, z + 1.12);
+  }
+  /* 桥头小灯 */
+  b.cyl('lhSteelD', 0.06, 0.07, 2.2, 6, x1 - 0.4, y + 1.10, z + 1.0);
+  b.sph('lhLamp', 0.20, x1 - 0.4, y + 2.28, z + 1.0, 1, 1.1, 1);
+  /* 小船一艘系在桥边 */
+  const bx = 16.0, bz = 8.6;
+  b.box('lhWhite', 1.1, 0.42, 3.2, bx, LH_SEA + 0.22, bz);
+  b.box('lhBlue', 1.16, 0.20, 3.24, bx, LH_SEA + 0.44, bz);
+  b.box('lhWhite', 0.9, 0.35, 0.8, bx, LH_SEA + 0.55, bz - 0.9);
+  b.cyl('lhWoodD', 0.05, 0.06, 1.0, 5, bx, LH_SEA + 0.9, bz + 0.6);
+  /* 远处一艘帆船 */
+  b.box('lhWhite', 1.4, 0.5, 3.6, -14.0, LH_SEA + 0.25, 12.0);
+  b.cyl('lhWoodD', 0.06, 0.07, 4.2, 5, -14.0, LH_SEA + 2.4, 12.0);
+  b.box('lhCloth', 0.06, 3.0, 1.8, -14.0, LH_SEA + 3.1, 12.0, 0, 0, 0.06);
+}
+
+/* ---------------- 海鸥：绕岛盘旋 ---------------- */
+function lhGulls(g) {
+  const gulls = [];
+  for (let i = 0; i < 7; i++) {
+    const gg = new T.Group();
+    const gb = new Builder();
+    gb.box('lhWhite', 0.18, 0.16, 0.55, 0, 0, 0);
+    gb.box('lhWhite', 0.62, 0.03, 0.22, -0.34, 0.05, 0.02, 0, 0, 0.22);
+    gb.box('lhWhite', 0.62, 0.03, 0.22, 0.34, 0.05, 0.02, 0, 0, -0.22);
+    gb.box('lhGold', 0.06, 0.06, 0.14, 0, 0, 0.34);
+    gb.build(gg, { noOutline: [] });
+    g.add(gg);
+    gulls.push({
+      g: gg, r: 9 + (i % 3) * 3.2, h: 8.5 + (i % 4) * 2.0,
+      ph: i * 0.9, sp: 0.16 + (i % 3) * 0.04
+    });
+  }
+  CT_ANIM.push(function (t) {
+    gulls.forEach(function (q) {
+      const a = q.ph + t * q.sp;
+      q.g.position.set(LH_CX + Math.cos(a) * q.r, q.h + Math.sin(t * 0.8 + q.ph) * 0.8,
+        LH_CZ + Math.sin(a) * q.r);
+      q.g.rotation.y = -a + Math.PI / 2;
+      q.g.rotation.z = Math.sin(t * 2.4 + q.ph) * 0.12;
+    });
+  });
+}
+
+/* ---------------- 灯塔：收分塔身 + 三道红带 + 挑台 + 灯室 ---------------- */
+function lhTower(g, b) {
+  const cx = 0.0, cz = -6.0;
+  /* 石台基 */
+  b.cyl('lhStoneL', 4.4, 4.8, 0.42, 28, cx, LH_GY + 0.21, cz);
+  b.cyl('lhStone', 3.9, 4.2, 0.40, 28, cx, LH_GY + 0.62, cz);
+  b.cyl('lhStoneL', 3.4, 3.7, 0.26, 28, cx, LH_GY + 0.95, cz);
+  /* 台阶四级（朝南） */
+  for (let i = 0; i < 4; i++) {
+    b.box('lhStoneL', 2.2, 0.14, 0.44, cx, LH_GY + 0.20 - i * 0.12, cz + 4.4 + i * 0.42);
+  }
+  /* 塔身：底 r3.0 → 顶 r2.2，高 20 */
+  const Y0 = LH_GY + 1.08, H = 20.0;
+  b.cyl('lhWhite', 1.62, 2.52, H, 28, cx, Y0 + H / 2, cz);
+  /* 红带：三道，半径随高度收分 */
+  [6.4, 11.4, 16.4].forEach(function (dy) {
+    const t = dy / H;
+    const r = 2.52 + (1.62 - 2.52) * t;
+    b.cyl('lhRed', r + 0.04, r + 0.05, 1.05, 28, cx, Y0 + dy, cz);
+  });
+  /* 塔身小窗：螺旋上升 */
+  for (let i = 0; i < 5; i++) {
+    const dy = 3.2 + i * 3.3;
+    const r = 2.52 + (1.62 - 2.52) * (dy / H);
+    b.box('lhGlass', 0.44, 0.62, 0.16, cx + 0.1, Y0 + dy, cz + r - 0.02);
+  }
+  /* 门上雨棚 */
+  b.box('lhWhite', 1.6, 0.14, 0.7, cx, Y0 + 2.30, cz + 2.9);
+  b.box('lhWoodD', 1.2, 2.1, 0.14, cx, Y0 + 1.05, cz + 2.92);
+  /* 挑台 */
+  const TY = Y0 + H;
+  b.cyl('lhStoneL', 3.2, 3.0, 0.30, 26, cx, TY + 0.15, cz);
+  for (let i = 0; i < 16; i++) {
+    const a = i / 16 * Math.PI * 2;
+    b.box('lhSteelD', 0.07, 0.85, 0.07, cx + Math.cos(a) * 3.05, TY + 0.72, cz + Math.sin(a) * 3.05);
+  }
+  b.cyl('lhSteelD', 3.10, 3.10, 0.07, 26, cx, TY + 1.16, cz);
+  /* 灯室：玻璃 + 竖框 */
+  b.cyl('lhWhite', 1.62, 1.72, 0.30, 22, cx, TY + 0.45, cz);
+  b.cyl('lhGlass', 1.52, 1.62, 2.30, 22, cx, TY + 1.75, cz);
+  for (let i = 0; i < 10; i++) {
+    const a = i / 10 * Math.PI * 2;
+    b.box('lhSteelD', 0.08, 2.30, 0.08, cx + Math.cos(a) * 1.60, TY + 1.75, cz + Math.sin(a) * 1.60);
+  }
+  /* 顶盖：红锥 + 金顶珠 */
+  const cone = new T.ConeGeometry(2.15, 1.30, 20);
+  cone.translate(cx, TY + 3.58, cz);
+  b.add('lhRed', cone);
+  b.sph('lhGold', 0.22, cx, TY + 4.36, cz, 1, 1.2, 1);
+  b.cyl('lhSteelD', 0.05, 0.05, 1.6, 5, cx, TY + 5.2, cz);
+  /* 灯（自发光） */
+  b.sph('lhLamp', 0.62, cx, TY + 1.85, cz, 1, 1.25, 1);
+  return { cx: cx, cz: cz, y: TY + 1.85 };
+}
+
+/* ---------------- 守塔人小屋 ---------------- */
+function lhCottage(b, x, z) {
+  const W = 6.4, D = 4.6, H = 3.0, Y = LH_GY + 0.10;
+  b.box('lhStoneL', W + 0.6, 0.30, D + 0.6, x, Y + 0.15, z);
+  b.box('lhWhite', W, H, D, x, Y + 0.30 + H / 2, z);
+  /* 红瓦坡顶 */
+  gdGableRoof(b, 'lhRoof', 'lhRoofD', x, z, W + 0.9, D + 0.9, Y + 0.30 + H, Y + 0.30 + H + 1.7, 'z');
+  /* 门 + 两窗 + 百叶 */
+  b.box('lhWoodD', 1.2, 2.1, 0.14, x - 1.4, Y + 1.35, z + D / 2 + 0.02);
+  [-1.4, 2.2].forEach(function (dx) {
+    b.box('lhGlass', 1.0, 0.9, 0.12, x + dx, Y + 2.05, z + D / 2 + 0.02);
+    b.box('lhBlueD', 1.16, 1.02, 0.06, x + dx, Y + 2.05, z + D / 2 + 0.09);
+    b.box('lhGlass', 1.0, 0.9, 0.10, x + dx, Y + 2.05, z + D / 2 + 0.02);
+  });
+  /* 烟囱 */
+  b.box('lhStoneD', 0.7, 1.5, 0.7, x + 2.0, Y + 4.2, z - 1.0);
+  b.box('lhStoneL', 0.85, 0.16, 0.85, x + 2.0, Y + 4.98, z - 1.0);
+  /* 门前小径 */
+  b.box('lhPath', 1.6, 0.08, 3.6, x - 1.4, LH_GY + 0.12, z + 4.0);
+  /* 晾衣绳与两件衣服 */
+  b.cyl('lhWoodD', 0.06, 0.06, 2.6, 5, x + 3.4, LH_GY + 1.3, z + 1.6);
+  b.cyl('lhWoodD', 0.06, 0.06, 2.6, 5, x + 3.4, LH_GY + 1.3, z - 1.4);
+  b.box('lhCloth', 0.04, 0.7, 0.9, x + 3.4, LH_GY + 1.9, z + 0.9);
+  b.box('lhCloth2', 0.04, 0.6, 0.7, x + 3.4, LH_GY + 1.85, z - 0.6);
+  /* 菜园：三垄 */
+  for (let i = 0; i < 3; i++) {
+    b.box('lhSoil', 3.0, 0.16, 0.7, x - 1.0, LH_GY + 0.14, z - 4.0 - i * 1.1);
+    for (let k = 0; k < 5; k++) {
+      b.sph('lhCrop', 0.16, x - 2.2 + k * 0.6, LH_GY + 0.30, z - 4.0 - i * 1.1, 1, 1.2, 1);
+    }
+  }
+  /* 木栅栏：屋前一段 */
+  for (let i = 0; i < 7; i++) {
+    b.box('lhWoodD', 0.08, 0.9, 0.08, x - 3.6 + i * 1.1, LH_GY + 0.45, z + 4.6);
+  }
+  b.box('lhWood', 7.0, 0.08, 0.06, x - 0.3, LH_GY + 0.72, z + 4.6);
+  b.box('lhWood', 7.0, 0.08, 0.06, x - 0.3, LH_GY + 0.40, z + 4.6);
+}
+
+/* ---------------- 人物 ---------------- */
+function lhPeople(b) {
+  const base = { skin: 'lhSkin', hair: 'lhHair', ink: 'lhInk', belt: 'lhBelt', shoe: 'lhShoe', hat: 'none' };
+  function F(o) {
+    const q = {};
+    for (const k in base) q[k] = base[k];
+    for (const k in o) q[k] = o[k];
+    q.b = b;
+    buildFig(q);
+  }
+  const G = LH_GY + 0.12;
+  F({ x: 0.8, y: G, z: -3.0, ry: 2.9, s: 0.97, coat: 'lhRobeA', hat: 'cap', hatKey: 'lhHat' });
+  F({ x: -6.2, y: G, z: 1.4, ry: 0.4, s: 0.95, coat: 'lhRobeC' });
+  F({ x: 14.6, y: 0.70, z: 6.2, ry: 1.4, s: 0.94, pose: 'walk', coat: 'lhRobeB' });
+  F({ x: 10.2, y: 0.70, z: 5.4, ry: -1.2, s: 0.93, pose: 'walk', coat: 'lhRobeD' });
+  F({ x: -3.4, y: G, z: 5.2, ry: 0.9, s: 0.92, coat: 'lhRobeB' });
+}
+
+/* ---------------- 总装 + 光束 ---------------- */
+function buildLhAll() {
+  const g = new T.Group();
+  scene.add(g);
+  const b = new Builder();
+
+  lhIsland(b);
+  lhRocks(b);
+  lhPier(b);
+  const t = lhTower(g, b);
+  lhCottage(b, -6.4, 4.2);
+  lhPeople(b);
+  lhGulls(g);
+
+  /* 展台边框：海面外延后，靠这一圈木边把「微缩模型」的底座找回来 */
+  const BX = 32.6, BZ = 22.6, BH = 0.95;
+  /* 四面做成从海底到台沿的整块侧壁，像水族箱，而不是浮在水面的木条 */
+  [[0, BZ, BX * 2, 0.62], [0, -BZ, BX * 2, 0.62], [BX, 0, 0.62, BZ * 2], [-BX, 0, 0.62, BZ * 2]]
+    .forEach(function (q) {
+      b.box('lhWoodD', q[2], BH - LH_BB, q[3], q[0], (BH + LH_BB) / 2, q[1]);
+      b.box('lhWood', q[2] + 0.08, 0.14, q[3] + 0.08, q[0], BH + 0.05, q[1]);
+    });
+  b.build(g, { noOutline: ['lhFoam', 'lhCrop', 'lhLamp'] });
+
+  /* 海面（独立 Mesh，便于以后加动画） */
+  const sea = lhSea(g);
+
+  /* 光束：两个锥，绕灯室旋转 */
+  const beam = new T.Group();
+  beam.position.set(t.cx, t.y, t.cz);
+  [-1, 1].forEach(function (s) {
+    const geo = new T.ConeGeometry(4.6, 22, 18, 1, true);
+    geo.rotateZ(-Math.PI / 2 * s);
+    geo.translate(s * 11.0, 0, 0);
+    const m = new T.Mesh(geo, new T.MeshBasicMaterial({
+      color: 0xffe9a0, transparent: true, opacity: 0.17,
+      side: T.DoubleSide, depthWrite: false
+    }));
+    beam.add(m);
+  });
+  g.add(beam);
+  CT_ANIM.push(function (tt) { beam.rotation.y = tt * 0.55; });
+
+  /* 灯光 */
+  [[0, 8.0, 2.0, 5.0, 18.0], [0, 22.0, -6.0, 6.0, 26.0], [-6.4, 4.0, 4.2, 3.0, 10.0],
+   [12.0, 3.0, 5.6, 2.4, 10.0]]
+    .forEach(function (q) {
+      const lp = new T.PointLight(0xffd9a8, q[3], q[4], 2);
+      lp.position.set(q[0], q[1], q[2]);
+      scene.add(lp);
+    });
+}
+
   /* ================= 组装 ================= */
   const TOWER = !!PS.tower;
   const STORE = !!PS.store;
   const CLUB = !!PS.club;
   const WRH = !!PS.wh;
-  if (YL) {
+  if (LH) {
+    buildLhAll();
+  } else if (YL) {
     buildYlAll();
   } else if (MG) {
     buildMgAll();
@@ -20987,7 +21296,9 @@ function buildYlAll() {
 
   /* 室内暖光 */
   const LAMPK = cfg(PS.lampK, 1);
-  if (YL) {
+  if (LH) {
+    /* 灯塔的暖点光已在 buildLhAll() 内按位置布好 */
+  } else if (YL) {
     /* 游乐园的暖点光已在 buildYlAll() 内按位置布好 */
   } else if (MG) {
     /* 莫高窟的暖点光已在 buildMgAll() 内按位置布好 */
@@ -21189,23 +21500,23 @@ function buildYlAll() {
   }
 
   const VEG = PS.veg || {};
-  const willowPos = cfg(VEG.willows, (STORE || CLUB || JD || CYB || KFC || RL || LN || RW || SEC || DK || TV || ML || GD || TL || LJ || XS || MG || YL) ? [] : [[4.0, -4.35, 0.95], [-6.5, 1.95, 0.72]]);
+  const willowPos = cfg(VEG.willows, (STORE || CLUB || JD || CYB || KFC || RL || LN || RW || SEC || DK || TV || ML || GD || TL || LJ || XS || MG || YL || LH) ? [] : [[4.0, -4.35, 0.95], [-6.5, 1.95, 0.72]]);
   for (let i = 0; i < willowPos.length; i++) {
     scene.add(willow(willowPos[i][0], willowPos[i][1], willowPos[i][2]));
   }
 
-  if (!STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW && !SEC && !DK && !TV && !ML && !GD && !TL && !LJ && !XS && !MG && !YL) {
+  if (!STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW && !SEC && !DK && !TV && !ML && !GD && !TL && !LJ && !XS && !MG && !YL && !LH) {
     boatGroup = buildBoat(5.9, 1.15, Math.PI / 2 + 0.05);
     scene.add(boatGroup);
   }
 
-  const bamPos = cfg(VEG.bamboo, (STORE || CLUB || WRH || JD || CYB || KFC || RL || LN || RW || SEC || DK || TV || ML || GD || TL || LJ || XS || MG || YL) ? [] : [[-7.0, -4.6, 1.0], [-6.9, 6.9, 0.75]]);
+  const bamPos = cfg(VEG.bamboo, (STORE || CLUB || WRH || JD || CYB || KFC || RL || LN || RW || SEC || DK || TV || ML || GD || TL || LJ || XS || MG || YL || LH) ? [] : [[-7.0, -4.6, 1.0], [-6.9, 6.9, 0.75]]);
   for (let i = 0; i < bamPos.length; i++) scene.add(bamboo(bamPos[i][0], bamPos[i][1], bamPos[i][2]));
-  const potPos = cfg(VEG.pots, (STORE || CLUB || WRH || JD || CYB || KFC || RL || LN || RW || SEC || DK || TV || ML || GD || TL || LJ || XS || MG || YL) ? [] : [[1.85, 2.35], [2.1, -2.55]]);
+  const potPos = cfg(VEG.pots, (STORE || CLUB || WRH || JD || CYB || KFC || RL || LN || RW || SEC || DK || TV || ML || GD || TL || LJ || XS || MG || YL || LH) ? [] : [[1.85, 2.35], [2.1, -2.55]]);
   for (let i = 0; i < potPos.length; i++) scene.add(pot(potPos[i][0], potPos[i][1]));
 
   /* ================= 招牌 / 布幡 / 晾布 ================= */
-  if (!STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW && !SEC && !DK && !TV && !ML && !GD && !TL && !LJ && !XS && !MG && !YL) {
+  if (!STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW && !SEC && !DK && !TV && !ML && !GD && !TL && !LJ && !XS && !MG && !YL && !LH) {
   const plaqueMat = new T.MeshBasicMaterial({ map: TEX.plaque });
   const psz = cfg(PS.plaqueSize, [1.55, 0.46]);
   const plaque = new T.Mesh(new T.PlaneGeometry(psz[0], psz[1]), plaqueMat);
@@ -21229,7 +21540,7 @@ function buildYlAll() {
     'uniform sampler2D map; varying vec2 vUv;\n' +
     'void main(){ gl_FragColor = texture2D(map, vUv); }';
 
-  if (!TOWER && !STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW && !SEC && !DK && !TV && !ML && !GD && !TL && !LJ && !XS && !MG && !YL) {
+  if (!TOWER && !STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW && !SEC && !DK && !TV && !ML && !GD && !TL && !LJ && !XS && !MG && !YL && !LH) {
   const bannerMat = new T.ShaderMaterial({
     uniforms: { uTime: bannerUni.uTime, uAmp: { value: 0.11 }, map: { value: TEX.banner } },
     vertexShader: clothVert, fragmentShader: clothFrag, side: T.DoubleSide
@@ -21257,14 +21568,14 @@ function buildYlAll() {
     vertexShader: clothVert, fragmentShader: clothFrag, side: T.DoubleSide
   });
   const cloths = [];
-  if (!TOWER && !STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW && !SEC && !DK && !TV && !ML && !GD && !TL && !LJ && !XS && !MG && !YL) for (let i = 0; i < 2; i++) {
+  if (!TOWER && !STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW && !SEC && !DK && !TV && !ML && !GD && !TL && !LJ && !XS && !MG && !YL && !LH) for (let i = 0; i < 2; i++) {
     const c = new T.Mesh(new T.PlaneGeometry(0.7, 1.05, 4, 6), clothMat);
     c.position.set(2.62 + i * 0.86, 1.5 - i * 0.05, -1.95);
     c.rotation.y = -0.04 + i * 0.08;
     scene.add(c);
     cloths.push(c);
   }
-  if (!TOWER && !STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW && !SEC && !DK && !TV && !ML && !GD && !TL && !LJ && !XS && !MG && !YL) (function () {
+  if (!TOWER && !STORE && !CLUB && !WRH && !JD && !CYB && !KFC && !RL && !LN && !RW && !SEC && !DK && !TV && !ML && !GD && !TL && !LJ && !XS && !MG && !YL && !LH) (function () {
     const b = new Builder();
     const g = new T.Group();
     b.cyl('woodDark', 0.055, 0.065, 2.15, 6, 2.24, 1.07, -1.95);
@@ -21285,7 +21596,7 @@ function buildYlAll() {
   /* ================= 屋檐铜铃 ================= */
   const bells = [];
   (function () {
-    const pos = (STORE || CLUB || JD || CYB || KFC || RL || LN || RW || SEC || DK || TV || ML || GD || TL || LJ || XS || MG || YL) ? [] : cfg(PS.bellPos, [[2.78, 5.86, 3.08], [2.78, 5.86, -3.86], [-5.98, 5.86, 3.08], [-5.98, 5.86, -3.86]]);
+    const pos = (STORE || CLUB || JD || CYB || KFC || RL || LN || RW || SEC || DK || TV || ML || GD || TL || LJ || XS || MG || YL || LH) ? [] : cfg(PS.bellPos, [[2.78, 5.86, 3.08], [2.78, 5.86, -3.86], [-5.98, 5.86, 3.08], [-5.98, 5.86, -3.86]]);
     for (let i = 0; i < pos.length; i++) {
       const g = new T.Group();
       g.position.set(pos[i][0], pos[i][1], pos[i][2]);
@@ -21316,7 +21627,7 @@ function buildYlAll() {
     patches.push({ m: p, base: op, x0: x, z0: z });
     return p;
   }
-  if (STORE || CLUB || KFC || RL || LN || RW || SEC || DK || TV || ML || GD || TL || LJ || XS || MG || YL) {
+  if (STORE || CLUB || KFC || RL || LN || RW || SEC || DK || TV || ML || GD || TL || LJ || XS || MG || YL || LH) {
     // 玻璃幕面，不做木格窗光斑
   } else if (TOWER) {
     addPatch(4.4, 4.4, -2.05 + 3.2, 1.24, -0.2, 0.1, 0.18);
@@ -21380,7 +21691,7 @@ function buildYlAll() {
     smokes.push(new Smoke(-3.10, 2.20, 6.10, 0.70, 5));
   } else if (JD) {
     smokes.push(new Smoke(DHCX + 0.30, DH_RG + 0.92, DW1 - 0.62, 1.15, 7));
-  } else if (!TOWER && !STORE && !CLUB && !WRH && !CYB && !KFC && !RL && !LN && !RW && !SEC && !DK && !TV && !ML && !GD && !TL && !LJ && !XS && !MG && !YL) {
+  } else if (!TOWER && !STORE && !CLUB && !WRH && !CYB && !KFC && !RL && !LN && !RW && !SEC && !DK && !TV && !ML && !GD && !TL && !LJ && !XS && !MG && !YL && !LH) {
     smokes.push(new Smoke(-1.62, FL + 0.88, 0.73, 1.0, 6));
     smokes.push(new Smoke(-3.55, FL + 0.66, -2.3, 1.2, 7));
     smokes.push(new Smoke(2.3, F2 + 0.8, -0.5, 0.9, 5));
