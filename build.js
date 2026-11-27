@@ -55,6 +55,27 @@ for (const id of targets) {
     : '';
   const hazeDiv = p.city ? '<div id="haze"></div>' : '';
 
+  /* 星空：夜间题材用 CSS 多层星点，不占场景三角面 */
+  const stars = p.stars
+    ? `  #stars { position: fixed; inset: 0; pointer-events: none;
+         background-image:
+           radial-gradient(3.1px 3.1px at 12% 16%, rgba(255,255,255,0.92), transparent 60%),
+           radial-gradient(2.6px 2.6px at 27% 9%,  rgba(220,235,255,0.80), transparent 60%),
+           radial-gradient(3.5px 3.5px at 41% 22%, rgba(255,255,255,0.88), transparent 60%),
+           radial-gradient(2.4px 2.4px at 58% 12%, rgba(200,220,255,0.75), transparent 60%),
+           radial-gradient(3.3px 3.3px at 71% 19%, rgba(255,255,255,0.86), transparent 60%),
+           radial-gradient(2.6px 2.6px at 84% 8%,  rgba(230,240,255,0.78), transparent 60%),
+           radial-gradient(2.9px 2.9px at 92% 26%, rgba(255,255,255,0.82), transparent 60%),
+           radial-gradient(2.2px 2.2px at 6% 32%,  rgba(210,230,255,0.70), transparent 60%),
+           radial-gradient(2.6px 2.6px at 34% 36%, rgba(255,255,255,0.66), transparent 60%),
+           radial-gradient(2.4px 2.4px at 66% 34%, rgba(220,235,255,0.62), transparent 60%),
+           radial-gradient(2.9px 2.9px at 88% 40%, rgba(255,255,255,0.60), transparent 60%),
+           radial-gradient(2.2px 2.2px at 18% 6%,  rgba(255,255,255,0.55), transparent 60%);
+         opacity: 1.0; }
+`
+    : '';
+  const starsDiv = p.stars ? '<div id="stars"></div>' : '';
+
   const html = `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -67,11 +88,11 @@ for (const id of targets) {
   canvas { display: block; }
   #vig { position: fixed; inset: 0; pointer-events: none;
          background: radial-gradient(78% 72% at 50% 44%, rgba(0,0,0,0) 52%, ${vig} 100%); }
-${haze}</style>
+${haze}${stars}</style>
 </head>
 <body>
 <div id="vig"></div>
-${hazeDiv}
+${hazeDiv}${starsDiv}
 <script>
 ${three}
 </script>

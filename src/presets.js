@@ -1592,7 +1592,8 @@
       },
       veg: { willows: [], bamboo: [], pots: [] },
       cam: { theta: 0.88, phi: 1.00, dist: 82, target: [0.00, 4.50, 0.00] }
-    },
+    }
+,
 
     /* 游乐园 · 夜场（同一形制，夜景光照 + 彩灯自发光） */
     parknight: {
@@ -1686,6 +1687,90 @@
       veg: { willows: [], bamboo: [], pots: [] },
       cam: { theta: 0.75, phi: 1.12, dist: 74, target: [0.00, 6.00, -3.00] }
     },
+
+    /* 海岛灯塔 · 夜场（星空 + 月光 + 旋转光束） */
+    lighthousenight: {
+      id: 'lighthousenight',
+      title: '海岛灯塔 · 夜场',
+      lighthouse: true,
+      stars: true,
+      figStyle: 'voxel',
+      emis: 1.0,
+      lampK: 1.0,
+      sky: ['#050a18', '#0a1430', '#102048', '#0a1428'],
+      vig: 'rgba(0,0,10,0.52)',
+      shadowSpan: 34.0,
+      shadowFar: 180,
+      palette: {
+        /* 岛 */
+        lhSand: 0xd8c49a, lhSandD: 0xbfa87f, lhGrass: 0x5c7f42, lhGrassD: 0x486a32,
+        lhRock: 0x6b6559, lhRockD: 0x4a463d, lhRockL: 0x8a8375,
+        lhSoil: 0x6f5540, lhCrop: 0x6f9c3e, lhPath: 0xc9b795,
+        /* 灯塔 */
+        lhWhite: 0xf2efe6, lhRed: 0xc23a32, lhGlass: 0x8ec4d0, lhGold: 0xd8b35e,
+        lhSteelD: 0x6e767c,
+        /* 木 / 瓦 / 石 */
+        lhWood: 0x9a7048, lhWoodD: 0x63432a, lhRoof: 0xb5463a, lhRoofD: 0x8c342c,
+        lhStone: 0xa9a496, lhStoneD: 0x7d796c, lhStoneL: 0xc9c4b4,
+        /* 水 / 布 */
+        lhFoam: 0xeef6f8, lhCloth: 0x4e7ec0, lhCloth2: 0xd0664a, lhBlue: 0x3f7ec0, lhBlueD: 0x3a5a80,
+        /* 积木人 */
+        lhSkin: 0xe8bd9a, lhHair: 0x2e2823, lhInk: 0x241f1a,
+        lhBelt: 0x4a4238, lhShoe: 0x332c24, lhHat: 0x2a241e,
+        lhRobeA: 0x4e6b78, lhRobeB: 0x9a4638, lhRobeC: 0x6f6a8c, lhRobeD: 0x3f5a48
+      },
+      emit: {
+        lhLamp: { c: 0xfff6d8, e: 0xffd77a },
+        lhGlass: { c: 0x8ec4d0, e: 0x1c2a30 }
+      },
+      light: {
+        sun:  { color: 0x8fb4e0, i: 0.36, pos: [-18.0, 28.0, 14.0] },
+        fill: { color: 0x5878a8, i: 0.14, pos: [20.0, 14.0, -16.0] },
+        hemi: { sky: 0x1a2848, ground: 0x080c12, i: 0.26 },
+        amb:  { color: 0x30405a, i: 0.14 }
+      },
+      veg: { willows: [], bamboo: [], pots: [] },
+      cam: { theta: 0.75, phi: 1.12, dist: 74, target: [0.00, 6.00, -3.00] }
+    },
+
+    hermitage: {
+      id: 'hermitage',
+      title: '依山临溪 · 隐士楼阁',
+      hermitage: true,
+      figStyle: 'voxel',
+      emis: 1.0,
+      lampK: 1.0,
+      sky: ['#f2f5ee', '#e4ebe4', '#cfd9d3', '#a6b4ac'],
+      vig: 'rgba(56,66,58,0.20)',
+      shadowSpan: 30.0,
+      shadowFar: 170,
+      palette: {
+        ysGrass: 0x6e8a52, ysGrassD: 0x57703f,
+        ysSoil: 0x8d7556, ysSoilD: 0x63513c, ysBaseD: 0x4a4236,
+        ysStone: 0xa9a496, ysStoneD: 0x7d796c, ysStoneL: 0xc9c4b4,
+        ysRock: 0x6d7458, ysRockL: 0x8a8f72,
+        ysRiverBed: 0x8a8570, ysWater: 0x4a7a72, ysFoam: 0xeaf4f0, ysPath: 0xc2bda8, ysRockWet: 0x5a655f,
+        ysWood: 0x8a6a45, ysWoodD: 0x6b4f33, ysWall: 0xb89b6c, ysPaperD: 0xd9d2be, ysWoodR: 0x8e3f2e,
+        ysTile: 0x4e5a56, ysTileD: 0x3a4442, ysRidge: 0x2e3634,
+        ysDoor: 0x6b4f33, ysLattice: 0x9a7a4e, ysPaper: 0xe8e2d2,
+        ysGold: 0xc9a95e, ysGoldD: 0x8a7440,
+        ysBamboo: 0x6f8a45, ysBambooLeaf: 0x80a04e,
+        ysBark: 0x5a4632, ysPine: 0x2f4a2a, ysPineD: 0x223820, ysBush: 0x55703c,
+        ysInk: 0x1a1a18, ysWhite: 0xf6f6f2, ysRed: 0xc0392b,
+        ysCeladon: 0x8aa89a, ysBronze: 0x6b6a4a,
+        ysSkin: 0xe8bd9a, ysHair: 0x2e2823, ysBelt: 0x4a4238, ysShoe: 0x332c24,
+        ysRobeA: 0x6b7a8c, ysRobeB: 0x8a9070
+      },
+      emit: {},
+      light: {
+        sun:  { color: 0xfff0d8, i: 1.38, pos: [-20.0, 26.0, 12.0] },
+        fill: { color: 0xc8d8e0, i: 0.52, pos: [18.0, 16.0, -12.0] },
+        hemi: { sky: 0xe8eee6, ground: 0x5a6a4a, i: 0.66 },
+        amb:  { color: 0xb0b8b0, i: 0.32 }
+      },
+      veg: { willows: [], bamboo: [], pots: [] },
+      cam: { theta: 0.52, phi: 1.02, dist: 70, target: [0.00, 10.00, 0.00] }
+    }
   };
 
 

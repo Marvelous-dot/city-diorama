@@ -46,7 +46,7 @@
 >
 > 水车磨坊 · 溪畔：`https://marvelous-dot.github.io/city-diorama/mill.html`
 >
-> 总览（17 个在线演示）：`https://marvelous-dot.github.io/city-diorama/gallery.html`
+> 总览（19 个在线演示）：`https://marvelous-dot.github.io/city-diorama/gallery.html`
 >
 > 苏州园林 · 一池三山：`https://marvelous-dot.github.io/city-diorama/garden.html`
 >
@@ -63,6 +63,10 @@
 > 游乐园夜场：`https://marvelous-dot.github.io/city-diorama/parknight.html`
 >
 > 海岛灯塔：`https://marvelous-dot.github.io/city-diorama/lighthouse.html`
+>
+> 灯塔夜场：`https://marvelous-dot.github.io/city-diorama/lighthouse_night.html`
+>
+> 隐士楼阁：`https://marvelous-dot.github.io/city-diorama/hermitage.html`
 
 ## 预设
 
@@ -94,6 +98,8 @@
 | `park` | 欢乐游乐园 | 黄昏 / **全动** | 64×44 米：摩天轮（转 + 座舱竖直）、过山车（闭合轨道 + 3 节车厢）、旋转木马、海盗船、飞椅、小火车 |
 | `parknight` | 欢乐游乐园 · 夜场 | 夜景 / **全动** | 同 `park` 形制，深蓝天空 + 月光冷调；`emit` 给 `ylBulb` 自发光，摩天轮灯串整圈点亮 |
 | `lighthouse` | 海岛灯塔 | 黄昏 / 海面 | 64×44 米：外延海面收进木边展台、分层岛体（海底基座/沙滩环/草地台地）、10 组低模礁石、木栈桥与船、白色灯塔 + 三道红带 + 旋转光束 |
+| `lighthousenight` | 海岛灯塔 · 夜场 | 夜景 / 海面 | 同 `lighthouse` 形制：星空（CSS 星点）、海色转深蓝、光束加宽减淡、月光反射带 |
+| `hermitage` | 山居 · 隐士楼阁 | 晨雾 / 山水 | 56×44 米：**整个展台是一座山**——北侧三峰（30 / 18 / 17）、南坡五级台地（9.2 / 7.0 / 4.6 / 2.4 / 1.0）、楼阁坐在第二级、约 30 棵松柏成林、山顶瀑布分三级落到山腰、再经凹龛东侧跌到谷底溪 |
 
 ## 快速开始
 
@@ -619,7 +625,7 @@ NVIDIA 开源库（`simready-foundation` / SimReady Central，CC BY 4.0）里**�
 
 ```
 build.js            构建器：预设 + 场景模板 + three.js → 单文件 HTML
-src/presets.js      二十六个预设：调色板、灯光、相机、天空、文案
+src/presets.js      二十八个预设：调色板、灯光、相机、天空、文案
 src/scene.js        场景生成器（约 17800 行，全部程序化几何，含统一积木人物工厂 buildFig）
 src/kfc_assets.js   三件 SimReady 资产的紧凑量化几何（构建时内联）
 src/three.min.js    three.js（构建时内联进产物）
@@ -642,7 +648,7 @@ tools/              USD / OBJ → 三渲二 的实验脚本（非构建必需）
 ## 已知取舍
 
 - **单个产物约 1.4~1.5 MB**：three.js 占 630 KB，KFC 另带 74 KB 的 SimReady 资产。换来的是「双击就能看、断网也能看」，这个交换在演示场景里是划算的。
-- **全量预设有 26 个产物约 39 MB**：所以 `dist/` 不进版本库，`docs/` 只放十七个在线演示。
+- **全量预设有 28 个产物约 43 MB**：所以 `dist/` 不进版本库，`docs/` 只放十九个在线演示。
 - **软件渲染下帧率很低**：无 GPU 的截图环境约 3 fps，真机 GPU 上是满帧。
 - **旗舰预设机位拉到 232 米**：外环扩到 134×124 后，相机 `far` 提到 1000、雾推到 130~520，否则远处新区会被裁掉。
 
